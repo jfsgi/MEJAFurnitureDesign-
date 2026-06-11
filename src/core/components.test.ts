@@ -95,6 +95,63 @@ describe('bench', () => {
   });
 });
 
+describe('stool', () => {
+  const def = REGISTRY['stool'];
+
+  it('shares the seating generator: 4 legs, 4 aprons, solid seat', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Leg')).toHaveLength(4);
+    expect(names.filter((n) => n.startsWith('Apron'))).toHaveLength(4);
+    expect(names.filter((n) => n === 'Seat')).toHaveLength(1);
+  });
+
+  it('does not warn at bar height — tall stools are intentional', () => {
+    const tall = def.generate({ ...defaultParams(def), height: inch(30) });
+    expect(tall.findings).toHaveLength(0);
+  });
+});
+
+describe('cabinet', () => {
+  const def = REGISTRY['cabinet'];
+
+  it('builds the carcase, one door, and one shelf at defaults', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Side')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Top' || n === 'Bottom')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Back panel')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Door')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Shelf')).toHaveLength(1);
+  });
+
+  it('double doors produce two leaves that fill the opening minus reveals', () => {
+    const reveal = inch(0.125);
+    const params = { ...defaultParams(def), doors: 'double', reveal };
+    const model = def.generate(params);
+    const leaves = model.parts.filter((p) => p.name === 'Door');
+    expect(leaves).toHaveLength(2);
+    const innerW = (defaultParams(def).width as number) - 2 * (defaultParams(def).thickness as number);
+    const total = leaves.reduce((sum, l) => sum + l.cut.width, 0) + 3 * reveal;
+    expect(total).toBeCloseTo(innerW, 5);
+  });
+
+  it('scales parametrically: overall bbox follows W/D/H', () => {
+    const params = { ...defaultParams(def), width: inch(30), depth: inch(20), height: inch(48) };
+    const box = modelBBox(def.generate(params))!;
+    expect(box.max[0] - box.min[0]).toBeCloseTo(inch(30), 5);
+    expect(box.max[1] - box.min[1]).toBeCloseTo(inch(20), 5);
+    expect(box.max[2] - box.min[2]).toBeCloseTo(inch(48), 5);
+  });
+
+  it('warns when a single door is too wide for its hinges', () => {
+    const wide = def.generate({ ...defaultParams(def), width: inch(30) });
+    expect(wide.findings.some((f) => f.message.includes('double doors'))).toBe(true);
+    const paired = def.generate({ ...defaultParams(def), width: inch(30), doors: 'double' });
+    expect(paired.findings.some((f) => f.message.includes('double doors'))).toBe(false);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 

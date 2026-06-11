@@ -184,3 +184,10 @@ export const consoleTable = makeTable({
   description: 'Narrow hallway/entry table.',
   defaults: { width: inch(48), depth: inch(16), height: inch(32), legWidth: inch(1.75) },
 });
+
+export const sideTable = makeTable({
+  id: 'side-table',
+  name: 'Side table',
+  description: 'Small table beside a chair or sofa.',
+  defaults: { width: inch(20), depth: inch(18), height: inch(24), legWidth: inch(1.5), overhang: inch(1) },
+});
