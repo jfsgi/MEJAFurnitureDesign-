@@ -68,6 +68,12 @@ function Glyph({ category }: { category: string }) {
           <path d="M8 13c1.5 0 1.5 2 0 2m6-2c1.5 0 1.5 2 0 2m6-2c1.5 0 1.5 2 0 2" />
         </g>
       )}
+      {category === 'Drawers' && (
+        <g {...stroke}>
+          <path d="M4 12l10-4 10 4-10 4z" />
+          <path d="M4 12v6l10 4v-6M24 12v6l-10 4" />
+        </g>
+      )}
       {category === 'Boards & panels' && (
         <g {...stroke}>
           <path d="M4 16l14-6 6 2.5-14 6z" />

@@ -251,6 +251,42 @@ describe('wall shelf with hooks', () => {
   });
 });
 
+describe('drawer box', () => {
+  const def = REGISTRY['drawer-box'];
+
+  it('builds 2 sides, front, back, and a captured bottom', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n.startsWith('Side'))).toHaveLength(2);
+    expect(names.filter((n) => n.startsWith('Front'))).toHaveLength(1);
+    expect(names.filter((n) => n.startsWith('Back'))).toHaveLength(1);
+    expect(names.filter((n) => n === 'Bottom')).toHaveLength(1);
+  });
+
+  it('records the joinery choice on the jointed parts', () => {
+    const base = defaultParams(def);
+    const dovetail = def.generate(base);
+    expect(dovetail.parts.find((p) => p.id === 'front')!.name).toContain('dovetailed');
+    const boxJoint = def.generate({ ...base, joinery: 'box-joint' });
+    expect(boxJoint.parts.find((p) => p.id === 'front')!.name).toContain('box-jointed');
+  });
+
+  it('front and back fit between the sides', () => {
+    const params = defaultParams(def);
+    const model = def.generate(params);
+    const front = model.parts.find((p) => p.id === 'front')!;
+    const expected = (params.width as number) - 2 * (params.sideThickness as number);
+    expect(front.cut.length).toBeCloseTo(expected, 5);
+  });
+
+  it('warns when the depth strands a standard slide length', () => {
+    const odd = def.generate({ ...defaultParams(def), depth: inch(17) });
+    expect(odd.findings.some((f) => f.message.includes('slide'))).toBe(true);
+    const standard = def.generate({ ...defaultParams(def), depth: inch(18) });
+    expect(standard.findings).toHaveLength(0);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 
