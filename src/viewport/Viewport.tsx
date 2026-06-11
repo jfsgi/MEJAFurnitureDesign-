@@ -10,8 +10,9 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { Instance, Primitive } from '../core/types';
 import type { MaterialDef } from '../core/materials';
 import { MATERIAL_BY_ID, MATERIALS } from '../core/materials';
-import { docBBox, evaluateInstance, instanceBBox, type BBox } from '../core/evaluate';
-import { snapMM } from '../core/units';
+import { REGISTRY } from '../core/components/registry';
+import { docBBox, evaluateInstance, instanceBBox, modelBBox, type BBox } from '../core/evaluate';
+import { inch, snapMM } from '../core/units';
 import { useStore } from '../core/store';
 import { grainBoxGeometry, longestAxis, taperedBoxGeometry } from './geometry';
 import { getWoodTexture, grainOffset } from './woodTexture';
@@ -114,6 +115,11 @@ function PrimitiveMesh({
 
 function InstanceGroup({ inst }: { inst: Instance }) {
   const model = useMemo(() => evaluateInstance(inst), [inst]);
+  // Wall-mounted pieces get a patch of wall behind them so they don't float in space.
+  const wallBox = useMemo(
+    () => (REGISTRY[inst.componentId]?.mount === 'wall' ? modelBBox(model) : null),
+    [inst.componentId, model],
+  );
   const selected = useStore((s) => s.selectedId === inst.id);
   const hovered = useStore((s) => s.hoveredId === inst.id && s.selectedId !== inst.id);
   const hoveredPartIds = useStore((s) =>
@@ -202,6 +208,21 @@ function InstanceGroup({ inst }: { inst: Instance }) {
         hover(null);
       }}
     >
+      {wallBox && (
+        <mesh
+          position={[
+            (wallBox.min[0] + wallBox.max[0]) / 2,
+            wallBox.min[1] - 12.5,
+            (wallBox.max[2] + inch(8)) / 2,
+          ]}
+          raycast={() => null}
+        >
+          <boxGeometry
+            args={[wallBox.max[0] - wallBox.min[0] + inch(16), 25, wallBox.max[2] + inch(8)]}
+          />
+          <meshStandardMaterial color="#F2EDE3" roughness={0.95} metalness={0} />
+        </mesh>
+      )}
       {model.parts.map((part) => {
         const mat = MATERIAL_BY_ID[part.material] ?? FALLBACK_MATERIAL;
         return part.primitives.map((prim, i) => (

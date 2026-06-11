@@ -27,6 +27,7 @@ export const wallShelf: ComponentDef = {
       ] },
     { kind: 'count', key: 'hooks', label: 'Hooks', default: 3, min: 0, max: 8, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'white-oak', tier: 'basic' },
+    { kind: 'boolean', key: 'cubby', label: 'Cubbies under the shelf', default: false, tier: 'advanced' },
     { kind: 'length', key: 'depth', label: 'Depth', default: inch(5), min: inch(3), max: inch(10), tier: 'advanced' },
     { kind: 'length', key: 'mountHeight', label: 'Mount height', default: inch(66), min: inch(36), max: inch(84), tier: 'advanced' },
     { kind: 'length', key: 'thickness', label: 'Board thickness', default: inch(0.75), min: inch(0.5), max: inch(1), tier: 'advanced' },
@@ -81,9 +82,41 @@ export const wallShelf: ComponentDef = {
       });
     }
 
-    // Hook rail sits in front of the back panel along the bottom of the frame.
+    // Cubby row under the top shelf: a floor board plus two dividers splitting the
+    // bay into three openings, square-ish like the production tile-shelf variant.
+    const hasCubby = p['cubby'] as boolean;
+    const cubbyH = hasCubby ? Math.min(D, legH - inch(2)) : 0;
+    if (hasCubby) {
+      const bayD = D - (back !== 'open' ? backT : 0);
+      const bayY = (back !== 'open' ? backT : 0) / 2;
+      const floorZ = mount - t - cubbyH;
+      parts.push({
+        id: 'cubby-floor',
+        name: 'Cubby floor',
+        material: mat,
+        primitives: [{ shape: 'box', size: [innerL, bayD, t], at: [0, bayY, floorZ - t / 2] }],
+        cut: { length: innerL, width: bayD, thickness: t },
+      });
+      for (const sx of [-1, 1]) {
+        parts.push({
+          id: `cubby-divider-${sx}`,
+          name: 'Cubby divider',
+          material: mat,
+          primitives: [
+            { shape: 'box', size: [t, bayD, cubbyH], at: [sx * (innerL / 6), bayY, floorZ + cubbyH / 2] },
+          ],
+          cut: { length: cubbyH, width: bayD, thickness: t },
+        });
+      }
+    }
+
+    // Hook rail sits in front of the back panel along the bottom of the frame,
+    // never reaching up into the cubby row.
     const railBackY = -D / 2 + (back !== 'open' ? backT : 0);
-    const railH = Math.min(D, legH);
+    const railH = Math.max(
+      inch(1.5),
+      Math.min(D, legH - (hasCubby ? cubbyH + t : 0)),
+    );
     parts.push({
       id: 'rail',
       name: 'Hook rail',

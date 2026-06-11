@@ -245,6 +245,18 @@ describe('wall shelf with hooks', () => {
     expect(box.max[2]).toBeCloseTo(inch(66), 5);
   });
 
+  it('cubby option adds a floor and two dividers splitting three bays', () => {
+    const base = defaultParams(def);
+    const plain = def.generate(base).parts.length;
+    const model = def.generate({ ...base, cubby: true, legHeight: inch(12) });
+    expect(model.parts.length).toBe(plain + 3);
+    const dividers = model.parts.filter((p) => p.name === 'Cubby divider');
+    expect(dividers).toHaveLength(2);
+    const xs = dividers.map((d) => d.primitives[0].at[0]).sort((a, b) => a - b);
+    expect(xs[0]).toBeCloseTo(-xs[1], 5);
+    expect(model.parts.some((p) => p.name === 'Cubby floor')).toBe(true);
+  });
+
   it('warns when hooks crowd a short shelf', () => {
     const crowded = def.generate({ ...defaultParams(def), length: inch(20), hooks: 6 });
     expect(crowded.findings.some((f) => f.message.includes('crowd'))).toBe(true);
