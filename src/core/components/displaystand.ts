@@ -198,10 +198,12 @@ export const displayStand: ComponentDef = {
       cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: RAIL_T },
     });
 
-    // Shelves: all the same depth as the top, back edges flush with the back of the
-    // legs (the boards run between the legs to the rear plane). Bowed front edge,
-    // short backsplash at the back; middles carry a rail under the front edge (the
-    // top shelf rides the top rails, the bottom shelf the bottom cross supports).
+    // Shelves: full depth — from the rear leg plane to the front arch peak at the
+    // piece's full depth — passing between the raked legs and cantilevering past
+    // the bottom cross piece. Bowed front edge, short backsplash at the back;
+    // middles carry a rail under the front edge (the top shelf rides the top
+    // rails, the bottom shelf the bottom cross supports).
+    const shelfD = D - FRONT_BULGE; // board depth; the bow peaks at the full depth
     for (let i = 0; i < n; i++) {
       const s = surfaces[i];
       const isTop = i === 0;
@@ -213,13 +215,13 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [innerW, topD, t],
-            at: [0, backY + topD / 2, s - t / 2],
+            size: [innerW, shelfD, t],
+            at: [0, backY + shelfD / 2, s - t / 2],
             arch: 'front',
             rise: FRONT_BULGE,
           },
         ],
-        cut: { length: innerW, width: topD + FRONT_BULGE, thickness: t },
+        cut: { length: innerW, width: D, thickness: t },
       });
       const splashH = isTop ? LEG_PROUD : BACKSPLASH_H;
       parts.push({
@@ -240,7 +242,7 @@ export const displayStand: ComponentDef = {
             {
               shape: 'box',
               size: [innerW, t, SHELF_RAIL_H],
-              at: [0, backY + topD - t / 2, s - t - SHELF_RAIL_H / 2],
+              at: [0, backY + shelfD - t / 2, s - t - SHELF_RAIL_H / 2],
             },
           ],
           cut: { length: innerW, width: SHELF_RAIL_H, thickness: t },

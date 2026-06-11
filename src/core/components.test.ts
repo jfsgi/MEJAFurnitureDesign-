@@ -521,16 +521,22 @@ describe('tiered display stand', () => {
     expect(shape('Shelf')).toBe('archedBoard');
   });
 
-  it('shelves are uniform depth and reach the back of the legs', () => {
+  it('shelves run full depth: rear leg plane to the front arch peak', () => {
     const params = defaultParams(def);
     const model = def.generate(params);
+    const D = params.depth as number;
     const shelves = model.parts.filter((p) => p.name === 'Shelf' || p.name === 'Top shelf');
     expect(shelves).toHaveLength(4);
     for (const shelf of shelves) {
-      const prim = shelf.primitives[0] as { at: [number, number, number]; size: [number, number, number] };
-      expect(prim.size[1]).toBeCloseTo(params.topDepth as number, 5);
-      // Back edge flush with the rear plane of the legs.
-      expect(prim.at[1] - prim.size[1] / 2).toBeCloseTo(-(params.depth as number) / 2, 5);
+      const prim = shelf.primitives[0] as {
+        at: [number, number, number];
+        size: [number, number, number];
+        rise: number;
+      };
+      // Back edge flush with the rear plane; bow peak at the full depth.
+      expect(prim.at[1] - prim.size[1] / 2).toBeCloseTo(-D / 2, 5);
+      expect(prim.at[1] + prim.size[1] / 2 + prim.rise).toBeCloseTo(D / 2, 5);
+      expect(shelf.cut.width).toBeCloseTo(D, 5);
     }
   });
 
