@@ -27,6 +27,8 @@ interface State {
 
   selectedId: string | null;
   hoveredId: string | null;
+  /** Specific parts under the cursor (viewport hover or a cut-list row hover). */
+  hoveredPart: { instanceId: string; partIds: string[] } | null;
   workspace: Workspace;
   snap: boolean;
   libraryOpen: boolean;
@@ -44,6 +46,7 @@ interface State {
 
   select(id: string | null): void;
   hover(id: string | null): void;
+  setHoveredPart(p: { instanceId: string; partIds: string[] } | null): void;
   setWorkspace(w: Workspace): void;
   toggleSnap(): void;
   setLibraryOpen(open: boolean): void;
@@ -119,6 +122,7 @@ export const useStore = create<State>()((set, get) => {
 
     selectedId: null,
     hoveredId: null,
+    hoveredPart: null,
     workspace: 'design',
     snap: true,
     libraryOpen: true,
@@ -167,7 +171,8 @@ export const useStore = create<State>()((set, get) => {
     },
 
     select: (id) => set({ selectedId: id }),
-    hover: (id) => set({ hoveredId: id }),
+    hover: (id) => set(id === null ? { hoveredId: null, hoveredPart: null } : { hoveredId: id }),
+    setHoveredPart: (p) => set({ hoveredPart: p }),
     setWorkspace: (w) => set({ workspace: w }),
     toggleSnap: () => set({ snap: !get().snap }),
     setLibraryOpen: (open) => set({ libraryOpen: open }),

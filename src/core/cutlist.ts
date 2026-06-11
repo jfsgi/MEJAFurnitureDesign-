@@ -12,6 +12,8 @@ export interface CutRow {
   width: number;
   thickness: number;
   material: string;
+  /** Ids of the model parts aggregated into this row (hover sync with the viewport). */
+  partIds: string[];
 }
 
 export interface CutGroup {
@@ -29,8 +31,17 @@ export function buildCutList(doc: ProjectDoc): CutGroup[] {
       const row = byKey.get(key);
       if (row) {
         row.qty += 1;
+        row.partIds.push(part.id);
       } else {
-        byKey.set(key, { part: part.name, qty: 1, length, width, thickness, material: part.material });
+        byKey.set(key, {
+          part: part.name,
+          qty: 1,
+          length,
+          width,
+          thickness,
+          material: part.material,
+          partIds: [part.id],
+        });
       }
     }
     return { instance: inst, rows: [...byKey.values()] };

@@ -819,6 +819,40 @@ button {
   color: var(--text-2);
 }
 
+/* ---------- Inspector parts list ---------- */
+
+.parts-list {
+  gap: 0;
+}
+
+.part-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: default;
+}
+
+.part-row:hover {
+  background: var(--accent-subtle);
+}
+
+.part-row-name {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.part-row-dims {
+  color: var(--text-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---------- Viewport zoom tools ---------- */
 
 .viewport-tools {

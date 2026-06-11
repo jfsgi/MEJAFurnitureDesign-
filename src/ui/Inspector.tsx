@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { Instance, ParamDef } from '../core/types';
 import { REGISTRY } from '../core/components/registry';
 import { effectiveParams, evaluateInstance, modelBBox } from '../core/evaluate';
+import { buildCutList } from '../core/cutlist';
 import { MATERIALS } from '../core/materials';
 import { formatLength } from '../core/units';
 import { useStore } from '../core/store';
@@ -136,6 +137,7 @@ function SelectionInspector({ inst }: { inst: Instance }) {
     useStore.getState();
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [partsOpen, setPartsOpen] = useState(false);
 
   const def = REGISTRY[inst.componentId];
   const model = evaluateInstance(inst);
@@ -230,6 +232,36 @@ function SelectionInspector({ inst }: { inst: Instance }) {
                 <RotateIcon /> Rotate 90°
               </button>
             </div>
+          </section>
+        )}
+
+        <button className="expander" onClick={() => setPartsOpen(!partsOpen)} aria-expanded={partsOpen}>
+          {partsOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
+          Parts ({model.parts.length})
+        </button>
+        {partsOpen && (
+          <section
+            className="inspector-section parts-list"
+            onMouseLeave={() => useStore.getState().setHoveredPart(null)}
+          >
+            {buildCutList({ ...useStore.getState().doc, instances: [inst] })[0].rows.map((row, i) => (
+              <div
+                key={i}
+                className="part-row"
+                onMouseEnter={() =>
+                  useStore.getState().setHoveredPart({ instanceId: inst.id, partIds: row.partIds })
+                }
+              >
+                <span className="part-row-name">
+                  {row.qty > 1 ? `${row.qty} × ` : ''}
+                  {row.part}
+                </span>
+                <span className="part-row-dims">
+                  {formatLength(row.length, units)} × {formatLength(row.width, units)} ×{' '}
+                  {formatLength(row.thickness, units)}
+                </span>
+              </div>
+            ))}
           </section>
         )}
 

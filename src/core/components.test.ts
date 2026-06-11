@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { REGISTRY } from './components/registry';
+import { buildCutList } from './cutlist';
 import { defaultParams, modelBBox } from './evaluate';
 import { inch } from './units';
+import type { ProjectDoc } from './types';
 
 describe('component registry', () => {
   it('every component generates parts at its defaults', () => {
@@ -404,6 +406,25 @@ describe('spice rack', () => {
     expect(box.max[2] - box.min[2]).toBeCloseTo(params.height as number, 1);
     // The aligned wedge must not inflate the bbox past the rack's depth.
     expect(box.max[1] - box.min[1]).toBeLessThanOrEqual((params.depth as number) + 1);
+  });
+});
+
+describe('cut list part tracking', () => {
+  it('aggregated rows carry the ids of every part they cover', () => {
+    const doc: ProjectDoc = {
+      schema: 1,
+      name: 'test',
+      units: 'imperial',
+      instances: [
+        { id: 'i1', componentId: 'dining-table', name: 'Table', position: [0, 0], rotationZ: 0, params: {} },
+      ],
+    };
+    const rows = buildCutList(doc)[0].rows;
+    const legs = rows.find((r) => r.part === 'Leg')!;
+    expect(legs.qty).toBe(4);
+    expect(legs.partIds).toHaveLength(4);
+    expect(new Set(legs.partIds).size).toBe(4);
+    for (const row of rows) expect(row.partIds).toHaveLength(row.qty);
   });
 });
 

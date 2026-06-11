@@ -34,13 +34,17 @@ function PrimitiveMesh({
   mat,
   selected,
   hovered,
+  partHovered,
   seed,
+  partId,
 }: {
   prim: Primitive;
   mat: MaterialDef;
   selected: boolean;
   hovered: boolean;
+  partHovered: boolean;
   seed: string;
+  partId: string;
 }) {
   const grainTex = mat.grain ? getWoodTexture(mat.id, prim.shape === 'cylinder') : null;
 
@@ -57,7 +61,8 @@ function PrimitiveMesh({
   useEffect(() => () => geo?.dispose(), [geo]);
 
   // Hover/selection per UI standard §4.2: outline carries the accent; the surface only
-  // brightens neutrally (a color tint would distort wood tones).
+  // brightens neutrally (a color tint would distort wood tones). The exact part under
+  // the cursor brightens a step further than the rest of its assembly.
   const highlight = hovered && !selected;
   const material = (
     <meshStandardMaterial
@@ -65,17 +70,21 @@ function PrimitiveMesh({
       map={grainTex}
       roughness={mat.roughness}
       metalness={mat.metalness}
-      emissive={highlight || selected ? '#ffffff' : '#000000'}
-      emissiveIntensity={highlight ? 0.08 : selected ? 0.04 : 0}
+      emissive={highlight || selected || partHovered ? '#ffffff' : '#000000'}
+      emissiveIntensity={partHovered ? 0.15 : highlight ? 0.08 : selected ? 0.04 : 0}
     />
   );
   const edges = (
-    <Edges threshold={20} color={selected ? '#0F766E' : highlight ? '#14B8A6' : mat.edge} />
+    <Edges
+      threshold={20}
+      color={partHovered ? '#2DD4BF' : selected ? '#0F766E' : highlight ? '#14B8A6' : mat.edge}
+    />
   );
+  const userData = { partId };
 
   if (prim.shape === 'cylinder') {
     return (
-      <mesh position={prim.at} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={prim.at} rotation={[Math.PI / 2, 0, 0]} userData={userData}>
         <cylinderGeometry args={[prim.radiusTop, prim.radiusBottom, prim.height, 32]} />
         {material}
         {edges}
@@ -86,7 +95,7 @@ function PrimitiveMesh({
   const tiltY = prim.shape === 'box' ? (prim.tilt ?? 0) : 0;
   if (geo) {
     return (
-      <mesh position={prim.at} rotation={[tiltX, tiltY, 0]} geometry={geo}>
+      <mesh position={prim.at} rotation={[tiltX, tiltY, 0]} geometry={geo} userData={userData}>
         {material}
         {edges}
       </mesh>
@@ -95,7 +104,7 @@ function PrimitiveMesh({
   // Only ungrained boxes reach here (cylinders returned above; tapered/grained use `geo`).
   if (prim.shape !== 'box') return null;
   return (
-    <mesh position={prim.at} rotation={[tiltX, tiltY, 0]}>
+    <mesh position={prim.at} rotation={[tiltX, tiltY, 0]} userData={userData}>
       <boxGeometry args={prim.size} />
       {material}
       {edges}
@@ -107,10 +116,26 @@ function InstanceGroup({ inst }: { inst: Instance }) {
   const model = useMemo(() => evaluateInstance(inst), [inst]);
   const selected = useStore((s) => s.selectedId === inst.id);
   const hovered = useStore((s) => s.hoveredId === inst.id && s.selectedId !== inst.id);
+  const hoveredPartIds = useStore((s) =>
+    s.hoveredPart?.instanceId === inst.id ? s.hoveredPart.partIds : null,
+  );
   const snap = useStore((s) => s.snap);
   const units = useStore((s) => s.doc.units);
-  const { select, hover, setPosition, beginGesture, endGesture } = useStore.getState();
+  const { select, hover, setHoveredPart, setPosition, beginGesture, endGesture } =
+    useStore.getState();
   useCursor(hovered, 'grab');
+
+  const lastPartId = useRef<string | null>(null);
+  const trackPart = (e: ThreeEvent<PointerEvent>) => {
+    const partId =
+      (e.object.userData?.partId as string | undefined) ??
+      (e.object.parent?.userData?.partId as string | undefined) ??
+      null;
+    if (partId !== lastPartId.current) {
+      lastPartId.current = partId;
+      setHoveredPart(partId ? { instanceId: inst.id, partIds: [partId] } : null);
+    }
+  };
 
   const drag = useRef<{ start: [number, number]; base: [number, number]; moved: boolean } | null>(
     null,
@@ -129,7 +154,10 @@ function InstanceGroup({ inst }: { inst: Instance }) {
 
   const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
     const d = drag.current;
-    if (!d) return;
+    if (!d) {
+      trackPart(e);
+      return;
+    }
     e.stopPropagation();
     const gp = groundFromRay(e.ray);
     if (!gp) return;
@@ -167,8 +195,12 @@ function InstanceGroup({ inst }: { inst: Instance }) {
       onPointerOver={(e) => {
         e.stopPropagation();
         hover(inst.id);
+        trackPart(e);
       }}
-      onPointerOut={() => hover(null)}
+      onPointerOut={() => {
+        lastPartId.current = null;
+        hover(null);
+      }}
     >
       {model.parts.map((part) => {
         const mat = MATERIAL_BY_ID[part.material] ?? FALLBACK_MATERIAL;
@@ -179,7 +211,9 @@ function InstanceGroup({ inst }: { inst: Instance }) {
             mat={mat}
             selected={selected}
             hovered={hovered}
+            partHovered={hoveredPartIds?.includes(part.id) ?? false}
             seed={`${inst.id}/${part.id}/${i}`}
+            partId={part.id}
           />
         ));
       })}
