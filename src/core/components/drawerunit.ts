@@ -87,7 +87,7 @@ export const drawerUnit: ComponentDef = {
         { value: 'inset', label: 'Inset' },
         { value: 'overlay', label: 'Overlay' },
       ] },
-    { kind: 'boolean', key: 'pulls', label: 'Finger pull cutouts', default: true, tier: 'advanced' },
+    { kind: 'boolean', key: 'pulls', label: 'Finger pull cutouts', default: false, tier: 'advanced' },
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
     { kind: 'enum', key: 'caseJoinery', label: 'Case joinery', default: 'half-blind-dovetail', tier: 'advanced',
       options: [

@@ -417,17 +417,17 @@ describe('drawer unit', () => {
     expect(butt.parts.find((p) => p.id === 'top')!.name).toBe('Top');
   });
 
-  it('fronts scoop a finger pull in the top middle by default', () => {
+  it('pull cutouts are opt-in: plain fronts by default, scoop when enabled', () => {
     const base = defaultParams(def);
-    const front = def.generate(base).parts.find((p) => p.name.startsWith('Drawer front'))!;
+    const plain = def.generate(base).parts.find((p) => p.name.startsWith('Drawer front'))!;
+    expect(plain.primitives[0].shape).toBe('box');
+    const front = def
+      .generate({ ...base, pulls: true })
+      .parts.find((p) => p.name.startsWith('Drawer front'))!;
     const prim = front.primitives[0] as { shape: string; arch?: string; at: [number, number, number] };
     expect(prim.shape).toBe('archedBoard');
     expect(prim.arch).toBe('scoop');
     expect(prim.at[0]).toBeCloseTo(0, 5); // centered on the single column
-    const plain = def
-      .generate({ ...base, pulls: false })
-      .parts.find((p) => p.name.startsWith('Drawer front'))!;
-    expect(plain.primitives[0].shape).toBe('box');
   });
 
   it('back panel insets 1/4" from the rear of the box', () => {
@@ -494,13 +494,13 @@ describe('storage tower', () => {
     expect(names.filter((n) => n === 'Fixed shelf')).toHaveLength(1);
   });
 
-  it('drawer fronts carry scooped pulls by default, backs stay solid', () => {
-    const model = def.generate(defaultParams(def));
-    const fronts = model.parts.filter((p) => p.name === 'Drawer end (pull)');
-    const backs = model.parts.filter((p) => p.name === 'Drawer end');
+  it('pulls are opt-in: solid box fronts by default, scooped when enabled', () => {
+    const plain = def.generate(defaultParams(def));
+    expect(plain.parts.filter((p) => p.name === 'Drawer end (pull)')).toHaveLength(0);
+    expect(plain.parts.filter((p) => p.name === 'Drawer end')).toHaveLength(12);
+    const pulled = def.generate({ ...defaultParams(def), pulls: true });
+    const fronts = pulled.parts.filter((p) => p.name === 'Drawer end (pull)');
     expect(fronts).toHaveLength(6);
-    expect(backs).toHaveLength(6);
-    expect(fronts[0].primitives.length).toBeGreaterThanOrEqual(1);
     expect((fronts[0].primitives[0] as { arch?: string }).arch).toBe('scoop');
   });
 

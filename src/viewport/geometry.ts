@@ -97,13 +97,21 @@ export function archedBoardGeometry(
   }
 
   if (arch === 'scoop') {
-    // Finger pull: a smooth cosine scoop cut down into the top edge between the
-    // shoulders — the shaper-cutter wave, not a square notch.
+    // Finger pull, to the shop pattern: a flat-bottomed scoop with smooth
+    // S-curve shoulders easing back up to the top edge.
     const c = Math.max(hx - shoulder, 1);
-    const ztAt = (x: number) =>
-      Math.abs(x) >= c ? hz : hz - rise * 0.5 * (1 + Math.cos((Math.PI * x) / c));
+    const sCurve = Math.min(c * 0.4, Math.max(rise * 1.8, 1));
+    const flatHalf = c - sCurve;
+    const ztAt = (x: number) => {
+      const ax = Math.abs(x);
+      if (ax >= c) return hz;
+      if (ax <= flatHalf) return hz - rise;
+      const tt = (ax - flatHalf) / sCurve;
+      return hz - rise * 0.5 * (1 + Math.cos(Math.PI * tt));
+    };
+    const segments = ARC_SEGMENTS * 2; // the S-curves need the extra samples
     const xs: number[] = [-hx];
-    for (let i = 0; i <= ARC_SEGMENTS; i++) xs.push(-c + (2 * c * i) / ARC_SEGMENTS);
+    for (let i = 0; i <= segments; i++) xs.push(-c + (2 * c * i) / segments);
     xs.push(hx);
     for (let i = 0; i < xs.length - 1; i++) {
       const [x0, x1] = [xs[i], xs[i + 1]];
