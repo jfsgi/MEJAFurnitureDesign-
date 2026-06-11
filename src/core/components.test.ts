@@ -497,6 +497,18 @@ describe('tiered display stand', () => {
     expect(bottomUnderside).toBeCloseTo(inch(2.4375) + inch(2.5), 3); // seated on the rails
   });
 
+  it('side rails enclose the shelf ends flush: leg tops above, shelf surface below', () => {
+    const model = def.generate(defaultParams(def));
+    const t = defaultParams(def).thickness as number;
+    const topRail = model.parts.find((p) => p.name === 'Side rail (top)')!;
+    const topPrim = topRail.primitives[0] as { at: [number, number, number]; size: [number, number, number] };
+    expect(topPrim.at[2] + topPrim.size[2] / 2).toBeCloseTo(inch(38), 3); // flush with proud legs
+    const botRail = model.parts.find((p) => p.name === 'Side rail (bottom)')!;
+    const botPrim = botRail.primitives[0] as { at: [number, number, number]; size: [number, number, number] };
+    const bottomShelfSurface = inch(2.4375) + inch(2.5) + t;
+    expect(botPrim.at[2] + botPrim.size[2] / 2).toBeCloseTo(bottomShelfSurface, 3);
+  });
+
   it('arches where the drawing has them: front rail, side rails, shelf fronts', () => {
     const model = def.generate(defaultParams(def));
     const shape = (name: string, id?: string) =>

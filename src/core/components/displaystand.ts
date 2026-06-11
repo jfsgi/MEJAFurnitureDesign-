@@ -105,11 +105,13 @@ export const displayStand: ComponentDef = {
       (_, i) => sTop - ((sTop - sBottom) * i) / (n - 1),
     );
 
-    // Side rails tie each back leg to its raked leg under the top shelf and at the
-    // bottom; lower edges arched, lengths measured at the lower edge so the front
-    // end runs inside the raked leg like a tenon.
-    const sideTopZ = sTop - t - SIDE_TOP_RAIL_H / 2;
-    const sideTopLen = outerAt(sTop - t - SIDE_TOP_RAIL_H) - 2 * legD;
+    // Side rails tie each back leg to its raked leg and enclose the shelf ends:
+    // the top pair runs flush with the proud leg tops (a gallery with the
+    // backsplash), the bottom pair flush with the bottom shelf's top surface.
+    // Lower edges arched; lengths measured at the lower edge so the front end
+    // runs inside the raked leg like a tenon.
+    const sideTopZ = H - SIDE_TOP_RAIL_H / 2;
+    const sideTopLen = outerAt(H - SIDE_TOP_RAIL_H) - 2 * legD;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-top-${sx}`,
@@ -128,7 +130,7 @@ export const displayStand: ComponentDef = {
         cut: { length: sideTopLen, width: SIDE_TOP_RAIL_H, thickness: RAIL_T },
       });
     }
-    const sideBotLen = outerAt(BOTTOM_RAIL_Z) - 2 * legD;
+    const sideBotLen = outerAt(sBottom - SIDE_BOTTOM_RAIL_H) - 2 * legD;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-bottom-${sx}`,
@@ -138,7 +140,7 @@ export const displayStand: ComponentDef = {
           {
             shape: 'archedBoard',
             size: [RAIL_T, sideBotLen, SIDE_BOTTOM_RAIL_H],
-            at: [sx * legX, backY + legD + sideBotLen / 2, BOTTOM_RAIL_Z + SIDE_BOTTOM_RAIL_H / 2],
+            at: [sx * legX, backY + legD + sideBotLen / 2, sBottom - SIDE_BOTTOM_RAIL_H / 2],
             arch: 'bottom-y',
             rise: inch(0.75),
             shoulder: inch(1),
