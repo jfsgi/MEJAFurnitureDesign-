@@ -110,6 +110,10 @@ export const displayStand: ComponentDef = {
     // runs inside the raked leg like a tenon.
     const sideTopZ = H - SIDE_TOP_RAIL_H / 2;
     const sideTopLen = outerAt(H - SIDE_TOP_RAIL_H) - 2 * legD;
+    // Rails are leg-thickness stock, but the rendered boards sit a hair under it:
+    // their ends run inside the raked leg like a tenon, and dead-flush faces would
+    // ghost the buried outline through the leg's surface.
+    const railT = legW - 1;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-top-${sx}`,
@@ -118,7 +122,7 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [legW, sideTopLen, SIDE_TOP_RAIL_H],
+            size: [railT, sideTopLen, SIDE_TOP_RAIL_H],
             at: [sx * legX, backY + legD + sideTopLen / 2, sideTopZ],
             arch: 'bottom-y',
             rise: ARCH_RISE_SIDE,
@@ -137,7 +141,7 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [legW, sideBotLen, SIDE_BOTTOM_RAIL_H],
+            size: [railT, sideBotLen, SIDE_BOTTOM_RAIL_H],
             at: [sx * legX, backY + legD + sideBotLen / 2, sBottom - SIDE_BOTTOM_RAIL_H / 2],
             arch: 'bottom-y',
             rise: inch(0.75),
