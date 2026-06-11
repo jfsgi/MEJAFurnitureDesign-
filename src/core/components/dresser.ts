@@ -4,7 +4,7 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { drawerBoxParts } from './drawerparts';
+import { caseCornerFingers, drawerBoxParts, type CaseJoinery } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -26,6 +26,13 @@ export const dresser: ComponentDef = {
     { kind: 'count', key: 'drawerCount', label: 'Drawers', default: 4, min: 1, max: 8, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'walnut', tier: 'basic' },
     { kind: 'boolean', key: 'graduated', label: 'Graduated heights', default: true, tier: 'advanced' },
+    { kind: 'enum', key: 'caseJoinery', label: 'Case joinery', default: 'half-blind-dovetail', tier: 'advanced',
+      options: [
+        { value: 'half-blind-dovetail', label: 'Half-blind dovetail' },
+        { value: 'through-dovetail', label: 'Through dovetail' },
+        { value: 'box-joint', label: 'Box joint' },
+        { value: 'butt', label: 'Butt / screwed' },
+      ] },
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
     { kind: 'length', key: 'thickness', label: 'Board thickness', default: inch(0.75), min: inch(0.5), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.75), tier: 'advanced' },
@@ -51,29 +58,74 @@ export const dresser: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
+    // Case joinery: sides join the top and bottom with rendered corner fingers
+    // (half-blind shows on the side faces under the cap's lap; through styles
+    // pierce the cap face). Cut lengths book the stock the joint consumes.
+    const caseJoinery = str(p, 'caseJoinery');
+    const jointed = caseJoinery !== 'butt';
+    const jointTag =
+      caseJoinery === 'half-blind-dovetail'
+        ? ' (half-blind DT)'
+        : caseJoinery === 'through-dovetail'
+          ? ' (dovetail)'
+          : caseJoinery === 'box-joint'
+            ? ' (box joint)'
+            : '';
+    const capLen =
+      caseJoinery === 'half-blind-dovetail'
+        ? innerW + t
+        : jointed
+          ? innerW + 2 * t
+          : innerW;
+    const sideParts: Record<number, Part> = {};
     for (const sx of [-1, 1]) {
-      parts.push({
+      const part: Part = {
         id: `side-${sx}`,
-        name: 'Side',
+        name: `Side${jointTag}`,
         material: mat,
-        primitives: [{ shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] }],
+        primitives: [
+          jointed
+            ? { shape: 'box', size: [t, D, H - 2 * t], at: [sx * (W / 2 - t / 2), 0, H / 2] }
+            : { shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] },
+        ],
         cut: { length: H, width: D, thickness: t },
-      });
+      };
+      sideParts[sx] = part;
+      parts.push(part);
     }
-    parts.push({
+    const bottomPart: Part = {
       id: 'bottom',
-      name: 'Bottom',
+      name: `Bottom${jointTag}`,
       material: mat,
       primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, t / 2] }],
-      cut: { length: innerW, width: D, thickness: t },
-    });
-    parts.push({
+      cut: { length: capLen, width: D, thickness: t },
+    };
+    parts.push(bottomPart);
+    const topPart: Part = {
       id: 'top',
-      name: 'Top',
+      name: `Top${jointTag}`,
       material: mat,
       primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, H - t / 2] }],
-      cut: { length: innerW, width: D, thickness: t },
-    });
+      cut: { length: capLen, width: D, thickness: t },
+    };
+    parts.push(topPart);
+    if (jointed) {
+      for (const sx of [-1, 1] as const) {
+        for (const zEdge of ['top', 'bottom'] as const) {
+          const { sideFingers, capFingers } = caseCornerFingers({
+            zEdge,
+            sx,
+            W,
+            D,
+            H,
+            t,
+            style: caseJoinery as CaseJoinery,
+          });
+          sideParts[sx].primitives.push(...sideFingers);
+          (zEdge === 'top' ? topPart : bottomPart).primitives.push(...capFingers);
+        }
+      }
+    }
     parts.push({
       id: 'back',
       name: 'Back panel',

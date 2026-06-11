@@ -6,60 +6,10 @@
 // (1/16" typical); stacked fronts are spaced by that same reveal. The back panel
 // insets 1/4" from the rear of the box.
 
-import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part, Primitive } from '../types';
+import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { drawerBoxParts } from './drawerparts';
+import { caseCornerFingers, drawerBoxParts, type CaseJoinery } from './drawerparts';
 import { slideFitWarning } from './drawerbox';
-
-/**
- * One visible case corner: a row of fingers along the depth where a side meets
- * the top or bottom. Through dovetails flare the side's tails toward the cap
- * face; box joints are square. The cap board carries the complementary fingers.
- */
-function caseCornerFingers(opts: {
-  zEdge: 'top' | 'bottom';
-  sx: 1 | -1;
-  W: number;
-  D: number;
-  H: number;
-  t: number;
-  dovetail: boolean;
-}): { sideFingers: Primitive[]; capFingers: Primitive[] } {
-  const { sx, W, D, H, t, dovetail } = opts;
-  const x = sx * (W / 2 - t / 2);
-  const zc = opts.zEdge === 'top' ? H - t / 2 : t / 2;
-  const n = Math.max(3, 2 * Math.round(D / (t * 3)) + 1); // odd: tails cap both ends
-  const fy = D / n;
-  const flare = dovetail ? Math.min(fy * 0.2, t * 0.4) : 0;
-  const sideFingers: Primitive[] = [];
-  const capFingers: Primitive[] = [];
-  for (let k = 0; k < n; k++) {
-    const y = -D / 2 + (k + 0.5) * fy;
-    const isTail = k % 2 === 0;
-    if (flare === 0 || k === 0 || k === n - 1) {
-      (isTail ? sideFingers : capFingers).push({
-        shape: 'box',
-        size: [t, fy, t],
-        at: [x, y, zc],
-        endGrain: !isTail,
-      });
-      continue;
-    }
-    const wide: [number, number] = [t, fy + 2 * flare];
-    const narrow: [number, number] = [t, fy - 2 * flare];
-    const tailGrows = isTail === (opts.zEdge === 'top'); // tails widen toward the cap face
-    (isTail ? sideFingers : capFingers).push({
-      shape: 'taperedBox',
-      top: tailGrows ? wide : narrow,
-      bottom: tailGrows ? narrow : wide,
-      height: t,
-      at: [x, y, zc],
-      align: [0, 0],
-      endGrain: !isTail,
-    });
-  }
-  return { sideFingers, capFingers };
-}
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -91,9 +41,9 @@ export const drawerUnit: ComponentDef = {
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
     { kind: 'enum', key: 'caseJoinery', label: 'Case joinery', default: 'half-blind-dovetail', tier: 'advanced',
       options: [
-        { value: 'half-blind-dovetail', label: 'Half-blind dovetail (hidden)' },
-        { value: 'through-dovetail', label: 'Through dovetail (visible)' },
-        { value: 'box-joint', label: 'Box joint (visible)' },
+        { value: 'half-blind-dovetail', label: 'Half-blind dovetail' },
+        { value: 'through-dovetail', label: 'Through dovetail' },
+        { value: 'box-joint', label: 'Box joint' },
         { value: 'butt', label: 'Butt / screwed' },
       ] },
     { kind: 'length', key: 'thickness', label: 'Case thickness', default: inch(0.625), min: inch(0.5), max: inch(1), tier: 'advanced' },
@@ -123,11 +73,12 @@ export const drawerUnit: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Case joinery. Half-blind dovetails hide entirely from the show faces (their
-    // point); through dovetails and box joints render visible corner fingers along
-    // the top and bottom edges. Cut lengths book the stock the joint consumes.
+    // Case joinery. All jointed styles render corner fingers: half-blind shows
+    // tails on the side faces under the cap's lap strip (the cap face stays
+    // clean); through dovetails and box joints pierce the cap face too. Cut
+    // lengths book the stock the joint consumes.
     const caseJoinery = str(p, 'caseJoinery');
-    const visibleJoint = caseJoinery === 'through-dovetail' || caseJoinery === 'box-joint';
+    const visibleJoint = caseJoinery !== 'butt';
     const jointTag =
       caseJoinery === 'half-blind-dovetail'
         ? ' (half-blind DT)'
@@ -186,7 +137,7 @@ export const drawerUnit: ComponentDef = {
             D,
             H,
             t,
-            dovetail: caseJoinery === 'through-dovetail',
+            style: caseJoinery as CaseJoinery,
           });
           sideParts[sx].primitives.push(...sideFingers);
           (zEdge === 'top' ? topPart : bottomPart).primitives.push(...capFingers);

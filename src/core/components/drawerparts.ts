@@ -12,6 +12,70 @@ const PULL_DEPTH_MAX = inch(1.125);
 
 export type BoxJoinery = 'dovetail' | 'box-joint';
 
+export type CaseJoinery = 'half-blind-dovetail' | 'through-dovetail' | 'box-joint';
+
+/**
+ * One case corner where a side meets the top or bottom: a row of fingers along
+ * the depth. Through dovetails and box joints pierce the cap (visible from the
+ * cap face); half-blind dovetails stop a lap short — tails and pins show on the
+ * side face with the cap's lap strip above them, and the cap face stays clean.
+ */
+export function caseCornerFingers(opts: {
+  zEdge: 'top' | 'bottom';
+  sx: 1 | -1;
+  W: number;
+  D: number;
+  H: number;
+  t: number;
+  style: CaseJoinery;
+}): { sideFingers: Primitive[]; capFingers: Primitive[] } {
+  const { sx, W, D, H, t, style } = opts;
+  const x = sx * (W / 2 - t / 2);
+  const top = opts.zEdge === 'top';
+  const lap = style === 'half-blind-dovetail' ? t / 3 : 0;
+  const bandH = t - lap;
+  const zc = top ? H - t + bandH / 2 : t - bandH / 2;
+  const n = Math.max(3, 2 * Math.round(D / (t * 3)) + 1); // odd: tails cap both ends
+  const fy = D / n;
+  const flare = style === 'box-joint' ? 0 : Math.min(fy * 0.2, t * 0.4);
+  const sideFingers: Primitive[] = [];
+  const capFingers: Primitive[] = [];
+  for (let k = 0; k < n; k++) {
+    const y = -D / 2 + (k + 0.5) * fy;
+    const isTail = k % 2 === 0;
+    if (flare === 0 || k === 0 || k === n - 1) {
+      (isTail ? sideFingers : capFingers).push({
+        shape: 'box',
+        size: [t, fy, bandH],
+        at: [x, y, zc],
+        endGrain: !isTail,
+      });
+      continue;
+    }
+    const wide: [number, number] = [t, fy + 2 * flare];
+    const narrow: [number, number] = [t, fy - 2 * flare];
+    const tailGrows = isTail === top; // tails widen toward the cap face
+    (isTail ? sideFingers : capFingers).push({
+      shape: 'taperedBox',
+      top: tailGrows ? wide : narrow,
+      bottom: tailGrows ? narrow : wide,
+      height: bandH,
+      at: [x, y, zc],
+      align: [0, 0],
+      endGrain: !isTail,
+    });
+  }
+  if (lap > 0) {
+    // The half-blind lap: cap material covering the joint from the cap face.
+    capFingers.push({
+      shape: 'box',
+      size: [t, D, lap],
+      at: [x, 0, top ? H - lap / 2 : lap / 2],
+    });
+  }
+  return { sideFingers, capFingers };
+}
+
 /**
  * One corner column of interlocking fingers: tails belong to the side board,
  * pins to the end board, alternating up the joint. Dovetails flare the tails

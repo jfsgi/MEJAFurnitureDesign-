@@ -170,7 +170,7 @@ describe('chest of drawers', () => {
     expect(names.filter((n) => n === 'Drawer side')).toHaveLength(8);
     expect(names.filter((n) => n === 'Drawer end')).toHaveLength(8);
     expect(names.filter((n) => n === 'Drawer bottom')).toHaveLength(4);
-    expect(names.filter((n) => n === 'Side')).toHaveLength(2);
+    expect(names.filter((n) => n.startsWith('Side'))).toHaveLength(2);
   });
 
   it('fronts plus reveals exactly fill the interior height', () => {
@@ -396,9 +396,27 @@ describe('drawer unit', () => {
     const bjSide = boxJoint.parts.find((p) => p.id === 'side-1')!;
     expect(bjSide.primitives.length).toBeGreaterThan(2);
     expect(bjSide.primitives.every((pr) => pr.shape === 'box')).toBe(true);
-    // Half-blind: clean single-board faces, the joint hidden by design.
+    // Half-blind: tails show on the side face, but never pierce the cap face —
+    // the cap's lap strip covers the joint from above.
+    const t = base.thickness as number;
+    const H = base.height as number;
     const halfBlind = def.generate(base);
-    expect(halfBlind.parts.find((p) => p.id === 'side-1')!.primitives).toHaveLength(1);
+    const hbSide = halfBlind.parts.find((p) => p.id === 'side-1')!;
+    expect(hbSide.primitives.length).toBeGreaterThan(1);
+    for (const pr of hbSide.primitives) {
+      const top =
+        pr.shape === 'box'
+          ? pr.at[2] + pr.size[2] / 2
+          : pr.shape === 'taperedBox'
+            ? pr.at[2] + pr.height / 2
+            : 0;
+      expect(top).toBeLessThanOrEqual(H - t / 3 + 1e-6);
+    }
+    const hbTop = halfBlind.parts.find((p) => p.id === 'top')!;
+    const lapStrips = hbTop.primitives.filter(
+      (pr) => pr.shape === 'box' && Math.abs(pr.size[2] - t / 3) < 1e-6,
+    );
+    expect(lapStrips.length).toBe(2); // one over each corner column
   });
 
   it('half-blind dovetailed case: labeled parts, top/bottom stock runs into the sockets', () => {
