@@ -5,6 +5,7 @@ import { bookcase } from './bookcase';
 import { cabinet } from './cabinet';
 import { dresser } from './dresser';
 import { drawerBox } from './drawerbox';
+import { drawerUnit } from './drawerunit';
 import { bench, stool } from './seating';
 import { wallShelf } from './wallshelf';
 
@@ -20,6 +21,7 @@ const ALL: ComponentDef[] = [
   dresser,
   wallShelf,
   drawerBox,
+  drawerUnit,
   taperedLeg,
   straightLeg,
   roundLeg,
@@ -37,7 +39,7 @@ export const CATEGORIES: { name: string; components: ComponentDef[] }[] = [
   { name: 'Seating', components: [bench, stool] },
   { name: 'Storage', components: [bookcase, cabinet, dresser] },
   { name: 'Wall-mounted', components: [wallShelf] },
-  { name: 'Drawers', components: [drawerBox] },
+  { name: 'Drawers', components: [drawerBox, drawerUnit] },
   { name: 'Legs', components: [taperedLeg, straightLeg, roundLeg] },
   { name: 'Boards & panels', components: [board, panel, shelf] },
 ];

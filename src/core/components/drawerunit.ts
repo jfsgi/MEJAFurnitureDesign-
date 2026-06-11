@@ -1,36 +1,42 @@
-// Parametric chest of drawers: carcase + N drawers, each an inset front with a full
-// drawer box behind it (sides, ends, bottom — sized for side-mount slides). Drawer
-// heights optionally graduate, shallowest at the top, the classic dresser proportion.
+// Parametric drawer unit, MEJA's countertop/desktop product: an outer case with N
+// drawers — full boxes behind inset or overlay fronts — mirroring the production Box
+// Builder's construction (case walls, back gap, slide gaps, front clearances).
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
 import { drawerBoxParts } from './drawerparts';
+import { slideFitWarning } from './drawerbox';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
 
 const SLIDE_CLEARANCE = inch(0.5); // per side, standard side-mount slides
 const BOX_HEIGHT_CLEARANCE = inch(1);
-const BOX_DEPTH_CLEARANCE = inch(1);
-const MIN_OPENING = inch(2.5);
+const BACK_GAP = inch(0.5); // box to back panel (slide stop + back offset)
+const MIN_OPENING = inch(2);
 
-export const dresser: ComponentDef = {
-  id: 'dresser',
-  name: 'Chest of drawers',
-  category: 'Storage',
-  description: 'Drawer chest with inset fronts. Heights graduate toward the top.',
+export const drawerUnit: ComponentDef = {
+  id: 'drawer-unit',
+  name: 'Drawer unit',
+  category: 'Drawers',
+  description: 'Countertop case with sliding drawers, inset or overlay fronts.',
   params: [
-    { kind: 'length', key: 'width', label: 'Width', default: inch(36), min: inch(16), max: inch(72), tier: 'basic' },
-    { kind: 'length', key: 'depth', label: 'Depth', default: inch(18), min: inch(12), max: inch(30), tier: 'basic' },
-    { kind: 'length', key: 'height', label: 'Height', default: inch(34), min: inch(16), max: inch(60), tier: 'basic' },
-    { kind: 'count', key: 'drawerCount', label: 'Drawers', default: 4, min: 1, max: 8, tier: 'basic' },
+    { kind: 'length', key: 'width', label: 'Width', default: inch(24), min: inch(10), max: inch(48), tier: 'basic' },
+    { kind: 'length', key: 'depth', label: 'Depth', default: inch(14), min: inch(8), max: inch(30), tier: 'basic' },
+    { kind: 'length', key: 'height', label: 'Height', default: inch(8), min: inch(3), max: inch(24), tier: 'basic' },
+    { kind: 'count', key: 'drawerCount', label: 'Drawers', default: 2, min: 1, max: 6, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'walnut', tier: 'basic' },
-    { kind: 'boolean', key: 'graduated', label: 'Graduated heights', default: true, tier: 'advanced' },
+    { kind: 'enum', key: 'frontStyle', label: 'Front style', default: 'inset', tier: 'advanced',
+      options: [
+        { value: 'inset', label: 'Inset' },
+        { value: 'overlay', label: 'Overlay' },
+      ] },
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
-    { kind: 'length', key: 'thickness', label: 'Board thickness', default: inch(0.75), min: inch(0.5), max: inch(1.5), tier: 'advanced' },
-    { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.75), tier: 'advanced' },
+    { kind: 'length', key: 'thickness', label: 'Case thickness', default: inch(0.625), min: inch(0.5), max: inch(1), tier: 'advanced' },
+    { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'boxSideThickness', label: 'Box side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
-    { kind: 'length', key: 'reveal', label: 'Front reveal', default: inch(0.125), min: inch(0.0625), max: inch(0.25), tier: 'advanced' },
+    { kind: 'length', key: 'gap', label: 'Front gap', default: inch(0.0625), min: inch(0.03125), max: inch(0.25), tier: 'advanced' },
+    { kind: 'length', key: 'overlayAmount', label: 'Overlay amount', default: inch(0.5), min: inch(0.25), max: inch(0.75), tier: 'advanced' },
   ],
   generate(p): GeneratedModel {
     const W = num(p, 'width');
@@ -40,8 +46,9 @@ export const dresser: ComponentDef = {
     const t = num(p, 'thickness');
     const backT = num(p, 'backThickness');
     const sideT = num(p, 'boxSideThickness');
-    const reveal = num(p, 'reveal');
-    const graduated = p['graduated'] as boolean;
+    const gap = num(p, 'gap');
+    const overlay = num(p, 'overlayAmount');
+    const overlayFronts = str(p, 'frontStyle') === 'overlay';
     const mat = str(p, 'material');
     const boxMat = str(p, 'boxMaterial');
 
@@ -84,45 +91,42 @@ export const dresser: ComponentDef = {
       cut: { length: innerH, width: innerW, thickness: backT },
     });
 
-    // Split the interior into n openings with a reveal above, below, and between fronts.
-    // Graduated: heights form an arithmetic series, shallowest on top, capped so the
-    // top drawer never drops below the minimum useful opening.
-    const available = innerH - (n + 1) * reveal;
-    const equal = available / n;
-    let step = 0;
-    if (graduated && n > 1) {
-      step = Math.min(equal * 0.25, Math.max(0, ((equal - MIN_OPENING) * 2) / (n - 1)));
-    }
-    const heights = Array.from({ length: n }, (_, i) => equal - step * ((n - 1) / 2 - i));
-
-    const frontW = innerW - 2 * reveal;
+    // Openings: equal slices of the interior with a gap above, below, and between.
+    const opening = (innerH - (n + 1) * gap) / n;
     const boxW = innerW - 2 * SLIDE_CLEARANCE;
-    const boxD = D - backT - t - BOX_DEPTH_CLEARANCE;
+    const boxD = D - backT - t - BACK_GAP;
     const boxY = D / 2 - t - boxD / 2;
 
-    let zCursor = H - t;
+    // Overlay fronts cover the case edges; their own stack starts above the top edge.
+    const frontW = overlayFronts ? Math.min(innerW + 2 * overlay, W) : innerW - 2 * gap;
+    const frontH = overlayFronts ? (innerH + 2 * overlay - (n - 1) * gap) / n : opening;
+    const frontY = overlayFronts ? D / 2 + t / 2 : D / 2 - t / 2;
+
+    let openingCursor = H - t;
+    let frontCursor = overlayFronts ? H - t + overlay : H - t;
     for (let i = 0; i < n; i++) {
-      const h = heights[i];
-      zCursor -= reveal;
-      const frontZ = zCursor - h / 2;
-      zCursor -= h;
+      openingCursor -= gap;
+      const openingTop = openingCursor;
+      openingCursor -= opening;
+      if (!overlayFronts) frontCursor = openingTop;
 
       parts.push({
         id: `drawer-front-${i}`,
         name: 'Drawer front',
         material: mat,
-        primitives: [{ shape: 'box', size: [frontW, t, h], at: [0, D / 2 - t / 2, frontZ] }],
-        cut: { length: frontW, width: h, thickness: t },
+        primitives: [{ shape: 'box', size: [frontW, t, frontH], at: [0, frontY, frontCursor - frontH / 2] }],
+        cut: { length: frontW, width: frontH, thickness: t },
       });
+      if (overlayFronts) frontCursor -= frontH + gap;
 
       parts.push(
         ...drawerBoxParts({
           idPrefix: `drawer-${i}`,
           boxW,
           boxD,
-          boxH: Math.max(h - BOX_HEIGHT_CLEARANCE, inch(0.75)),
+          boxH: Math.max(opening - BOX_HEIGHT_CLEARANCE, inch(0.75)),
           centerY: boxY,
-          bottomZ: frontZ - h / 2 + inch(0.25),
+          bottomZ: openingTop - opening + inch(0.25),
           sideT,
           bottomT: inch(0.25),
           material: boxMat,
@@ -130,7 +134,7 @@ export const dresser: ComponentDef = {
       );
     }
 
-    if (equal < MIN_OPENING) {
+    if (opening < MIN_OPENING) {
       findings.push({
         severity: 'warning',
         message: `${n} drawers in ${formatLength(H, 'imperial')} leaves openings under ${formatLength(MIN_OPENING, 'imperial')}. Reduce the count or add height.`,
@@ -142,12 +146,8 @@ export const dresser: ComponentDef = {
         message: `Drawers ${formatLength(boxW, 'imperial')} wide tend to rack. Consider two banks of drawers.`,
       });
     }
-    if (H > inch(48)) {
-      findings.push({
-        severity: 'warning',
-        message: 'Tall chests should be anchored to the wall (anti-tip).',
-      });
-    }
+    const slideWarning = slideFitWarning(boxD);
+    if (slideWarning) findings.push(slideWarning);
 
     return { parts, findings };
   },

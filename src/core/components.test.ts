@@ -287,6 +287,48 @@ describe('drawer box', () => {
   });
 });
 
+describe('drawer unit', () => {
+  const def = REGISTRY['drawer-unit'];
+
+  it('builds the case plus a front and full box per drawer', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Side')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Drawer front')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Drawer side')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Drawer end')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Drawer bottom')).toHaveLength(2);
+  });
+
+  it('inset fronts plus gaps exactly fill the interior height', () => {
+    const params = defaultParams(def);
+    const model = def.generate(params);
+    const fronts = model.parts.filter((p) => p.name === 'Drawer front');
+    const innerH = (params.height as number) - 2 * (params.thickness as number);
+    const gap = params.gap as number;
+    const total =
+      fronts.reduce((sum, f) => sum + f.cut.width, 0) + (fronts.length + 1) * gap;
+    expect(total).toBeCloseTo(innerH, 5);
+  });
+
+  it('overlay fronts cover the case edges and sit proud of it', () => {
+    const base = defaultParams(def);
+    const model = def.generate({ ...base, frontStyle: 'overlay' });
+    const front = model.parts.find((p) => p.name === 'Drawer front')!;
+    const innerW = (base.width as number) - 2 * (base.thickness as number);
+    expect(front.cut.length).toBeGreaterThan(innerW);
+    const caseDepthFront = (base.depth as number) / 2;
+    expect(front.primitives[0].at[1]).toBeGreaterThan(caseDepthFront - 0.001);
+  });
+
+  it('inherits the slide-fit warning for in-between depths', () => {
+    // depth 20" − front 0.625 − back 0.25 − gap 0.5 = 18.625" box → strands an 18" slide... within tolerance.
+    // Use 21": box depth 19.625" → more than 0.75" past an 18" slide.
+    const odd = def.generate({ ...defaultParams(def), depth: inch(21) });
+    expect(odd.findings.some((f) => f.message.includes('slide'))).toBe(true);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 

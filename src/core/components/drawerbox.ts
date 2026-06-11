@@ -12,6 +12,18 @@ const str = (p: ParamValues, k: string): string => p[k] as string;
 const SLIDE_LENGTHS = [inch(9), inch(12), inch(15), inch(18), inch(21), inch(24)];
 const SLIDE_FIT_TOLERANCE = inch(0.75);
 
+/** Warn when a box depth strands a standard slide length; null when it fits. */
+export function slideFitWarning(depth: number): Finding | null {
+  const fit = SLIDE_LENGTHS.filter((s) => s <= depth).pop();
+  if (depth >= SLIDE_LENGTHS[0] && fit !== undefined && depth - fit > SLIDE_FIT_TOLERANCE) {
+    return {
+      severity: 'warning',
+      message: `A ${formatLength(depth, 'imperial')} deep box only fits a ${formatLength(fit, 'imperial')} slide. Size the depth to a standard slide length (12", 15", 18", 21", 24").`,
+    };
+  }
+  return null;
+}
+
 export const drawerBox: ComponentDef = {
   id: 'drawer-box',
   name: 'Drawer box',
@@ -74,13 +86,8 @@ export const drawerBox: ComponentDef = {
       cut: { length: endW, width: D - 2 * sideT, thickness: bottomT },
     });
 
-    const fit = SLIDE_LENGTHS.filter((s) => s <= D).pop();
-    if (D >= SLIDE_LENGTHS[0] && fit !== undefined && D - fit > SLIDE_FIT_TOLERANCE) {
-      findings.push({
-        severity: 'warning',
-        message: `A ${formatLength(D, 'imperial')} deep box only fits a ${formatLength(fit, 'imperial')} slide. Size the depth to a standard slide length (12", 15", 18", 21", 24").`,
-      });
-    }
+    const slideWarning = slideFitWarning(D);
+    if (slideWarning) findings.push(slideWarning);
     if (endW > inch(36)) {
       findings.push({
         severity: 'warning',
