@@ -12,7 +12,7 @@ import { maxShelfSpan } from '../materials';
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
 
-const RAIL_T = inch(1);
+
 const TOP_RAIL_H = inch(2.5);
 const BOTTOM_RAIL_H = inch(2.5);
 const SIDE_TOP_RAIL_H = inch(2.75);
@@ -120,14 +120,14 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [RAIL_T, sideTopLen, SIDE_TOP_RAIL_H],
+            size: [legW, sideTopLen, SIDE_TOP_RAIL_H],
             at: [sx * legX, backY + legD + sideTopLen / 2, sideTopZ],
             arch: 'bottom-y',
             rise: ARCH_RISE_SIDE,
             shoulder: inch(1),
           },
         ],
-        cut: { length: sideTopLen, width: SIDE_TOP_RAIL_H, thickness: RAIL_T },
+        cut: { length: sideTopLen, width: SIDE_TOP_RAIL_H, thickness: legW },
       });
     }
     const sideBotLen = outerAt(sBottom - SIDE_BOTTOM_RAIL_H) - 2 * legD;
@@ -139,14 +139,14 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [RAIL_T, sideBotLen, SIDE_BOTTOM_RAIL_H],
+            size: [legW, sideBotLen, SIDE_BOTTOM_RAIL_H],
             at: [sx * legX, backY + legD + sideBotLen / 2, sBottom - SIDE_BOTTOM_RAIL_H / 2],
             arch: 'bottom-y',
             rise: inch(0.75),
             shoulder: inch(1),
           },
         ],
-        cut: { length: sideBotLen, width: SIDE_BOTTOM_RAIL_H, thickness: RAIL_T },
+        cut: { length: sideBotLen, width: SIDE_BOTTOM_RAIL_H, thickness: legW },
       });
     }
 
@@ -159,18 +159,18 @@ export const displayStand: ComponentDef = {
       name: 'Top rail',
       material: mat,
       primitives: [
-        { shape: 'box', size: [innerW, RAIL_T, TOP_RAIL_H], at: [0, backY + topD - legD / 2, topRailZ] },
+        { shape: 'box', size: [innerW, legW, TOP_RAIL_H], at: [0, backY + topD - legD / 2, topRailZ] },
       ],
-      cut: { length: innerW, width: TOP_RAIL_H, thickness: RAIL_T },
+      cut: { length: innerW, width: TOP_RAIL_H, thickness: legW },
     });
     parts.push({
       id: 'rail-top-back',
       name: 'Top rail',
       material: mat,
       primitives: [
-        { shape: 'box', size: [innerW, RAIL_T, TOP_RAIL_H], at: [0, backY + legD / 2, topRailZ] },
+        { shape: 'box', size: [innerW, legW, TOP_RAIL_H], at: [0, backY + legD / 2, topRailZ] },
       ],
-      cut: { length: innerW, width: TOP_RAIL_H, thickness: RAIL_T },
+      cut: { length: innerW, width: TOP_RAIL_H, thickness: legW },
     });
     parts.push({
       id: 'rail-bottom-front',
@@ -179,23 +179,23 @@ export const displayStand: ComponentDef = {
       primitives: [
         {
           shape: 'archedBoard',
-          size: [innerW, RAIL_T, BOTTOM_RAIL_H],
+          size: [innerW, legW, BOTTOM_RAIL_H],
           at: [0, backY + outerAt(botRailZ) - legD / 2, botRailZ],
           arch: 'bottom-x',
           rise: ARCH_RISE_FRONT,
           shoulder: inch(1.5),
         },
       ],
-      cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: RAIL_T },
+      cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: legW },
     });
     parts.push({
       id: 'rail-bottom-back',
       name: 'Bottom rail',
       material: mat,
       primitives: [
-        { shape: 'box', size: [innerW, RAIL_T, BOTTOM_RAIL_H], at: [0, backY + legD / 2, botRailZ] },
+        { shape: 'box', size: [innerW, legW, BOTTOM_RAIL_H], at: [0, backY + legD / 2, botRailZ] },
       ],
-      cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: RAIL_T },
+      cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: legW },
     });
 
     // Shelves: full depth — from the rear leg plane to the front arch peak at the
