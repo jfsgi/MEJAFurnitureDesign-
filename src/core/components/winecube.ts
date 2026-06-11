@@ -24,6 +24,7 @@ export const wineCube: ComponentDef = {
     { kind: 'boolean', key: 'drawer', label: 'Drawer below', default: true, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'white-oak', tier: 'basic' },
     { kind: 'length', key: 'drawerHeight', label: 'Drawer height', default: inch(6), min: inch(3), max: inch(12), tier: 'advanced' },
+    { kind: 'boolean', key: 'pull', label: 'Finger pull cutout', default: true, tier: 'advanced' },
     { kind: 'length', key: 'thickness', label: 'Board thickness', default: inch(0.75), min: inch(0.5), max: inch(1.25), tier: 'advanced' },
     { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'boxSideThickness', label: 'Box side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
@@ -123,6 +124,7 @@ export const wineCube: ComponentDef = {
           sideT,
           bottomT: inch(0.25),
           material: mat,
+          pull: p['pull'] as boolean,
         }),
       );
     }

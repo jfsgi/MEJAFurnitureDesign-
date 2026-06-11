@@ -294,6 +294,17 @@ describe('drawer box', () => {
     expect(front.cut.length).toBeCloseTo(expected, 5);
   });
 
+  it('finger pull notches the front into three boards; cut stays one board', () => {
+    const base = defaultParams(def);
+    const plain = def.generate(base).parts.find((p) => p.id === 'front')!;
+    expect(plain.primitives).toHaveLength(1);
+    const pulled = def.generate({ ...base, pull: true }).parts.find((p) => p.id === 'front')!;
+    expect(pulled.primitives).toHaveLength(3);
+    expect(pulled.cut).toEqual(plain.cut);
+    const back = def.generate({ ...base, pull: true }).parts.find((p) => p.id === 'back')!;
+    expect(back.primitives).toHaveLength(1);
+  });
+
   it('warns when the depth strands a standard slide length', () => {
     const odd = def.generate({ ...defaultParams(def), depth: inch(17) });
     expect(odd.findings.some((f) => f.message.includes('slide'))).toBe(true);
@@ -353,6 +364,15 @@ describe('storage tower', () => {
     expect(names.filter((n) => n === 'Drawer side')).toHaveLength(12);
     expect(names.filter((n) => n === 'Drawer front')).toHaveLength(0);
     expect(names.filter((n) => n === 'Fixed shelf')).toHaveLength(1);
+  });
+
+  it('drawer fronts carry pull cutouts by default, backs stay solid', () => {
+    const model = def.generate(defaultParams(def));
+    const fronts = model.parts.filter((p) => p.name === 'Drawer end (pull)');
+    const backs = model.parts.filter((p) => p.name === 'Drawer end');
+    expect(fronts).toHaveLength(6);
+    expect(backs).toHaveLength(6);
+    expect(fronts[0].primitives).toHaveLength(3);
   });
 
   it('removing the cubby gives the drawers the full interior', () => {

@@ -39,6 +39,7 @@ export const drawerBox: ComponentDef = {
         { value: 'box-joint', label: 'Box joint' },
       ] },
     { kind: 'material', key: 'material', label: 'Material', default: 'maple', tier: 'basic' },
+    { kind: 'boolean', key: 'pull', label: 'Finger pull cutout', default: false, tier: 'advanced' },
     { kind: 'length', key: 'sideThickness', label: 'Side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
     { kind: 'length', key: 'bottomThickness', label: 'Bottom thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'bottomRecess', label: 'Bottom recess', default: inch(0.25), min: inch(0.125), max: inch(0.75), tier: 'advanced' },
@@ -68,13 +69,36 @@ export const drawerBox: ComponentDef = {
       });
     }
     for (const sy of [-1, 1]) {
-      parts.push({
-        id: sy > 0 ? 'front' : 'back',
-        name: sy > 0 ? `Front (${joinery})` : `Back (${joinery})`,
+      const isFront = sy > 0;
+      const y = sy * (D / 2 - sideT / 2);
+      const part: Part = {
+        id: isFront ? 'front' : 'back',
+        name: isFront ? `Front (${joinery})` : `Back (${joinery})`,
         material: mat,
-        primitives: [{ shape: 'box', size: [endW, sideT, H], at: [0, sy * (D / 2 - sideT / 2), H / 2] }],
+        primitives: [],
         cut: { length: endW, width: H, thickness: sideT },
-      });
+      };
+      if (isFront && (p['pull'] as boolean)) {
+        // Finger pull notched from the top edge; the cut entry stays the full board.
+        const notchW = Math.min(inch(4.5), endW * 0.4);
+        const notchD = Math.min(inch(1.125), H * 0.4);
+        const segW = (endW - notchW) / 2;
+        for (const nx of [-1, 1]) {
+          part.primitives.push({
+            shape: 'box',
+            size: [segW, sideT, H],
+            at: [nx * (notchW / 2 + segW / 2), y, H / 2],
+          });
+        }
+        part.primitives.push({
+          shape: 'box',
+          size: [notchW, sideT, H - notchD],
+          at: [0, y, (H - notchD) / 2],
+        });
+      } else {
+        part.primitives.push({ shape: 'box', size: [endW, sideT, H], at: [0, y, H / 2] });
+      }
+      parts.push(part);
     }
     parts.push({
       id: 'bottom',

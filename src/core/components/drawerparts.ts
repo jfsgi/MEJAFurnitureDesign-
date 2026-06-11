@@ -7,6 +7,9 @@ import { inch } from '../units';
 
 const BOTTOM_RECESS = inch(0.25); // drawer bottom sits up in its groove
 
+const PULL_WIDTH_MAX = inch(4.5);
+const PULL_DEPTH_MAX = inch(1.125);
+
 export function drawerBoxParts(opts: {
   idPrefix: string;
   boxW: number;
@@ -17,8 +20,10 @@ export function drawerBoxParts(opts: {
   sideT: number;
   bottomT: number;
   material: string;
+  /** Notch a finger-pull cutout into the top edge of the front. */
+  pull?: boolean;
 }): Part[] {
-  const { idPrefix, boxW, boxD, boxH, centerY, bottomZ, sideT, bottomT, material } = opts;
+  const { idPrefix, boxW, boxD, boxH, centerY, bottomZ, sideT, bottomT, material, pull } = opts;
   const boxZ = bottomZ + boxH / 2;
   const endW = boxW - 2 * sideT;
   const parts: Part[] = [];
@@ -35,15 +40,36 @@ export function drawerBoxParts(opts: {
     });
   }
   for (const sy of [-1, 1]) {
-    parts.push({
+    const y = centerY + sy * (boxD / 2 - sideT / 2);
+    const isFront = sy > 0;
+    // The cut entry stays the full board either way — the pull is notched out of it.
+    const part: Part = {
       id: `${idPrefix}-end-${sy}`,
-      name: 'Drawer end',
+      name: isFront && pull ? 'Drawer end (pull)' : 'Drawer end',
       material,
-      primitives: [
-        { shape: 'box', size: [endW, sideT, boxH], at: [0, centerY + sy * (boxD / 2 - sideT / 2), boxZ] },
-      ],
+      primitives: [],
       cut: { length: endW, width: boxH, thickness: sideT },
-    });
+    };
+    if (isFront && pull) {
+      const notchW = Math.min(PULL_WIDTH_MAX, endW * 0.4);
+      const notchD = Math.min(PULL_DEPTH_MAX, boxH * 0.4);
+      const segW = (endW - notchW) / 2;
+      for (const nx of [-1, 1]) {
+        part.primitives.push({
+          shape: 'box',
+          size: [segW, sideT, boxH],
+          at: [nx * (notchW / 2 + segW / 2), y, boxZ],
+        });
+      }
+      part.primitives.push({
+        shape: 'box',
+        size: [notchW, sideT, boxH - notchD],
+        at: [0, y, boxZ - notchD / 2],
+      });
+    } else {
+      part.primitives.push({ shape: 'box', size: [endW, sideT, boxH], at: [0, y, boxZ] });
+    }
+    parts.push(part);
   }
   parts.push({
     id: `${idPrefix}-bottom`,

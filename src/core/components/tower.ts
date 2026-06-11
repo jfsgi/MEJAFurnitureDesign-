@@ -24,6 +24,7 @@ export const storageTower: ComponentDef = {
     { kind: 'count', key: 'drawerCount', label: 'Drawers', default: 6, min: 1, max: 8, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'cedar', tier: 'basic' },
     { kind: 'boolean', key: 'cubby', label: 'Open cubby on top', default: true, tier: 'advanced' },
+    { kind: 'boolean', key: 'pulls', label: 'Finger pull cutouts', default: true, tier: 'advanced' },
     { kind: 'length', key: 'cubbyHeight', label: 'Cubby height', default: inch(12), min: inch(6), max: inch(24), tier: 'advanced' },
     { kind: 'boolean', key: 'graduated', label: 'Graduated heights', default: true, tier: 'advanced' },
     { kind: 'length', key: 'thickness', label: 'Board thickness', default: inch(0.75), min: inch(0.5), max: inch(1.25), tier: 'advanced' },
@@ -131,6 +132,7 @@ export const storageTower: ComponentDef = {
           sideT,
           bottomT: inch(0.25),
           material: mat,
+          pull: p['pulls'] as boolean,
         }),
       );
     }
