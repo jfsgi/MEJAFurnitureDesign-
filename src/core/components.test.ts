@@ -510,6 +510,17 @@ describe('tiered display stand', () => {
     expect(botPrim.at[2] + botPrim.size[2] / 2).toBeCloseTo(bottomShelfSurface, 3);
   });
 
+  it('arch rises adjust per part', () => {
+    const base = defaultParams(def);
+    const riseOf = (params: typeof base, id: string) =>
+      (def.generate(params).parts.find((p) => p.id === id)!.primitives[0] as { rise: number }).rise;
+    expect(riseOf({ ...base, frontArchRise: inch(1) }, 'rail-bottom-front')).toBeCloseTo(inch(1), 5);
+    expect(riseOf({ ...base, sideTopArchRise: inch(2) }, 'side-rail-top--1')).toBeCloseTo(inch(2), 5);
+    expect(riseOf({ ...base, sideBottomArchRise: 0 }, 'side-rail-bottom--1')).toBe(0);
+    // Clamped: the curve always leaves a shoulder on the board.
+    expect(riseOf({ ...base, frontArchRise: inch(2.25) }, 'rail-bottom-front')).toBeLessThan(inch(2.5));
+  });
+
   it('arches where the drawing has them: front rail, side rails, shelf fronts', () => {
     const model = def.generate(defaultParams(def));
     const shape = (name: string, id?: string) =>

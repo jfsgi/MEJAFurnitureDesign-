@@ -20,8 +20,6 @@ const SIDE_BOTTOM_RAIL_H = inch(2.25);
 const BOTTOM_RAIL_Z = inch(2.4375); // floor to the bottom rails' lower edge
 const LEG_PROUD = inch(0.75); // leg tops stand this far above the top shelf
 const BACKSPLASH_H = inch(1.75);
-const ARCH_RISE_FRONT = inch(2);
-const ARCH_RISE_SIDE = inch(1);
 
 export const displayStand: ComponentDef = {
   id: 'display-stand',
@@ -38,6 +36,9 @@ export const displayStand: ComponentDef = {
     { kind: 'length', key: 'legWidth', label: 'Leg width', default: inch(1.5), min: inch(1), max: inch(2.5), tier: 'advanced' },
     { kind: 'length', key: 'legDepth', label: 'Leg depth', default: inch(3), min: inch(1.5), max: inch(4), tier: 'advanced' },
     { kind: 'length', key: 'thickness', label: 'Shelf thickness', default: inch(0.75), min: inch(0.5), max: inch(1), tier: 'advanced' },
+    { kind: 'length', key: 'frontArchRise', label: 'Front rail arch', default: inch(2), min: 0, max: inch(2.25), tier: 'advanced' },
+    { kind: 'length', key: 'sideTopArchRise', label: 'Top side rail arch', default: inch(1), min: 0, max: inch(2.5), tier: 'advanced' },
+    { kind: 'length', key: 'sideBottomArchRise', label: 'Bottom side rail arch', default: inch(0.75), min: 0, max: inch(2), tier: 'advanced' },
   ],
   generate(p): GeneratedModel {
     const W = num(p, 'width');
@@ -49,6 +50,10 @@ export const displayStand: ComponentDef = {
     const t = num(p, 'thickness');
     const topD = Math.max(Math.min(num(p, 'topDepth'), D - inch(2)), 2 * legD + inch(2));
     const mat = str(p, 'material');
+    // Per-part arch rises, clamped so the curve always leaves a working shoulder.
+    const frontRise = Math.min(num(p, 'frontArchRise'), BOTTOM_RAIL_H - inch(0.25));
+    const sideTopRise = Math.min(num(p, 'sideTopArchRise'), SIDE_TOP_RAIL_H - inch(0.25));
+    const sideBotRise = Math.min(num(p, 'sideBottomArchRise'), SIDE_BOTTOM_RAIL_H - inch(0.25));
 
     const innerW = W - 2 * legW;
     const backY = -D / 2;
@@ -125,7 +130,7 @@ export const displayStand: ComponentDef = {
             size: [railT, sideTopLen, SIDE_TOP_RAIL_H],
             at: [sx * legX, backY + legD + sideTopLen / 2, sideTopZ],
             arch: 'bottom-y',
-            rise: ARCH_RISE_SIDE,
+            rise: sideTopRise,
             shoulder: inch(1),
           },
         ],
@@ -144,7 +149,7 @@ export const displayStand: ComponentDef = {
             size: [railT, sideBotLen, SIDE_BOTTOM_RAIL_H],
             at: [sx * legX, backY + legD + sideBotLen / 2, sBottom - SIDE_BOTTOM_RAIL_H / 2],
             arch: 'bottom-y',
-            rise: inch(0.75),
+            rise: sideBotRise,
             shoulder: inch(1),
           },
         ],
@@ -175,7 +180,7 @@ export const displayStand: ComponentDef = {
           size: [innerW, legW, BOTTOM_RAIL_H],
           at: [0, backY + outerAt(botRailZ) - legD / 2, botRailZ],
           arch: 'bottom-x',
-          rise: ARCH_RISE_FRONT,
+          rise: frontRise,
           shoulder: inch(1.5),
         },
       ],

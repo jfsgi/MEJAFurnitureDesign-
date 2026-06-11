@@ -26,6 +26,7 @@ const ARC_SEGMENTS = 24;
 
 /** Circular-arc sampler: chord half-length c, rise r, returns offset above the chord. */
 function arcOffset(u: number, c: number, r: number): number {
+  if (r <= 1e-6) return 0; // rise dialed to zero — a straight edge
   const R = (c * c + r * r) / (2 * r);
   return Math.sqrt(Math.max(R * R - u * u, 0)) - (R - r);
 }
