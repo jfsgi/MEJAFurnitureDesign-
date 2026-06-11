@@ -4,7 +4,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../core/store';
-import { FurnitureEngine, LIGHTING_PRESETS, type LightingPresetId } from './engine';
+import {
+  FurnitureEngine,
+  LIGHTING_PRESETS,
+  type LightingPresetId,
+  type MaterialInfo,
+} from './engine';
 import { buildStudioGroup } from './bridge';
 import { DownloadIcon } from '../ui/icons';
 
@@ -30,6 +35,10 @@ export function StudioView() {
   const [background, setBackground] = useState<string>('#22252a');
   const [textureSize, setTextureSize] = useState(2048);
   const [rendering, setRendering] = useState(false);
+  const [materialsList, setMaterialsList] = useState<MaterialInfo[]>([]);
+  const [parts, setParts] = useState<string[]>([]);
+  const [targetPart, setTargetPart] = useState('*');
+  const [resetTick, setResetTick] = useState(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -39,6 +48,7 @@ export function StudioView() {
       lighting: 'studio',
     });
     engineRef.current = engine;
+    setMaterialsList(engine.listMaterials());
     return () => {
       engineRef.current = null;
       framedRef.current = false;
@@ -53,7 +63,10 @@ export function StudioView() {
     engine.setTextureResolution(textureSize);
     engine.showObject(buildStudioGroup(doc, engine.materials), { frame: !framedRef.current });
     framedRef.current = true;
-  }, [doc, textureSize]);
+    const names = engine.listParts();
+    setParts(names);
+    setTargetPart((part) => (part === '*' || names.includes(part) ? part : '*'));
+  }, [doc, textureSize, resetTick]);
 
   useEffect(() => {
     engineRef.current?.setLighting(lighting);
@@ -136,6 +149,44 @@ export function StudioView() {
               4K · full
             </button>
           </div>
+
+          <h4 className="panel-heading">Materials</h4>
+          <select
+            className="input"
+            value={targetPart}
+            onChange={(e) => setTargetPart(e.target.value)}
+            aria-label="Apply material to"
+          >
+            <option value="*">Whole scene</option>
+            {parts.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+          <div className="swatches" role="group" aria-label="Studio materials">
+            {materialsList.map((m) => (
+              <button
+                key={m.id}
+                className="swatch"
+                style={{ background: m.swatch }}
+                title={m.label}
+                aria-label={`Apply ${m.label}`}
+                onClick={() =>
+                  engineRef.current?.setMaterial(m.id, targetPart === '*' ? undefined : targetPart)
+                }
+              />
+            ))}
+          </div>
+          <button
+            className="btn"
+            onClick={() => {
+              engineRef.current?.clearMaterialOverrides();
+              setResetTick((t) => t + 1);
+            }}
+          >
+            Reset to design materials
+          </button>
 
           <div className="studio-render">
             <button className="btn btn--primary" onClick={render4K} disabled={rendering}>

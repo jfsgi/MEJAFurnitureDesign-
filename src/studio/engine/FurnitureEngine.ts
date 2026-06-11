@@ -111,11 +111,18 @@ export class FurnitureEngine {
 
   /**
    * Atelier3D extension: shows an externally built object (the design-bridge
-   * group). The caller owns mesh naming and material assignment.
+   * group). The caller owns mesh naming and base material assignment; studio
+   * overrides applied via setMaterial are re-applied across rebuilds.
    */
   showObject(object: THREE.Object3D, options?: { frame?: boolean }): void {
     this.swapObject(object, options?.frame ?? true);
     this.currentLayout = null;
+    this.reapplyAssignments();
+  }
+
+  /** Atelier3D extension: drops every studio material override. */
+  clearMaterialOverrides(): void {
+    this.assignments.clear();
   }
 
   listMaterials(): MaterialInfo[] {
