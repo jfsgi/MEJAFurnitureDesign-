@@ -380,6 +380,27 @@ describe('drawer unit', () => {
     expect(fronts[0].primitives[0].at[1]).toBeGreaterThan((base.depth as number) / 2 - 0.001);
   });
 
+  it('visible case joints render corner fingers; half-blind stays clean', () => {
+    const base = defaultParams(def);
+    const through = def.generate({ ...base, caseJoinery: 'through-dovetail' });
+    const side = through.parts.find((p) => p.id === 'side-1')!;
+    expect(side.name).toBe('Side (dovetail)');
+    expect(side.primitives.filter((pr) => pr.shape === 'taperedBox').length).toBeGreaterThan(2);
+    const top = through.parts.find((p) => p.id === 'top')!;
+    expect(top.primitives.length).toBeGreaterThan(1);
+    expect(top.cut.length).toBeCloseTo(
+      (base.width as number) - 2 * (base.thickness as number) + 2 * (base.thickness as number),
+      5,
+    );
+    const boxJoint = def.generate({ ...base, caseJoinery: 'box-joint' });
+    const bjSide = boxJoint.parts.find((p) => p.id === 'side-1')!;
+    expect(bjSide.primitives.length).toBeGreaterThan(2);
+    expect(bjSide.primitives.every((pr) => pr.shape === 'box')).toBe(true);
+    // Half-blind: clean single-board faces, the joint hidden by design.
+    const halfBlind = def.generate(base);
+    expect(halfBlind.parts.find((p) => p.id === 'side-1')!.primitives).toHaveLength(1);
+  });
+
   it('half-blind dovetailed case: labeled parts, top/bottom stock runs into the sockets', () => {
     const params = defaultParams(def);
     const model = def.generate(params);
