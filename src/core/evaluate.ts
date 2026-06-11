@@ -68,8 +68,8 @@ function primCorners(prim: Primitive): [number, number, number][] {
     // union of both faces' extents (a back-flush wedge reaches well past center).
     const [tw, td] = prim.top;
     const [bw, bd] = prim.bottom;
-    const ox = (prim.align[0] * (tw - bw)) / 2;
-    const oy = (prim.align[1] * (td - bd)) / 2;
+    const ox = (prim.align[0] * (tw - bw)) / 2 + (prim.shift?.[0] ?? 0);
+    const oy = (prim.align[1] * (td - bd)) / 2 + (prim.shift?.[1] ?? 0);
     const xs = [Math.min(-tw / 2, ox - bw / 2), Math.max(tw / 2, ox + bw / 2)];
     const ys = [Math.min(-td / 2, oy - bd / 2), Math.max(td / 2, oy + bd / 2)];
     const corners: [number, number, number][] = [];

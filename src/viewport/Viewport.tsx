@@ -52,7 +52,7 @@ function PrimitiveMesh({
   const geo = useMemo(() => {
     const offset = grainOffset(seed);
     if (prim.shape === 'taperedBox') {
-      return taperedBoxGeometry(prim.top, prim.bottom, prim.height, prim.align, offset);
+      return taperedBoxGeometry(prim.top, prim.bottom, prim.height, prim.align, prim.shift ?? [0, 0], offset);
     }
     if (prim.shape === 'box' && mat.grain) {
       return grainBoxGeometry(prim.size, longestAxis(prim.size), offset);

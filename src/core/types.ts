@@ -68,6 +68,8 @@ export type Primitive =
       height: number;
       at: [number, number, number]; // center of the bounding volume
       align: [number, number]; // -1 | 0 | 1 per axis: which faces stay flush as it tapers
+      /** Extra bottom-face offset: shears the prism — raked legs with level cuts. */
+      shift?: [number, number];
     }
   | {
       shape: 'cylinder';

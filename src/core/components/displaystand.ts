@@ -68,11 +68,10 @@ export const displayStand: ComponentDef = {
       });
     }
 
-    // Raked front legs: tilted about the width axis, outer face landing at the top
-    // depth up high and at the full base depth on the floor; sized to span 0..legH.
-    const rake = Math.atan2(D - topD, H);
-    const legL = (legH - legD * Math.sin(rake)) / Math.cos(rake);
-    const topAxisY = backY + outerAt(legH) - legD / 2;
+    // Raked front legs: sheared prisms — level top and foot cuts, slanted faces —
+    // outer face landing at the top depth up high and the full base depth on the floor.
+    const shearY = D - outerAt(legH);
+    const rakeLen = Math.hypot(legH, shearY);
     for (const sx of [-1, 1]) {
       parts.push({
         id: `leg-front-${sx}`,
@@ -80,18 +79,23 @@ export const displayStand: ComponentDef = {
         material: mat,
         primitives: [
           {
-            shape: 'box',
-            size: [legW, legD, legL],
-            at: [sx * legX, topAxisY + (legL / 2) * Math.sin(rake), legH / 2],
-            tiltX: rake,
+            shape: 'taperedBox',
+            top: [legW, legD],
+            bottom: [legW, legD],
+            height: legH,
+            at: [sx * legX, backY + outerAt(legH) - legD / 2, legH / 2],
+            align: [0, 0],
+            shift: [0, shearY],
           },
         ],
-        cut: { length: legL, width: legD, thickness: legW },
+        cut: { length: rakeLen, width: legD, thickness: legW },
       });
     }
 
-    // Side rails tie each back leg to its raked leg, top and bottom.
-    const sideTopLen = topD - 2 * legD;
+    // Side rails tie each back leg to its raked leg, top and bottom. Lengths are
+    // measured at the rail's lower edge — the longest gap — so the front end runs
+    // inside the raked leg like a tenon instead of leaving a wedge of daylight.
+    const sideTopLen = outerAt(legH - SIDE_TOP_RAIL_H) - 2 * legD;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-top-${sx}`,
@@ -108,7 +112,7 @@ export const displayStand: ComponentDef = {
       });
     }
     const botRailZ = BOTTOM_RAIL_Z + SIDE_BOTTOM_RAIL_H / 2;
-    const sideBotLen = outerAt(botRailZ) - 2 * legD;
+    const sideBotLen = outerAt(BOTTOM_RAIL_Z) - 2 * legD;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-bottom-${sx}`,

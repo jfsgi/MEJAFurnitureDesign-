@@ -477,7 +477,10 @@ describe('tiered display stand', () => {
     expect(names.filter((n) => n === 'Shelf')).toHaveLength(3);
     expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(3);
     const raked = model.parts.find((p) => p.name === 'Leg (raked)')!;
-    expect((raked.primitives[0] as { tiltX?: number }).tiltX ?? 0).toBeGreaterThan(0);
+    const prim = raked.primitives[0] as { shape: string; shift?: [number, number] };
+    // Sheared prism: level top/foot cuts, bottom face pushed forward by the rake.
+    expect(prim.shape).toBe('taperedBox');
+    expect(prim.shift?.[1] ?? 0).toBeGreaterThan(0);
   });
 
   it('matches the drawing: 14" full-width top, ~8" top side rails, longer bottom ones', () => {
@@ -486,7 +489,8 @@ describe('tiered display stand', () => {
     expect(top.cut.length).toBeCloseTo(inch(36), 5);
     expect(top.cut.width).toBeCloseTo(inch(14), 5);
     const sideTop = model.parts.find((p) => p.name === 'Side rail (top)')!;
-    expect(sideTop.cut.length).toBeCloseTo(inch(8), 5);
+    expect(sideTop.cut.length).toBeGreaterThan(inch(7.9));
+    expect(sideTop.cut.length).toBeLessThan(inch(9));
     const sideBottom = model.parts.find((p) => p.name === 'Side rail (bottom)')!;
     expect(sideBottom.cut.length).toBeGreaterThan(inch(12));
     expect(sideBottom.cut.length).toBeLessThan(inch(14));

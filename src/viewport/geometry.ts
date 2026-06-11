@@ -76,21 +76,23 @@ export function grainBoxGeometry(
 /**
  * Tapered box (3D nine-patch slice): rectangular top and bottom of different sizes.
  * `align` per axis: 0 = taper centered, ±1 = that face stays flush (e.g. a leg whose
- * outer faces stay straight while the inner faces taper). Grain runs along Z (legs).
- * Model space, Z-up.
+ * outer faces stay straight while the inner faces taper). `shift` offsets the bottom
+ * face further — a sheared prism for raked legs with level end cuts. Grain runs along
+ * Z (legs). Model space, Z-up.
  */
 export function taperedBoxGeometry(
   top: [number, number],
   bottom: [number, number],
   height: number,
   align: [number, number],
+  shift: UV = [0, 0],
   uvOffset: UV = [0, 0],
 ): THREE.BufferGeometry {
   const [tw, td] = top;
   const [bw, bd] = bottom;
   const hz = height / 2;
-  const ox = (align[0] * (tw - bw)) / 2;
-  const oy = (align[1] * (td - bd)) / 2;
+  const ox = (align[0] * (tw - bw)) / 2 + shift[0];
+  const oy = (align[1] * (td - bd)) / 2 + shift[1];
 
   const t: V3[] = [
     [-tw / 2, -td / 2, hz],
