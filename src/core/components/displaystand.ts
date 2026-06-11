@@ -1,8 +1,8 @@
 // Parametric tiered display stand, per the shop's drawings: rectangular legs
 // (1-1/2" x 3") standing 3/4" proud of the top shelf, a raked front pair with level
 // cuts, side rails with arched lower edges tying each pair, an arched front rail at
-// the floor, and shelves that deepen with the rake — each with a bowed front edge,
-// a short backsplash, and the bottom shelf seated on the cross supports.
+// the floor, and uniform-depth shelves running to the rear leg plane — each with a
+// bowed front edge, a short backsplash, the bottom one seated on the cross supports.
 // Still pending a fillet profile: the bullnose on the shelf fronts.
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
@@ -198,12 +198,12 @@ export const displayStand: ComponentDef = {
       cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: RAIL_T },
     });
 
-    // Shelves: bowed front edge, short backsplash at the back; middles carry a rail
-    // under the front edge (the top shelf rides the top rails, the bottom shelf the
-    // bottom rails). Depths follow the rake, notched around the legs.
+    // Shelves: all the same depth as the top, back edges flush with the back of the
+    // legs (the boards run between the legs to the rear plane). Bowed front edge,
+    // short backsplash at the back; middles carry a rail under the front edge (the
+    // top shelf rides the top rails, the bottom shelf the bottom cross supports).
     for (let i = 0; i < n; i++) {
       const s = surfaces[i];
-      const depth = outerAt(s) - legD;
       const isTop = i === 0;
       const isBottom = i === n - 1;
       parts.push({
@@ -213,13 +213,13 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [innerW, depth, t],
-            at: [0, backY + legD + depth / 2, s - t / 2],
+            size: [innerW, topD, t],
+            at: [0, backY + topD / 2, s - t / 2],
             arch: 'front',
             rise: FRONT_BULGE,
           },
         ],
-        cut: { length: innerW, width: depth + FRONT_BULGE, thickness: t },
+        cut: { length: innerW, width: topD + FRONT_BULGE, thickness: t },
       });
       const splashH = isTop ? LEG_PROUD : BACKSPLASH_H;
       parts.push({
@@ -227,7 +227,7 @@ export const displayStand: ComponentDef = {
         name: 'Shelf backsplash',
         material: mat,
         primitives: [
-          { shape: 'box', size: [innerW, t, splashH], at: [0, backY + legD + t / 2, s + splashH / 2] },
+          { shape: 'box', size: [innerW, t, splashH], at: [0, backY + t / 2, s + splashH / 2] },
         ],
         cut: { length: innerW, width: splashH, thickness: t },
       });
@@ -240,7 +240,7 @@ export const displayStand: ComponentDef = {
             {
               shape: 'box',
               size: [innerW, t, SHELF_RAIL_H],
-              at: [0, backY + legD + depth - t / 2, s - t - SHELF_RAIL_H / 2],
+              at: [0, backY + topD - t / 2, s - t - SHELF_RAIL_H / 2],
             },
           ],
           cut: { length: innerW, width: SHELF_RAIL_H, thickness: t },
