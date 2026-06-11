@@ -102,20 +102,12 @@ interface State {
 }
 
 function defaultDoc(): ProjectDoc {
+  // New projects open to a blank floor; the Library is the starting point.
   return {
     schema: 1,
     name: 'Untitled project',
     units: 'imperial',
-    instances: [
-      {
-        id: crypto.randomUUID(),
-        componentId: 'dining-table',
-        name: 'Dining table',
-        position: [0, 0],
-        rotationZ: 0,
-        params: {},
-      },
-    ],
+    instances: [],
   };
 }
 
