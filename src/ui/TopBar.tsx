@@ -5,7 +5,7 @@ import { DownloadIcon, FolderIcon, RedoIcon, UndoIcon } from './icons';
 
 const WORKSPACES: { id: Workspace; label: string; disabled?: string }[] = [
   { id: 'design', label: 'Design' },
-  { id: 'studio', label: 'Studio', disabled: 'Render studio arrives in Phase 2' },
+  { id: 'studio', label: 'Studio' },
   { id: 'documents', label: 'Documents' },
 ];
 
@@ -130,7 +130,11 @@ export function TopBar() {
           <DownloadIcon />
         </button>
         <div className="topbar-divider" />
-        <button className="btn btn--primary" disabled title="Render studio arrives in Phase 2">
+        <button
+          className="btn btn--primary"
+          onClick={() => setWorkspace('studio')}
+          title="Open the render studio"
+        >
           Render
         </button>
         <input

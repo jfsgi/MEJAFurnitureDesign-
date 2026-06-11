@@ -819,6 +819,43 @@ button {
   color: var(--text-2);
 }
 
+/* ---------- Studio workspace ---------- */
+
+.studio {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.studio-canvas {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  background: #22252a;
+}
+
+.studio-canvas canvas {
+  display: block;
+}
+
+.studio-render {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-render .btn {
+  justify-content: center;
+}
+
+.studio-render-hint {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+}
+
 /* ---------- Stock breakdown diagrams ---------- */
 
 .stock-sheet {

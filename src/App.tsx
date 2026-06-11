@@ -9,6 +9,7 @@ import { Inspector } from './ui/Inspector';
 import { StatusBar } from './ui/StatusBar';
 import { Toast } from './ui/Toast';
 import { DocumentsView } from './ui/DocumentsView';
+import { StudioView } from './studio/StudioView';
 import { LibraryIcon, PanelRightIcon } from './ui/icons';
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -95,6 +96,8 @@ export default function App() {
       <div className="app-main">
         {workspace === 'documents' ? (
           <DocumentsView />
+        ) : workspace === 'studio' ? (
+          <StudioView />
         ) : (
           <>
             {libraryOpen ? (

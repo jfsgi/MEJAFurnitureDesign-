@@ -66,7 +66,9 @@ export function StatusBar() {
       </div>
 
       <div className={`statusbar-hint${readout && workspace === 'design' ? ' statusbar-hint--active' : ''}`}>
-        {workspace !== 'design'
+        {workspace === 'studio'
+          ? 'Drag to orbit · Scroll to zoom · Render exports a 4K PNG'
+          : workspace !== 'design'
           ? 'Documents regenerate live from the model'
           : zoomArmed
             ? 'Zoom window: drag a box around what you want to see — Esc cancels'
