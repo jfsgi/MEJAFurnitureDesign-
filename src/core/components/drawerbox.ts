@@ -79,21 +79,17 @@ export const drawerBox: ComponentDef = {
         cut: { length: endW, width: H, thickness: sideT },
       };
       if (isFront && (p['pull'] as boolean)) {
-        // Finger pull notched from the top edge; the cut entry stays the full board.
-        const notchW = Math.min(inch(4.5), endW * 0.4);
-        const notchD = Math.min(inch(1.125), H * 0.4);
-        const segW = (endW - notchW) / 2;
-        for (const nx of [-1, 1]) {
-          part.primitives.push({
-            shape: 'box',
-            size: [segW, sideT, H],
-            at: [nx * (notchW / 2 + segW / 2), y, H / 2],
-          });
-        }
+        // Smooth shaper-cutter scoop from the top edge; the cut entry stays the
+        // full board — the pull is machined out of it.
+        const pullW = Math.min(inch(4.5), endW * 0.4);
+        const pullD = Math.min(inch(1.125), H * 0.4);
         part.primitives.push({
-          shape: 'box',
-          size: [notchW, sideT, H - notchD],
-          at: [0, y, (H - notchD) / 2],
+          shape: 'archedBoard',
+          size: [endW, sideT, H],
+          at: [0, y, H / 2],
+          arch: 'scoop',
+          rise: pullD,
+          shoulder: (endW - pullW) / 2,
         });
       } else {
         part.primitives.push({ shape: 'box', size: [endW, sideT, H], at: [0, y, H / 2] });

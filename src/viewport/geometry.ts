@@ -38,7 +38,7 @@ function arcOffset(u: number, c: number, r: number): number {
  */
 export function archedBoardGeometry(
   size: V3,
-  arch: 'bottom-x' | 'bottom-y' | 'front',
+  arch: 'bottom-x' | 'bottom-y' | 'front' | 'scoop',
   rise: number,
   shoulder = 0,
   endSkew = 0,
@@ -83,6 +83,42 @@ export function archedBoardGeometry(
     }
     mb.quad([hx, -hy, -hz], [hx, -hy, hz], [-hx, -hy, hz], [-hx, -hy, -hz],
       [u(hx), v(-hz)], [u(hx), v(hz)], [u(-hx), v(hz)], [u(-hx), v(-hz)]);
+    for (const s of [-1, 1]) {
+      const p0: V3 = [s * hx, -hy, -hz];
+      const p1: V3 = [s * hx, hy, -hz];
+      const p2: V3 = [s * hx, hy, hz];
+      const p3: V3 = [s * hx, -hy, hz];
+      const quad = s > 0 ? [p0, p1, p2, p3] : [p1, p0, p3, p2];
+      mb.quad(quad[0], quad[1], quad[2], quad[3],
+        [v(quad[0][1]), v(quad[0][2])], [v(quad[1][1]), v(quad[1][2])],
+        [v(quad[2][1]), v(quad[2][2])], [v(quad[3][1]), v(quad[3][2])]);
+    }
+    return mb.build();
+  }
+
+  if (arch === 'scoop') {
+    // Finger pull: a smooth cosine scoop cut down into the top edge between the
+    // shoulders — the shaper-cutter wave, not a square notch.
+    const c = Math.max(hx - shoulder, 1);
+    const ztAt = (x: number) =>
+      Math.abs(x) >= c ? hz : hz - rise * 0.5 * (1 + Math.cos((Math.PI * x) / c));
+    const xs: number[] = [-hx];
+    for (let i = 0; i <= ARC_SEGMENTS; i++) xs.push(-c + (2 * c * i) / ARC_SEGMENTS);
+    xs.push(hx);
+    for (let i = 0; i < xs.length - 1; i++) {
+      const [x0, x1] = [xs[i], xs[i + 1]];
+      if (x1 - x0 < 1e-6) continue;
+      const [z0, z1] = [ztAt(x0), ztAt(x1)];
+      // front cap (+Y), back cap (−Y), and the scooped top strip
+      mb.quad([x0, hy, z0], [x1, hy, z1], [x1, hy, -hz], [x0, hy, -hz],
+        [u(x0), v(z0)], [u(x1), v(z1)], [u(x1), v(-hz)], [u(x0), v(-hz)]);
+      mb.quad([x0, -hy, -hz], [x1, -hy, -hz], [x1, -hy, z1], [x0, -hy, z0],
+        [u(x0), v(-hz)], [u(x1), v(-hz)], [u(x1), v(z1)], [u(x0), v(z0)]);
+      mb.quad([x0, -hy, z0], [x1, -hy, z1], [x1, hy, z1], [x0, hy, z0],
+        [u(x0), v(-hy)], [u(x1), v(-hy)], [u(x1), v(hy)], [u(x0), v(hy)]);
+    }
+    mb.quad([-hx, hy, -hz], [hx, hy, -hz], [hx, -hy, -hz], [-hx, -hy, -hz],
+      [u(-hx), v(hy)], [u(hx), v(hy)], [u(hx), v(-hy)], [u(-hx), v(-hy)]);
     for (const s of [-1, 1]) {
       const p0: V3 = [s * hx, -hy, -hz];
       const p1: V3 = [s * hx, hy, -hz];

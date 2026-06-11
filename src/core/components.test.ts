@@ -294,15 +294,19 @@ describe('drawer box', () => {
     expect(front.cut.length).toBeCloseTo(expected, 5);
   });
 
-  it('finger pull notches the front into three boards; cut stays one board', () => {
+  it('finger pull is a smooth scoop in the front; cut stays one board', () => {
     const base = defaultParams(def);
     const plain = def.generate(base).parts.find((p) => p.id === 'front')!;
-    expect(plain.primitives).toHaveLength(1);
+    expect(plain.primitives[0].shape).toBe('box');
     const pulled = def.generate({ ...base, pull: true }).parts.find((p) => p.id === 'front')!;
-    expect(pulled.primitives).toHaveLength(3);
+    expect(pulled.primitives).toHaveLength(1);
+    const prim = pulled.primitives[0] as { shape: string; arch?: string; rise?: number };
+    expect(prim.shape).toBe('archedBoard');
+    expect(prim.arch).toBe('scoop');
+    expect(prim.rise).toBeGreaterThan(0);
     expect(pulled.cut).toEqual(plain.cut);
     const back = def.generate({ ...base, pull: true }).parts.find((p) => p.id === 'back')!;
-    expect(back.primitives).toHaveLength(1);
+    expect(back.primitives[0].shape).toBe('box');
   });
 
   it('warns when the depth strands a standard slide length', () => {
@@ -366,13 +370,14 @@ describe('storage tower', () => {
     expect(names.filter((n) => n === 'Fixed shelf')).toHaveLength(1);
   });
 
-  it('drawer fronts carry pull cutouts by default, backs stay solid', () => {
+  it('drawer fronts carry scooped pulls by default, backs stay solid', () => {
     const model = def.generate(defaultParams(def));
     const fronts = model.parts.filter((p) => p.name === 'Drawer end (pull)');
     const backs = model.parts.filter((p) => p.name === 'Drawer end');
     expect(fronts).toHaveLength(6);
     expect(backs).toHaveLength(6);
-    expect(fronts[0].primitives).toHaveLength(3);
+    expect(fronts[0].primitives).toHaveLength(1);
+    expect((fronts[0].primitives[0] as { arch?: string }).arch).toBe('scoop');
   });
 
   it('removing the cubby gives the drawers the full interior', () => {

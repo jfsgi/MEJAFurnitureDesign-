@@ -51,20 +51,16 @@ export function drawerBoxParts(opts: {
       cut: { length: endW, width: boxH, thickness: sideT },
     };
     if (isFront && pull) {
-      const notchW = Math.min(PULL_WIDTH_MAX, endW * 0.4);
-      const notchD = Math.min(PULL_DEPTH_MAX, boxH * 0.4);
-      const segW = (endW - notchW) / 2;
-      for (const nx of [-1, 1]) {
-        part.primitives.push({
-          shape: 'box',
-          size: [segW, sideT, boxH],
-          at: [nx * (notchW / 2 + segW / 2), y, boxZ],
-        });
-      }
+      // Smooth shaper-cutter scoop, to the shop pattern's scale.
+      const pullW = Math.min(PULL_WIDTH_MAX, endW * 0.4);
+      const pullD = Math.min(PULL_DEPTH_MAX, boxH * 0.4);
       part.primitives.push({
-        shape: 'box',
-        size: [notchW, sideT, boxH - notchD],
-        at: [0, y, boxZ - notchD / 2],
+        shape: 'archedBoard',
+        size: [endW, sideT, boxH],
+        at: [0, y, boxZ],
+        arch: 'scoop',
+        rise: pullD,
+        shoulder: (endW - pullW) / 2,
       });
     } else {
       part.primitives.push({ shape: 'box', size: [endW, sideT, boxH], at: [0, y, boxZ] });
