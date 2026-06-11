@@ -330,15 +330,47 @@ describe('drawer unit', () => {
     expect(names.filter((n) => n === 'Drawer bottom')).toHaveLength(2);
   });
 
-  it('inset fronts plus gaps exactly fill the interior height', () => {
+  it('inset fronts fill the interior with the reveal above, below, and between', () => {
     const params = defaultParams(def);
     const model = def.generate(params);
     const fronts = model.parts.filter((p) => p.name === 'Drawer front');
     const innerH = (params.height as number) - 2 * (params.thickness as number);
-    const gap = params.gap as number;
+    const reveal = params.insetReveal as number;
+    expect(reveal).toBeCloseTo(inch(0.125), 5); // shop standard for inset
     const total =
-      fronts.reduce((sum, f) => sum + f.cut.width, 0) + (fronts.length + 1) * gap;
+      fronts.reduce((sum, f) => sum + f.cut.width, 0) + (fronts.length + 1) * reveal;
     expect(total).toBeCloseTo(innerH, 5);
+  });
+
+  it('overlay fronts cover the box face to within the reveal, spaced by it', () => {
+    const base = defaultParams(def);
+    const model = def.generate({ ...base, frontStyle: 'overlay' });
+    const fronts = model.parts
+      .filter((p) => p.name === 'Drawer front')
+      .sort((a, b) => b.primitives[0].at[2] - a.primitives[0].at[2]);
+    const r = base.overlayReveal as number;
+    expect(r).toBeCloseTo(inch(0.0625), 5); // shop standard for overlay
+    const W = base.width as number;
+    const H = base.height as number;
+    // Perimeter reveal at the outer edges of the box.
+    expect(fronts[0].cut.length).toBeCloseTo(W - 2 * r, 5);
+    const topEdge = fronts[0].primitives[0].at[2] + fronts[0].cut.width / 2;
+    expect(topEdge).toBeCloseTo(H - r, 5);
+    // Stacked fronts spaced by the same reveal.
+    const gapBetween =
+      fronts[0].primitives[0].at[2] - fronts[0].cut.width / 2 -
+      (fronts[1].primitives[0].at[2] + fronts[1].cut.width / 2);
+    expect(gapBetween).toBeCloseTo(r, 5);
+    // Proud of the case face.
+    expect(fronts[0].primitives[0].at[1]).toBeGreaterThan((base.depth as number) / 2 - 0.001);
+  });
+
+  it('back panel insets 1/4" from the rear of the box', () => {
+    const params = defaultParams(def);
+    const back = def.generate(params).parts.find((p) => p.id === 'back')!;
+    const prim = back.primitives[0] as { at: [number, number, number]; size: [number, number, number] };
+    const rearFace = prim.at[1] - prim.size[1] / 2;
+    expect(rearFace).toBeCloseTo(-(params.depth as number) / 2 + inch(0.25), 5);
   });
 
   it('overlay fronts cover the case edges and sit proud of it', () => {
@@ -365,7 +397,7 @@ describe('drawer unit', () => {
     const innerW = inch(45) - 2 * t;
     const colW = (innerW - 2 * t) / 3;
     const front = model.parts.find((p) => p.name === 'Drawer front')!;
-    expect(front.cut.length).toBeCloseTo(colW - 2 * (base.gap as number), 5);
+    expect(front.cut.length).toBeCloseTo(colW - 2 * (base.insetReveal as number), 5);
     // Divider planes land between the columns.
     const xs = dividers.map((d) => d.primitives[0].at[0]).sort((a, b) => a - b);
     expect(xs[0]).toBeCloseTo(-innerW / 2 + colW + t / 2, 5);

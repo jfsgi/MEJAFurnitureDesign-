@@ -1,6 +1,10 @@
-// Parametric drawer unit, MEJA's countertop/desktop product: an outer case with N
-// drawers — full boxes behind inset or overlay fronts — mirroring the production Box
-// Builder's construction (case walls, back gap, slide gaps, front clearances).
+// Parametric drawer unit, MEJA's countertop/desktop product: an outer case split
+// into columns by case-stock dividers, each column carrying a bank of drawers —
+// full boxes behind inset or overlay fronts. Reveals follow the shop standard:
+// inset fronts sit in their openings with a reveal all around (1/8" typical);
+// overlay fronts sit on the box face with a reveal at the case's outer edges
+// (1/16" typical); stacked fronts are spaced by that same reveal. The back panel
+// insets 1/4" from the rear of the box.
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
@@ -12,7 +16,8 @@ const str = (p: ParamValues, k: string): string => p[k] as string;
 
 const SLIDE_CLEARANCE = inch(0.5); // per side, standard side-mount slides
 const BOX_HEIGHT_CLEARANCE = inch(1);
-const BACK_GAP = inch(0.5); // box to back panel (slide stop + back offset)
+const BACK_OFFSET = inch(0.25); // back panel inset from the rear of the box
+const DRAWER_BACK_GAP = inch(0.25); // box to back panel
 const MIN_OPENING = inch(2);
 
 export const drawerUnit: ComponentDef = {
@@ -36,8 +41,8 @@ export const drawerUnit: ComponentDef = {
     { kind: 'length', key: 'thickness', label: 'Case thickness', default: inch(0.625), min: inch(0.5), max: inch(1), tier: 'advanced' },
     { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'boxSideThickness', label: 'Box side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
-    { kind: 'length', key: 'gap', label: 'Front gap', default: inch(0.0625), min: inch(0.03125), max: inch(0.25), tier: 'advanced' },
-    { kind: 'length', key: 'overlayAmount', label: 'Overlay amount', default: inch(0.5), min: inch(0.25), max: inch(0.75), tier: 'advanced' },
+    { kind: 'length', key: 'insetReveal', label: 'Inset reveal', default: inch(0.125), min: inch(0.0625), max: inch(0.25), tier: 'advanced' },
+    { kind: 'length', key: 'overlayReveal', label: 'Overlay reveal', default: inch(0.0625), min: inch(0.03125), max: inch(0.25), tier: 'advanced' },
   ],
   generate(p): GeneratedModel {
     const W = num(p, 'width');
@@ -47,8 +52,8 @@ export const drawerUnit: ComponentDef = {
     const t = num(p, 'thickness');
     const backT = num(p, 'backThickness');
     const sideT = num(p, 'boxSideThickness');
-    const gap = num(p, 'gap');
-    const overlay = num(p, 'overlayAmount');
+    const rIns = num(p, 'insetReveal');
+    const rOv = num(p, 'overlayReveal');
     const overlayFronts = str(p, 'frontStyle') === 'overlay';
     const mat = str(p, 'material');
     const boxMat = str(p, 'boxMaterial');
@@ -82,21 +87,26 @@ export const drawerUnit: ComponentDef = {
       primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, H - t / 2] }],
       cut: { length: innerW, width: D, thickness: t },
     });
+    // Back panel, inset from the rear of the box per the shop standard.
     parts.push({
       id: 'back',
       name: 'Back panel',
       material: mat,
       primitives: [
-        { shape: 'box', size: [innerW, backT, innerH], at: [0, -(D / 2 - backT / 2), H / 2] },
+        {
+          shape: 'box',
+          size: [innerW, backT, innerH],
+          at: [0, -D / 2 + BACK_OFFSET + backT / 2, H / 2],
+        },
       ],
       cut: { length: innerH, width: innerW, thickness: backT },
     });
 
-    // Openings: equal slices of the interior with a gap above, below, and between.
     // Columns split the interior with full dividers of case stock; each column
     // carries its own bank of drawers riding the case sides and the dividers.
     const nCol = num(p, 'columns');
     const colW = (innerW - (nCol - 1) * t) / nCol;
+    const dividerD = D - BACK_OFFSET - backT;
     for (let c = 1; c < nCol; c++) {
       parts.push({
         id: `divider-${c}`,
@@ -105,47 +115,47 @@ export const drawerUnit: ComponentDef = {
         primitives: [
           {
             shape: 'box',
-            size: [t, D - backT, innerH],
-            at: [-innerW / 2 + c * (colW + t) - t / 2, backT / 2, H / 2],
+            size: [t, dividerD, innerH],
+            at: [-innerW / 2 + c * (colW + t) - t / 2, (BACK_OFFSET + backT) / 2, H / 2],
           },
         ],
-        cut: { length: innerH, width: D - backT, thickness: t },
+        cut: { length: innerH, width: dividerD, thickness: t },
       });
     }
 
-    const opening = (innerH - (n + 1) * gap) / n;
+    // Interior openings: inset fronts live inside them with the reveal above,
+    // below, and between; overlay construction splits the interior evenly and
+    // the reveals live on the case face instead.
+    const opening = overlayFronts ? innerH / n : (innerH - (n + 1) * rIns) / n;
     const boxW = colW - 2 * SLIDE_CLEARANCE;
-    const boxD = D - backT - t - BACK_GAP;
+    const boxD = D - BACK_OFFSET - backT - DRAWER_BACK_GAP - t;
     const boxY = D / 2 - t - boxD / 2;
 
-    // Overlay fronts cover the case edges (and split the dividers between columns);
-    // their own stack starts above the top edge.
-    const frontW = overlayFronts
-      ? Math.min(colW + 2 * overlay, nCol > 1 ? colW + t - gap : W - 2 * gap)
-      : colW - 2 * gap;
-    const frontH = overlayFronts ? (innerH + 2 * overlay - (n - 1) * gap) / n : opening;
+    // Front grid. Inset: within each opening, reveal all around. Overlay: fronts
+    // sit on the box face, covering it to within the reveal of the outer edges,
+    // spaced from each other by the same reveal (splitting dividers and rails).
+    const frontW = overlayFronts ? (W - (nCol + 1) * rOv) / nCol : colW - 2 * rIns;
+    const frontH = overlayFronts ? (H - (n + 1) * rOv) / n : opening;
     const frontY = overlayFronts ? D / 2 + t / 2 : D / 2 - t / 2;
 
     for (let c = 0; c < nCol; c++) {
       const colX = -innerW / 2 + c * (colW + t) + colW / 2;
-      let openingCursor = H - t;
-      let frontCursor = overlayFronts ? H - t + overlay : H - t;
+      const frontX = overlayFronts ? -W / 2 + rOv + c * (frontW + rOv) + frontW / 2 : colX;
       for (let i = 0; i < n; i++) {
-        openingCursor -= gap;
-        const openingTop = openingCursor;
-        openingCursor -= opening;
-        if (!overlayFronts) frontCursor = openingTop;
+        const openingTop = overlayFronts
+          ? H - t - i * opening
+          : H - t - rIns - i * (opening + rIns);
+        const frontTop = overlayFronts ? H - rOv - i * (frontH + rOv) : openingTop;
 
         parts.push({
           id: `drawer-front-${c}-${i}`,
           name: 'Drawer front',
           material: mat,
           primitives: [
-            { shape: 'box', size: [frontW, t, frontH], at: [colX, frontY, frontCursor - frontH / 2] },
+            { shape: 'box', size: [frontW, t, frontH], at: [frontX, frontY, frontTop - frontH / 2] },
           ],
           cut: { length: frontW, width: frontH, thickness: t },
         });
-        if (overlayFronts) frontCursor -= frontH + gap;
 
         parts.push(
           ...drawerBoxParts({
