@@ -19,7 +19,6 @@ const SIDE_TOP_RAIL_H = inch(2.75);
 const SIDE_BOTTOM_RAIL_H = inch(2.25);
 const BOTTOM_RAIL_Z = inch(2.4375); // floor to the bottom rails' lower edge
 const LEG_PROUD = inch(0.75); // leg tops stand this far above the top shelf
-const FRONT_BULGE = inch(0.75); // shelf front edge bow
 const BACKSPLASH_H = inch(1.75);
 const ARCH_RISE_FRONT = inch(2);
 const ARCH_RISE_SIDE = inch(1);
@@ -188,14 +187,14 @@ export const displayStand: ComponentDef = {
       cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: legW },
     });
 
-    // Shelves: full depth — from the rear leg plane to the front arch peak at the
-    // piece's full depth — passing between the raked legs and cantilevering past
-    // the bottom cross piece. Clean bowed boards with a short backsplash; the top
-    // shelf rides the back rail, the bottom shelf the bottom cross supports.
-    const shelfD = D - FRONT_BULGE; // board depth; the bow peaks at the full depth
+    // Shelves: straight sides run from the rear leg plane to the raked legs, then a
+    // half-ellipse sweeps leg to leg out to the piece's full depth at center. Each
+    // shelf's ellipse differs — the raked legs sit deeper at every level down. The
+    // top shelf rides the back rail; the bottom shelf the bottom cross supports.
     for (let i = 0; i < n; i++) {
       const s = surfaces[i];
       const isTop = i === 0;
+      const springD = outerAt(s); // the raked legs' face at this shelf — the spring line
       parts.push({
         id: `shelf-${i}`,
         name: isTop ? 'Top shelf' : 'Shelf',
@@ -203,10 +202,10 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [innerW, shelfD, t],
-            at: [0, backY + shelfD / 2, s - t / 2],
+            size: [innerW, springD, t],
+            at: [0, backY + springD / 2, s - t / 2],
             arch: 'front',
-            rise: FRONT_BULGE,
+            rise: D - springD,
           },
         ],
         cut: { length: innerW, width: D, thickness: t },

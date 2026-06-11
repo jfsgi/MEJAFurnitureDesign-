@@ -56,10 +56,11 @@ export function archedBoardGeometry(
   const v = (val: number) => val / GRAIN_MM_V + uvOffset[1];
 
   if (arch === 'front') {
-    // Plan bulge: front edge curve from corner to corner, +rise at center.
-    const yAt = (x: number) => hy + arcOffset(x, hx, rise);
+    // Half-ellipse bulge: springs vertically off the corners, +rise at center.
+    // Cosine-spaced samples keep the steep ends smooth.
+    const yAt = (x: number) => hy + rise * Math.sqrt(Math.max(1 - (x / hx) ** 2, 0));
     const xs: number[] = [];
-    for (let i = 0; i <= ARC_SEGMENTS; i++) xs.push(-hx + (sx * i) / ARC_SEGMENTS);
+    for (let i = 0; i <= ARC_SEGMENTS; i++) xs.push(-hx * Math.cos((Math.PI * i) / ARC_SEGMENTS));
     for (let i = 0; i < xs.length - 1; i++) {
       const [x0, x1] = [xs[i], xs[i + 1]];
       const [y0, y1] = [yAt(x0), yAt(x1)];

@@ -83,7 +83,7 @@ export type Primitive =
       size: [number, number, number];
       at: [number, number, number];
       /** bottom-x/-y: relief arch cut up into the lower edge along that axis;
-       *  front: convex plan bulge on the +Y edge, springing from the corners. */
+       *  front: convex half-ellipse bulge on the +Y edge, springing from the corners. */
       arch: 'bottom-x' | 'bottom-y' | 'front';
       rise: number;
       /** Flat ends left at either side of a bottom arch. */

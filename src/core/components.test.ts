@@ -522,23 +522,28 @@ describe('tiered display stand', () => {
     expect(shape('Shelf')).toBe('archedBoard');
   });
 
-  it('shelves run full depth: rear leg plane to the front arch peak', () => {
+  it('each shelf carries its own half-ellipse: spring at the legs, peak at full depth', () => {
     const params = defaultParams(def);
     const model = def.generate(params);
     const D = params.depth as number;
     const shelves = model.parts.filter((p) => p.name === 'Shelf' || p.name === 'Top shelf');
     expect(shelves).toHaveLength(4);
+    const rises: number[] = [];
     for (const shelf of shelves) {
       const prim = shelf.primitives[0] as {
         at: [number, number, number];
         size: [number, number, number];
         rise: number;
       };
-      // Back edge flush with the rear plane; bow peak at the full depth.
+      // Back edge flush with the rear plane; ellipse peak at the full depth.
       expect(prim.at[1] - prim.size[1] / 2).toBeCloseTo(-D / 2, 5);
       expect(prim.at[1] + prim.size[1] / 2 + prim.rise).toBeCloseTo(D / 2, 5);
       expect(shelf.cut.width).toBeCloseTo(D, 5);
+      rises.push(prim.rise);
     }
+    // The legs sit deeper at every level down, so each ellipse is shallower.
+    for (let i = 1; i < rises.length; i++) expect(rises[i]).toBeLessThan(rises[i - 1]);
+    expect(rises[0]).toBeGreaterThan(inch(5)); // top shelf sweeps from ~14" out to 20"
   });
 
   it('matches the drawing envelope: 36 × 20 × 38 at defaults', () => {
