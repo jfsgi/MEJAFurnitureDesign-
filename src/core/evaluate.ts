@@ -46,24 +46,37 @@ function primCorners(prim: Primitive): [number, number, number][] {
   let hx: number, hy: number, hz: number;
   if (prim.shape === 'box') {
     [hx, hy, hz] = [prim.size[0] / 2, prim.size[1] / 2, prim.size[2] / 2];
-    if (prim.tilt) {
-      // Tilted about the depth (Y) axis: rotate the corner offsets like three.js does.
-      const cos = Math.cos(prim.tilt);
-      const sin = Math.sin(prim.tilt);
+    if (prim.tilt || prim.tiltX) {
+      // Rotate the corner offsets like three.js does: about X, then about Y.
+      const cosX = Math.cos(prim.tiltX ?? 0);
+      const sinX = Math.sin(prim.tiltX ?? 0);
+      const cosY = Math.cos(prim.tilt ?? 0);
+      const sinY = Math.sin(prim.tilt ?? 0);
       const corners: [number, number, number][] = [];
       for (const sx of [-1, 1])
         for (const sy of [-1, 1])
           for (const sz of [-1, 1]) {
             const x = sx * hx;
-            const z = sz * hz;
-            corners.push([cx + x * cos + z * sin, cy + sy * hy, cz - x * sin + z * cos]);
+            const y = sy * hy * cosX - sz * hz * sinX;
+            const z = sy * hy * sinX + sz * hz * cosX;
+            corners.push([cx + x * cosY + z * sinY, cy + y, cz - x * sinY + z * cosY]);
           }
       return corners;
     }
   } else if (prim.shape === 'taperedBox') {
-    hx = Math.max(prim.top[0], prim.bottom[0]) / 2;
-    hy = Math.max(prim.top[1], prim.bottom[1]) / 2;
-    hz = prim.height / 2;
+    // The top face is centered on `at`; align shifts the bottom face — take the
+    // union of both faces' extents (a back-flush wedge reaches well past center).
+    const [tw, td] = prim.top;
+    const [bw, bd] = prim.bottom;
+    const ox = (prim.align[0] * (tw - bw)) / 2;
+    const oy = (prim.align[1] * (td - bd)) / 2;
+    const xs = [Math.min(-tw / 2, ox - bw / 2), Math.max(tw / 2, ox + bw / 2)];
+    const ys = [Math.min(-td / 2, oy - bd / 2), Math.max(td / 2, oy + bd / 2)];
+    const corners: [number, number, number][] = [];
+    for (const x of xs)
+      for (const y of ys)
+        for (const sz of [-1, 1]) corners.push([cx + x, cy + y, cz + (sz * prim.height) / 2]);
+    return corners;
   } else {
     const r = Math.max(prim.radiusTop, prim.radiusBottom);
     [hx, hy, hz] = [r, r, prim.height / 2];

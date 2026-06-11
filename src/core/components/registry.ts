@@ -10,6 +10,7 @@ import { drawerBox } from './drawerbox';
 import { drawerUnit } from './drawerunit';
 import { bench, stool } from './seating';
 import { wallShelf } from './wallshelf';
+import { spiceRack } from './spicerack';
 
 const ALL: ComponentDef[] = [
   diningTable,
@@ -24,6 +25,7 @@ const ALL: ComponentDef[] = [
   storageTower,
   wineCube,
   wallShelf,
+  spiceRack,
   drawerBox,
   drawerUnit,
   taperedLeg,
@@ -42,7 +44,7 @@ export const CATEGORIES: { name: string; components: ComponentDef[] }[] = [
   { name: 'Tables', components: [diningTable, coffeeTable, consoleTable, sideTable] },
   { name: 'Seating', components: [bench, stool] },
   { name: 'Storage', components: [bookcase, cabinet, dresser, storageTower, wineCube] },
-  { name: 'Wall-mounted', components: [wallShelf] },
+  { name: 'Wall-mounted', components: [wallShelf, spiceRack] },
   { name: 'Drawers', components: [drawerBox, drawerUnit] },
   { name: 'Legs', components: [taperedLeg, straightLeg, roundLeg] },
   { name: 'Boards & panels', components: [board, panel, shelf] },

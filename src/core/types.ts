@@ -58,6 +58,8 @@ export type Primitive =
       at: [number, number, number];
       /** Rotation about the depth (Y) axis, radians — diagonal dividers, angled parts. */
       tilt?: number;
+      /** Rotation about the width (X) axis, radians — leaned shelves. Use one tilt at a time. */
+      tiltX?: number;
     }
   | {
       shape: 'taperedBox';

@@ -379,6 +379,34 @@ describe('wine cube', () => {
   });
 });
 
+describe('spice rack', () => {
+  const def = REGISTRY['spice-rack'];
+
+  it('builds the four production parts: two sides, shelf, back', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Side (wedge)')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Shelf (angled)')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Back panel')).toHaveLength(1);
+  });
+
+  it('leans the shelf back toward the wall', () => {
+    const model = def.generate(defaultParams(def));
+    const shelf = model.parts.find((p) => p.name === 'Shelf (angled)')!;
+    const prim = shelf.primitives[0] as { tiltX?: number };
+    expect(prim.tiltX ?? 0).toBeLessThan(0);
+  });
+
+  it('hangs at mount height with the back-flush wedge inside the depth', () => {
+    const params = defaultParams(def);
+    const box = modelBBox(def.generate(params))!;
+    expect(box.min[2]).toBeCloseTo(params.mountHeight as number, 1);
+    expect(box.max[2] - box.min[2]).toBeCloseTo(params.height as number, 1);
+    // The aligned wedge must not inflate the bbox past the rack's depth.
+    expect(box.max[1] - box.min[1]).toBeLessThanOrEqual((params.depth as number) + 1);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 

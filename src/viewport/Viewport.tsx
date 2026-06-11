@@ -81,10 +81,11 @@ function PrimitiveMesh({
       </mesh>
     );
   }
-  const tilt = prim.shape === 'box' ? (prim.tilt ?? 0) : 0;
+  const tiltX = prim.shape === 'box' ? (prim.tiltX ?? 0) : 0;
+  const tiltY = prim.shape === 'box' ? (prim.tilt ?? 0) : 0;
   if (geo) {
     return (
-      <mesh position={prim.at} rotation={[0, tilt, 0]} geometry={geo}>
+      <mesh position={prim.at} rotation={[tiltX, tiltY, 0]} geometry={geo}>
         {material}
         {edges}
       </mesh>
@@ -93,7 +94,7 @@ function PrimitiveMesh({
   // Only ungrained boxes reach here (cylinders returned above; tapered/grained use `geo`).
   if (prim.shape !== 'box') return null;
   return (
-    <mesh position={prim.at} rotation={[0, tilt, 0]}>
+    <mesh position={prim.at} rotation={[tiltX, tiltY, 0]}>
       <boxGeometry args={prim.size} />
       {material}
       {edges}
