@@ -27,16 +27,17 @@ export const drawerUnit: ComponentDef = {
   description: 'Countertop case with sliding drawers, inset or overlay fronts.',
   params: [
     { kind: 'length', key: 'width', label: 'Width', default: inch(24), min: inch(10), max: inch(60), tier: 'basic' },
+    { kind: 'length', key: 'depth', label: 'Depth', default: inch(14), min: inch(8), max: inch(30), tier: 'basic' },
     { kind: 'length', key: 'height', label: 'Height', default: inch(8), min: inch(3), max: inch(24), tier: 'basic' },
     { kind: 'count', key: 'drawerCount', label: 'Drawers per column', default: 2, min: 1, max: 6, tier: 'basic' },
     { kind: 'count', key: 'columns', label: 'Columns', default: 1, min: 1, max: 4, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'walnut', tier: 'basic' },
-    { kind: 'length', key: 'depth', label: 'Depth', default: inch(14), min: inch(8), max: inch(30), tier: 'advanced' },
     { kind: 'enum', key: 'frontStyle', label: 'Front style', default: 'inset', tier: 'advanced',
       options: [
         { value: 'inset', label: 'Inset' },
         { value: 'overlay', label: 'Overlay' },
       ] },
+    { kind: 'boolean', key: 'pulls', label: 'Finger pull cutouts', default: true, tier: 'advanced' },
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
     { kind: 'enum', key: 'caseJoinery', label: 'Case joinery', default: 'half-blind-dovetail', tier: 'advanced',
       options: [
@@ -60,6 +61,7 @@ export const drawerUnit: ComponentDef = {
     const rIns = num(p, 'insetReveal');
     const rOv = num(p, 'overlayReveal');
     const overlayFronts = str(p, 'frontStyle') === 'overlay';
+    const pulls = p['pulls'] as boolean;
     const mat = str(p, 'material');
     const boxMat = str(p, 'boxMaterial');
 
@@ -160,12 +162,24 @@ export const drawerUnit: ComponentDef = {
           : H - t - rIns - i * (opening + rIns);
         const frontTop = overlayFronts ? H - rOv - i * (frontH + rOv) : openingTop;
 
+        // Finger pull scooped from the top middle of the front, to the shop pattern.
+        const pullW = Math.min(inch(4.5), frontW * 0.4);
+        const pullD = Math.min(inch(1.125), frontH * 0.4);
         parts.push({
           id: `drawer-front-${c}-${i}`,
-          name: 'Drawer front',
+          name: pulls ? 'Drawer front (pull)' : 'Drawer front',
           material: mat,
           primitives: [
-            { shape: 'box', size: [frontW, t, frontH], at: [frontX, frontY, frontTop - frontH / 2] },
+            pulls
+              ? {
+                  shape: 'archedBoard',
+                  size: [frontW, t, frontH],
+                  at: [frontX, frontY, frontTop - frontH / 2],
+                  arch: 'scoop',
+                  rise: pullD,
+                  shoulder: (frontW - pullW) / 2,
+                }
+              : { shape: 'box', size: [frontW, t, frontH], at: [frontX, frontY, frontTop - frontH / 2] },
           ],
           cut: { length: frontW, width: frontH, thickness: t },
         });

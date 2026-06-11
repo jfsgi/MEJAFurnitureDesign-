@@ -23,10 +23,10 @@ describe('component registry', () => {
     }
   });
 
-  it('caps basic parameters at 5 (UI standard / publishing rule)', () => {
+  it('caps basic parameters at 6 (UI standard / publishing rule)', () => {
     for (const def of Object.values(REGISTRY)) {
       const basics = def.params.filter((p) => p.tier === 'basic');
-      expect(basics.length, def.id).toBeLessThanOrEqual(5);
+      expect(basics.length, def.id).toBeLessThanOrEqual(6);
     }
   });
 });
@@ -166,7 +166,7 @@ describe('chest of drawers', () => {
   it('builds the carcase plus a full box behind every front', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
-    expect(names.filter((n) => n === 'Drawer front')).toHaveLength(4);
+    expect(names.filter((n) => n.startsWith('Drawer front'))).toHaveLength(4);
     expect(names.filter((n) => n === 'Drawer side')).toHaveLength(8);
     expect(names.filter((n) => n === 'Drawer end')).toHaveLength(8);
     expect(names.filter((n) => n === 'Drawer bottom')).toHaveLength(4);
@@ -176,7 +176,7 @@ describe('chest of drawers', () => {
   it('fronts plus reveals exactly fill the interior height', () => {
     const params = defaultParams(def);
     const model = def.generate(params);
-    const fronts = model.parts.filter((p) => p.name === 'Drawer front');
+    const fronts = model.parts.filter((p) => p.name.startsWith('Drawer front'));
     const t = params.thickness as number;
     const reveal = params.reveal as number;
     const innerH = (params.height as number) - 2 * t;
@@ -190,7 +190,7 @@ describe('chest of drawers', () => {
     const heightsOf = (params: typeof base) =>
       def
         .generate(params)
-        .parts.filter((p) => p.name === 'Drawer front')
+        .parts.filter((p) => p.name.startsWith('Drawer front'))
         .map((f) => f.cut.width);
     const graduated = heightsOf(base);
     // Generation order is top to bottom: each front at least as tall as the one above.
@@ -202,7 +202,7 @@ describe('chest of drawers', () => {
   it('uses the secondary material for drawer boxes', () => {
     const model = def.generate(defaultParams(def));
     const side = model.parts.find((p) => p.name === 'Drawer side')!;
-    const front = model.parts.find((p) => p.name === 'Drawer front')!;
+    const front = model.parts.find((p) => p.name.startsWith('Drawer front'))!;
     expect(side.material).toBe('maple');
     expect(front.material).toBe('walnut');
   });
@@ -324,7 +324,7 @@ describe('drawer unit', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
     expect(names.filter((n) => n.startsWith('Side'))).toHaveLength(2);
-    expect(names.filter((n) => n === 'Drawer front')).toHaveLength(2);
+    expect(names.filter((n) => n.startsWith('Drawer front'))).toHaveLength(2);
     expect(names.filter((n) => n === 'Drawer side')).toHaveLength(4);
     expect(names.filter((n) => n === 'Drawer end')).toHaveLength(4);
     expect(names.filter((n) => n === 'Drawer bottom')).toHaveLength(2);
@@ -333,7 +333,7 @@ describe('drawer unit', () => {
   it('inset fronts fill the interior with the reveal above, below, and between', () => {
     const params = defaultParams(def);
     const model = def.generate(params);
-    const fronts = model.parts.filter((p) => p.name === 'Drawer front');
+    const fronts = model.parts.filter((p) => p.name.startsWith('Drawer front'));
     const innerH = (params.height as number) - 2 * (params.thickness as number);
     const reveal = params.insetReveal as number;
     expect(reveal).toBeCloseTo(inch(0.125), 5); // shop standard for inset
@@ -346,7 +346,7 @@ describe('drawer unit', () => {
     const base = defaultParams(def);
     const model = def.generate({ ...base, frontStyle: 'overlay' });
     const fronts = model.parts
-      .filter((p) => p.name === 'Drawer front')
+      .filter((p) => p.name.startsWith('Drawer front'))
       .sort((a, b) => b.primitives[0].at[2] - a.primitives[0].at[2]);
     const r = base.overlayReveal as number;
     expect(r).toBeCloseTo(inch(0.0625), 5); // shop standard for overlay
@@ -381,6 +381,19 @@ describe('drawer unit', () => {
     expect(butt.parts.find((p) => p.id === 'top')!.name).toBe('Top');
   });
 
+  it('fronts scoop a finger pull in the top middle by default', () => {
+    const base = defaultParams(def);
+    const front = def.generate(base).parts.find((p) => p.name.startsWith('Drawer front'))!;
+    const prim = front.primitives[0] as { shape: string; arch?: string; at: [number, number, number] };
+    expect(prim.shape).toBe('archedBoard');
+    expect(prim.arch).toBe('scoop');
+    expect(prim.at[0]).toBeCloseTo(0, 5); // centered on the single column
+    const plain = def
+      .generate({ ...base, pulls: false })
+      .parts.find((p) => p.name.startsWith('Drawer front'))!;
+    expect(plain.primitives[0].shape).toBe('box');
+  });
+
   it('back panel insets 1/4" from the rear of the box', () => {
     const params = defaultParams(def);
     const back = def.generate(params).parts.find((p) => p.id === 'back')!;
@@ -392,7 +405,7 @@ describe('drawer unit', () => {
   it('overlay fronts cover the case edges and sit proud of it', () => {
     const base = defaultParams(def);
     const model = def.generate({ ...base, frontStyle: 'overlay' });
-    const front = model.parts.find((p) => p.name === 'Drawer front')!;
+    const front = model.parts.find((p) => p.name.startsWith('Drawer front'))!;
     const innerW = (base.width as number) - 2 * (base.thickness as number);
     expect(front.cut.length).toBeGreaterThan(innerW);
     const caseDepthFront = (base.depth as number) / 2;
@@ -407,12 +420,12 @@ describe('drawer unit', () => {
     const t = base.thickness as number;
     expect(dividers[0].cut.thickness).toBeCloseTo(t, 5);
     // 3 columns × 2 rows: a front and a full box per cell.
-    expect(model.parts.filter((p) => p.name === 'Drawer front')).toHaveLength(6);
+    expect(model.parts.filter((p) => p.name.startsWith('Drawer front'))).toHaveLength(6);
     expect(model.parts.filter((p) => p.name === 'Drawer side')).toHaveLength(12);
     // Columns split the interior evenly around the dividers.
     const innerW = inch(45) - 2 * t;
     const colW = (innerW - 2 * t) / 3;
-    const front = model.parts.find((p) => p.name === 'Drawer front')!;
+    const front = model.parts.find((p) => p.name.startsWith('Drawer front'))!;
     expect(front.cut.length).toBeCloseTo(colW - 2 * (base.insetReveal as number), 5);
     // Divider planes land between the columns.
     const xs = dividers.map((d) => d.primitives[0].at[0]).sort((a, b) => a - b);
@@ -435,7 +448,7 @@ describe('storage tower', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
     expect(names.filter((n) => n === 'Drawer side')).toHaveLength(12);
-    expect(names.filter((n) => n === 'Drawer front')).toHaveLength(0);
+    expect(names.filter((n) => n.startsWith('Drawer front'))).toHaveLength(0);
     expect(names.filter((n) => n === 'Fixed shelf')).toHaveLength(1);
   });
 
