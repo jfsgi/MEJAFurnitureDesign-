@@ -458,12 +458,18 @@ describe('drawer unit', () => {
     // 3 columns × 2 rows: a front and a full box per cell.
     expect(model.parts.filter((p) => p.name.startsWith('Drawer front'))).toHaveLength(6);
     expect(model.parts.filter((p) => p.name === 'Drawer side')).toHaveLength(12);
-    // Columns split the interior evenly around the dividers.
+    // Columns split the interior evenly around the dividers; inset fronts run
+    // over the recessed dividers, separated by single reveals.
     const innerW = inch(45) - 2 * t;
-    const colW = (innerW - 2 * t) / 3;
+    const r = base.insetReveal as number;
     const front = model.parts.find((p) => p.name.startsWith('Drawer front'))!;
-    expect(front.cut.length).toBeCloseTo(colW - 2 * (base.insetReveal as number), 5);
+    expect(front.cut.length).toBeCloseTo((innerW - 4 * r) / 3, 5);
+    // Divider recessed a front thickness; fronts cover it.
+    const divider = model.parts.find((p) => p.name === 'Divider')!;
+    const dPrim = divider.primitives[0] as { at: [number, number, number]; size: [number, number, number] };
+    expect(dPrim.at[1] + dPrim.size[1] / 2).toBeCloseTo((base.depth as number) / 2 - t, 5);
     // Divider planes land between the columns.
+    const colW = (innerW - 2 * t) / 3;
     const xs = dividers.map((d) => d.primitives[0].at[0]).sort((a, b) => a - b);
     expect(xs[0]).toBeCloseTo(-innerW / 2 + colW + t / 2, 5);
     expect(xs[1]).toBeCloseTo(-innerW / 2 + 2 * colW + 1.5 * t, 5);

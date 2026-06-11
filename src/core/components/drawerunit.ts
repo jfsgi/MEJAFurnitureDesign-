@@ -212,7 +212,9 @@ export const drawerUnit: ComponentDef = {
     // carries its own bank of drawers riding the case sides and the dividers.
     const nCol = num(p, 'columns');
     const colW = (innerW - (nCol - 1) * t) / nCol;
-    const dividerD = D - BACK_OFFSET - backT;
+    // Dividers stop a front-thickness shy of the case edge; the fronts run over
+    // them, so only the reveal shows between columns.
+    const dividerD = D - BACK_OFFSET - backT - t;
     for (let c = 1; c < nCol; c++) {
       parts.push({
         id: `divider-${c}`,
@@ -222,7 +224,7 @@ export const drawerUnit: ComponentDef = {
           {
             shape: 'box',
             size: [t, dividerD, innerH],
-            at: [-innerW / 2 + c * (colW + t) - t / 2, (BACK_OFFSET + backT) / 2, H / 2],
+            at: [-innerW / 2 + c * (colW + t) - t / 2, (BACK_OFFSET + backT - t) / 2, H / 2],
           },
         ],
         cut: { length: innerH, width: dividerD, thickness: t },
@@ -237,16 +239,21 @@ export const drawerUnit: ComponentDef = {
     const boxD = D - BACK_OFFSET - backT - DRAWER_BACK_GAP - t;
     const boxY = D / 2 - t - boxD / 2;
 
-    // Front grid. Inset: within each opening, reveal all around. Overlay: fronts
-    // sit on the box face, covering it to within the reveal of the outer edges,
-    // spaced from each other by the same reveal (splitting dividers and rails).
-    const frontW = overlayFronts ? (W - (nCol + 1) * rOv) / nCol : colW - 2 * rIns;
+    // Front grid. Inset: fronts share the case opening, running over the recessed
+    // dividers — the reveal at the case sides, between columns, and between rows.
+    // Overlay: fronts sit on the box face, covering it to within the reveal of
+    // the outer edges, spaced by the same reveal.
+    const frontW = overlayFronts
+      ? (W - (nCol + 1) * rOv) / nCol
+      : (innerW - (nCol + 1) * rIns) / nCol;
     const frontH = overlayFronts ? (H - (n + 1) * rOv) / n : opening;
     const frontY = overlayFronts ? D / 2 + t / 2 : D / 2 - t / 2;
 
     for (let c = 0; c < nCol; c++) {
       const colX = -innerW / 2 + c * (colW + t) + colW / 2;
-      const frontX = overlayFronts ? -W / 2 + rOv + c * (frontW + rOv) + frontW / 2 : colX;
+      const frontX = overlayFronts
+        ? -W / 2 + rOv + c * (frontW + rOv) + frontW / 2
+        : -innerW / 2 + rIns + c * (frontW + rIns) + frontW / 2;
       for (let i = 0; i < n; i++) {
         const openingTop = overlayFronts
           ? H - t - i * opening
