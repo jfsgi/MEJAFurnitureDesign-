@@ -299,7 +299,6 @@ describe('drawer box', () => {
     const plain = def.generate(base).parts.find((p) => p.id === 'front')!;
     expect(plain.primitives[0].shape).toBe('box');
     const pulled = def.generate({ ...base, pull: true }).parts.find((p) => p.id === 'front')!;
-    expect(pulled.primitives).toHaveLength(1);
     const prim = pulled.primitives[0] as { shape: string; arch?: string; rise?: number };
     expect(prim.shape).toBe('archedBoard');
     expect(prim.arch).toBe('scoop');
@@ -307,6 +306,22 @@ describe('drawer box', () => {
     expect(pulled.cut).toEqual(plain.cut);
     const back = def.generate({ ...base, pull: true }).parts.find((p) => p.id === 'back')!;
     expect(back.primitives[0].shape).toBe('box');
+  });
+
+  it('renders the corner joinery: flared dovetail tails, square box-joint fingers', () => {
+    const base = defaultParams(def);
+    const dovetail = def.generate(base); // dovetail is the default
+    const side = dovetail.parts.find((p) => p.id === 'side-1')!;
+    const tails = side.primitives.filter((pr) => pr.shape === 'taperedBox');
+    expect(tails.length).toBeGreaterThan(2);
+    expect((tails[0] as { axis?: string }).axis).toBe('y');
+    const front = dovetail.parts.find((p) => p.id === 'front')!;
+    expect(front.primitives.filter((pr) => pr.shape === 'taperedBox').length).toBeGreaterThan(0);
+
+    const boxJoint = def.generate({ ...base, joinery: 'box-joint' });
+    const bjSide = boxJoint.parts.find((p) => p.id === 'side-1')!;
+    expect(bjSide.primitives.every((pr) => pr.shape === 'box')).toBe(true);
+    expect(bjSide.primitives.length).toBeGreaterThan(2); // panel + square fingers
   });
 
   it('warns when the depth strands a standard slide length', () => {
@@ -458,7 +473,7 @@ describe('storage tower', () => {
     const backs = model.parts.filter((p) => p.name === 'Drawer end');
     expect(fronts).toHaveLength(6);
     expect(backs).toHaveLength(6);
-    expect(fronts[0].primitives).toHaveLength(1);
+    expect(fronts[0].primitives.length).toBeGreaterThanOrEqual(1);
     expect((fronts[0].primitives[0] as { arch?: string }).arch).toBe('scoop');
   });
 

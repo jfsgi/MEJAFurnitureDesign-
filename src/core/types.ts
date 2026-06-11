@@ -70,6 +70,8 @@ export type Primitive =
       align: [number, number]; // -1 | 0 | 1 per axis: which faces stay flush as it tapers
       /** Extra bottom-face offset: shears the prism — raked legs with level cuts. */
       shift?: [number, number];
+      /** Taper axis (default 'z'). Horizontal tapers make dovetail tails and pins. */
+      axis?: 'x' | 'y' | 'z';
     }
   | {
       shape: 'cylinder';

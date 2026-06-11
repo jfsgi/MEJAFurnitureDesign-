@@ -51,8 +51,8 @@ export async function brandSnapshot(blob: Blob, mimeType = 'image/png'): Promise
 
   const plateW = innerW + 2 * pad;
   const plateH = innerH + 2 * pad;
-  const plateX = (W - plateW) / 2; // centered in the print viewport
-  const plateY = H - plateH - 56 * s;
+  const plateX = W - plateW - 56 * s; // upper-right corner of the print viewport
+  const plateY = 56 * s;
 
   // Light plate reads on any render background, and suits the engraved logo.
   ctx.save();

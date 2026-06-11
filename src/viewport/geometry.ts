@@ -246,6 +246,7 @@ export function taperedBoxGeometry(
   shift: UV = [0, 0],
   uvOffset: UV = [0, 0],
   uvOrigin: V3 = [0, 0, 0],
+  axis: 'x' | 'y' | 'z' = 'z',
 ): THREE.BufferGeometry {
   const [tw, td] = top;
   const [bw, bd] = bottom;
@@ -283,5 +284,9 @@ export function taperedBoxGeometry(
   mb.quad(b[1], b[2], t[2], t[1], side(b[1]), side(b[2]), side(t[2]), side(t[1])); // +X
   mb.quad(b[2], b[3], t[3], t[2], side(b[2]), side(b[3]), side(t[3]), side(t[2])); // +Y
   mb.quad(b[3], b[0], t[0], t[3], side(b[3]), side(b[0]), side(t[0]), side(t[3])); // −X
-  return mb.build();
+  const geo = mb.build();
+  // Horizontal taper axes (dovetail tails/pins): build along Z, then lie down.
+  if (axis === 'y') geo.rotateX(-Math.PI / 2);
+  else if (axis === 'x') geo.rotateY(Math.PI / 2);
+  return geo;
 }

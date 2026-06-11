@@ -1,9 +1,10 @@
 // Standalone drawer box, MEJA's core quoted product: two sides, front, back, and a
-// recessed captured bottom. Joinery is half-blind dovetail or box joint — recorded on
-// the part for the cut list and the (future) joinery system; v1 renders square corners.
+// recessed captured bottom, with the corner joinery — dovetail or box joint —
+// rendered as interlocking fingers at all four corners.
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
+import { cornerFingerPrims } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -59,15 +60,22 @@ export const drawerBox: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
+    // Sides vacate the corner columns for the rendered joint fingers.
+    const sideParts: Record<number, Part> = {};
     for (const sx of [-1, 1]) {
-      parts.push({
+      const part: Part = {
         id: `side-${sx}`,
         name: `Side (${joinery})`,
         material: mat,
-        primitives: [{ shape: 'box', size: [sideT, D, H], at: [sx * (W / 2 - sideT / 2), 0, H / 2] }],
+        primitives: [
+          { shape: 'box', size: [sideT, D - 2 * sideT, H], at: [sx * (W / 2 - sideT / 2), 0, H / 2] },
+        ],
         cut: { length: D, width: H, thickness: sideT },
-      });
+      };
+      sideParts[sx] = part;
+      parts.push(part);
     }
+    const endParts: Record<number, Part> = {};
     for (const sy of [-1, 1]) {
       const isFront = sy > 0;
       const y = sy * (D / 2 - sideT / 2);
@@ -94,8 +102,27 @@ export const drawerBox: ComponentDef = {
       } else {
         part.primitives.push({ shape: 'box', size: [endW, sideT, H], at: [0, y, H / 2] });
       }
+      endParts[sy] = part;
       parts.push(part);
     }
+
+    // Visible corner joints, matching the joinery choice.
+    for (const sx of [-1, 1]) {
+      for (const sy of [-1, 1] as const) {
+        const { tails, pins } = cornerFingerPrims({
+          x: sx * (W / 2 - sideT / 2),
+          outerSign: sy,
+          yCenter: sy * (D / 2 - sideT / 2),
+          bottomZ: 0,
+          boxH: H,
+          sideT,
+          joinery: str(p, 'joinery') === 'dovetail' ? 'dovetail' : 'box-joint',
+        });
+        sideParts[sx].primitives.push(...tails);
+        endParts[sy].primitives.push(...pins);
+      }
+    }
+
     parts.push({
       id: 'bottom',
       name: 'Bottom',

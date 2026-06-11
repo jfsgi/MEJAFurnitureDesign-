@@ -63,6 +63,7 @@ function PrimitiveMesh({
         prim.shift ?? [0, 0],
         offset,
         prim.at,
+        prim.axis ?? 'z',
       );
     }
     if (prim.shape === 'archedBoard') {

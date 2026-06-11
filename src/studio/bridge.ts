@@ -91,6 +91,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.shift ?? [0, 0],
             offset,
             prim.at,
+            prim.axis ?? 'z',
           );
         } else if (prim.shape === 'archedBoard') {
           geometry = archedBoardGeometry(

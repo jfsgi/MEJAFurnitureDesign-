@@ -112,16 +112,24 @@ function primCorners(prim: Primitive): [number, number, number][] {
   } else if (prim.shape === 'taperedBox') {
     // The top face is centered on `at`; align shifts the bottom face — take the
     // union of both faces' extents (a back-flush wedge reaches well past center).
+    // Horizontal taper axes remap the built ranges like the geometry's rotation.
     const [tw, td] = prim.top;
     const [bw, bd] = prim.bottom;
     const ox = (prim.align[0] * (tw - bw)) / 2 + (prim.shift?.[0] ?? 0);
     const oy = (prim.align[1] * (td - bd)) / 2 + (prim.shift?.[1] ?? 0);
-    const xs = [Math.min(-tw / 2, ox - bw / 2), Math.max(tw / 2, ox + bw / 2)];
-    const ys = [Math.min(-td / 2, oy - bd / 2), Math.max(td / 2, oy + bd / 2)];
+    const rx = [Math.min(-tw / 2, ox - bw / 2), Math.max(tw / 2, ox + bw / 2)];
+    const ry = [Math.min(-td / 2, oy - bd / 2), Math.max(td / 2, oy + bd / 2)];
+    const rz = [-prim.height / 2, prim.height / 2];
+    const axis = prim.axis ?? 'z';
+    const [wx, wy, wz] =
+      axis === 'y'
+        ? [rx, rz, [-ry[1], -ry[0]]]
+        : axis === 'x'
+          ? [rz, ry, [-rx[1], -rx[0]]]
+          : [rx, ry, rz];
     const corners: [number, number, number][] = [];
-    for (const x of xs)
-      for (const y of ys)
-        for (const sz of [-1, 1]) corners.push([cx + x, cy + y, cz + (sz * prim.height) / 2]);
+    for (const x of wx)
+      for (const y of wy) for (const z of wz) corners.push([cx + x, cy + y, cz + z]);
     return corners;
   } else if (prim.shape === 'archedBoard') {
     // Stock extents; a front bulge reaches past +Y by its rise, an angled end
