@@ -46,6 +46,20 @@ function primCorners(prim: Primitive): [number, number, number][] {
   let hx: number, hy: number, hz: number;
   if (prim.shape === 'box') {
     [hx, hy, hz] = [prim.size[0] / 2, prim.size[1] / 2, prim.size[2] / 2];
+    if (prim.tilt) {
+      // Tilted about the depth (Y) axis: rotate the corner offsets like three.js does.
+      const cos = Math.cos(prim.tilt);
+      const sin = Math.sin(prim.tilt);
+      const corners: [number, number, number][] = [];
+      for (const sx of [-1, 1])
+        for (const sy of [-1, 1])
+          for (const sz of [-1, 1]) {
+            const x = sx * hx;
+            const z = sz * hz;
+            corners.push([cx + x * cos + z * sin, cy + sy * hy, cz - x * sin + z * cos]);
+          }
+      return corners;
+    }
   } else if (prim.shape === 'taperedBox') {
     hx = Math.max(prim.top[0], prim.bottom[0]) / 2;
     hy = Math.max(prim.top[1], prim.bottom[1]) / 2;

@@ -52,7 +52,13 @@ export type ParamDef = LengthParam | CountParam | EnumParam | BoolParam | Materi
 
 // Render/evaluation primitives, instance-local model space (Z-up, mm).
 export type Primitive =
-  | { shape: 'box'; size: [number, number, number]; at: [number, number, number] }
+  | {
+      shape: 'box';
+      size: [number, number, number];
+      at: [number, number, number];
+      /** Rotation about the depth (Y) axis, radians — diagonal dividers, angled parts. */
+      tilt?: number;
+    }
   | {
       shape: 'taperedBox';
       top: [number, number]; // W, D at the top

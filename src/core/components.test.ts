@@ -329,6 +329,56 @@ describe('drawer unit', () => {
   });
 });
 
+describe('storage tower', () => {
+  const def = REGISTRY['storage-tower'];
+
+  it('builds exposed drawer boxes with no applied fronts', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Drawer side')).toHaveLength(12);
+    expect(names.filter((n) => n === 'Drawer front')).toHaveLength(0);
+    expect(names.filter((n) => n === 'Fixed shelf')).toHaveLength(1);
+  });
+
+  it('removing the cubby gives the drawers the full interior', () => {
+    const base = defaultParams(def);
+    const topBox = (params: typeof base) => {
+      const boxes = def
+        .generate(params)
+        .parts.filter((p) => p.name === 'Drawer side');
+      return Math.max(...boxes.map((b) => b.primitives[0].at[2]));
+    };
+    expect(topBox({ ...base, cubby: false })).toBeGreaterThan(topBox(base));
+  });
+});
+
+describe('wine cube', () => {
+  const def = REGISTRY['wine-cube'];
+
+  it('builds crossing diagonal dividers and a drawer', () => {
+    const model = def.generate(defaultParams(def));
+    const dividers = model.parts.filter((p) => p.name === 'Divider (diagonal)');
+    expect(dividers).toHaveLength(2);
+    const tilts = dividers.map((d) => (d.primitives[0] as { tilt?: number }).tilt ?? 0);
+    expect(tilts[0]).toBeCloseTo(-tilts[1], 5);
+    expect(model.parts.some((p) => p.name === 'Drawer side')).toBe(true);
+  });
+
+  it('tilted dividers stay inside the case bbox', () => {
+    const params = defaultParams(def);
+    const box = modelBBox(def.generate(params))!;
+    expect(box.max[0] - box.min[0]).toBeCloseTo(params.width as number, 3);
+    expect(box.max[2] - box.min[2]).toBeCloseTo(params.height as number, 3);
+  });
+
+  it('warns when bottles will not fit', () => {
+    const tight = def.generate({ ...defaultParams(def), width: inch(14), height: inch(18) });
+    expect(tight.findings.some((f) => f.message.includes('tight'))).toBe(true);
+    const shallow = def.generate({ ...defaultParams(def), depth: inch(9) });
+    expect(shallow.findings.some((f) => f.message.includes('overhang'))).toBe(true);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 

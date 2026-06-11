@@ -19,6 +19,8 @@ export const MATERIALS: MaterialDef[] = [
   { id: 'maple', name: 'Maple', color: '#E3CFA8', edge: '#B29D74', roughness: 0.6, metalness: 0, grain: true },
   { id: 'cherry', name: 'Cherry', color: '#9E5F3E', edge: '#6F4029', roughness: 0.55, metalness: 0, grain: true },
   { id: 'ash', name: 'Ash', color: '#D6C6A2', edge: '#A6936E', roughness: 0.6, metalness: 0, grain: true },
+  { id: 'cedar', name: 'Aromatic cedar', color: '#A87884', edge: '#7A5560', roughness: 0.65, metalness: 0, grain: true },
+  { id: 'baltic-birch', name: 'Baltic birch', color: '#EBDDBC', edge: '#BCA87E', roughness: 0.55, metalness: 0, grain: true },
   { id: 'painted-white', name: 'Painted white', color: '#F1EFE9', edge: '#B9B5A9', roughness: 0.4, metalness: 0 },
   { id: 'painted-black', name: 'Painted black', color: '#35322E', edge: '#1C1A17', roughness: 0.4, metalness: 0 },
   { id: 'steel-black', name: 'Blackened steel', color: '#3A3A3E', edge: '#18181B', roughness: 0.35, metalness: 0.9 },
