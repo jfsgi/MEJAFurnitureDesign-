@@ -124,15 +124,17 @@ function primCorners(prim: Primitive): [number, number, number][] {
         for (const sz of [-1, 1]) corners.push([cx + x, cy + y, cz + (sz * prim.height) / 2]);
     return corners;
   } else if (prim.shape === 'archedBoard') {
-    // Stock extents; a front bulge reaches past the +Y face by its rise.
+    // Stock extents; a front bulge reaches past +Y by its rise, an angled end
+    // trim past the +length face by its skew.
     [hx, hy, hz] = [prim.size[0] / 2, prim.size[1] / 2, prim.size[2] / 2];
     const bulge = prim.arch === 'front' ? prim.rise : 0;
+    const skew = prim.endSkew ?? 0;
+    const maxX = hx + (prim.arch === 'bottom-x' ? skew : 0);
+    const maxY = hy + bulge + (prim.arch === 'bottom-y' ? skew : 0);
     const corners: [number, number, number][] = [];
-    for (const sx of [-1, 1])
-      for (const sz of [-1, 1]) {
-        corners.push([cx + sx * hx, cy - hy, cz + sz * hz]);
-        corners.push([cx + sx * hx, cy + hy + bulge, cz + sz * hz]);
-      }
+    for (const x of [-hx, maxX])
+      for (const y of [-hy, maxY])
+        for (const sz of [-1, 1]) corners.push([cx + x, cy + y, cz + sz * hz]);
     return corners;
   } else {
     const r = Math.max(prim.radiusTop, prim.radiusBottom);

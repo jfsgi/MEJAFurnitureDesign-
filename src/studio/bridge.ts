@@ -38,8 +38,9 @@ const AXIS: Record<number, 'x' | 'y' | 'z'> = { 0: 'x', 1: 'y', 2: 'z' };
 export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): THREE.Group {
   const root = new THREE.Group();
   root.name = doc.name;
-  // Model space (Z-up, mm) → engine world (Y-up, m).
-  root.rotation.x = -Math.PI / 2;
+  // Model space (Z-up, mm) → engine world (Y-up, m), turned so the design's
+  // front (+Y model) faces the engine's front camera (+Z world).
+  root.rotation.set(-Math.PI / 2, 0, Math.PI);
   root.scale.setScalar(0.001);
 
   for (const inst of doc.instances) {
@@ -68,7 +69,13 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
           );
           grain = 'z';
         } else if (prim.shape === 'archedBoard') {
-          geometry = archedBoardGeometry(prim.size, prim.arch, prim.rise, prim.shoulder ?? 0);
+          geometry = archedBoardGeometry(
+            prim.size,
+            prim.arch,
+            prim.rise,
+            prim.shoulder ?? 0,
+            prim.endSkew ?? 0,
+          );
           grain = prim.arch === 'bottom-y' ? 'y' : 'x';
         } else {
           geometry = new THREE.CylinderGeometry(

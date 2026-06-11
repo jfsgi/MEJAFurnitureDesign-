@@ -41,11 +41,19 @@ export function archedBoardGeometry(
   arch: 'bottom-x' | 'bottom-y' | 'front',
   rise: number,
   shoulder = 0,
+  endSkew = 0,
   uvOffset: UV = [0, 0],
 ): THREE.BufferGeometry {
   if (arch === 'bottom-y') {
     // Build along X, then rotate the finished geometry into Y.
-    const geo = archedBoardGeometry([size[1], size[0], size[2]], 'bottom-x', rise, shoulder, uvOffset);
+    const geo = archedBoardGeometry(
+      [size[1], size[0], size[2]],
+      'bottom-x',
+      rise,
+      shoulder,
+      endSkew,
+      uvOffset,
+    );
     geo.rotateZ(Math.PI / 2);
     return geo;
   }
@@ -109,6 +117,7 @@ export function archedBoardGeometry(
   mb.quad([-hx, -hy, hz], [hx, -hy, hz], [hx, hy, hz], [-hx, hy, hz],
     [u(-hx), v(-hy)], [u(hx), v(-hy)], [u(hx), v(hy)], [u(-hx), v(hy)]);
   for (const s of [-1, 1]) {
+    if (s > 0 && endSkew > 0) continue; // the +X end gets the angled trim below
     const p0: V3 = [s * hx, -hy, -hz];
     const p1: V3 = [s * hx, hy, -hz];
     const p2: V3 = [s * hx, hy, hz];
@@ -117,6 +126,19 @@ export function archedBoardGeometry(
     mb.quad(quad[0], quad[1], quad[2], quad[3],
       [v(quad[0][1]), v(quad[0][2])], [v(quad[1][1]), v(quad[1][2])],
       [v(quad[2][1]), v(quad[2][2])], [v(quad[3][1]), v(quad[3][2])]);
+  }
+  if (endSkew > 0) {
+    // Angled end trim: the end face leans out so the board grows by endSkew at
+    // its lower edge — the shoulder that meets a raked leg face.
+    const xe = hx + endSkew;
+    mb.quad([xe, -hy, -hz], [xe, hy, -hz], [hx, hy, hz], [hx, -hy, hz],
+      [v(-hy), v(-hz)], [v(hy), v(-hz)], [v(hy), v(hz)], [v(-hy), v(hz)]);
+    mb.quad([xe, -hy, -hz], [hx, -hy, -hz], [hx, hy, -hz], [xe, hy, -hz],
+      [u(xe), v(-hy)], [u(hx), v(-hy)], [u(hx), v(hy)], [u(xe), v(hy)]);
+    mb.quad([hx, hy, hz], [xe, hy, -hz], [hx, hy, -hz], [hx, hy, -hz],
+      [u(hx), v(hz)], [u(xe), v(-hz)], [u(hx), v(-hz)], [u(hx), v(-hz)]);
+    mb.quad([hx, -hy, hz], [hx, -hy, -hz], [xe, -hy, -hz], [xe, -hy, -hz],
+      [u(hx), v(hz)], [u(hx), v(-hz)], [u(xe), v(-hz)], [u(xe), v(-hz)]);
   }
   return mb.build();
 }

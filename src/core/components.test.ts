@@ -542,6 +542,17 @@ describe('tiered display stand', () => {
     expect(botPrim.at[2] + botPrim.size[2] / 2).toBeCloseTo(bottomShelfSurface, 3);
   });
 
+  it('side rail front ends are trimmed to the rake angle, ending at the leg face', () => {
+    const params = defaultParams(def);
+    const model = def.generate(params);
+    const rakeRun = ((params.depth as number) - (params.topDepth as number)) / (params.height as number);
+    for (const rail of model.parts.filter((p) => p.name.startsWith('Side rail'))) {
+      const prim = rail.primitives[0] as { size: [number, number, number]; endSkew?: number };
+      expect(prim.endSkew ?? 0).toBeCloseTo(rakeRun * prim.size[2], 5);
+      expect(rail.cut.length).toBeCloseTo(prim.size[1] + (prim.endSkew ?? 0), 5);
+    }
+  });
+
   it('arch rises adjust per part', () => {
     const base = defaultParams(def);
     const riseOf = (params: typeof base, id: string) =>

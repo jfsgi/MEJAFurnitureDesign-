@@ -88,6 +88,9 @@ export type Primitive =
       rise: number;
       /** Flat ends left at either side of a bottom arch. */
       shoulder?: number;
+      /** Angled trim on the +length end of a bottom arch: the end grows by this
+       *  toward the lower edge — shoulders meeting a raked leg. */
+      endSkew?: number;
     };
 
 export interface Part {

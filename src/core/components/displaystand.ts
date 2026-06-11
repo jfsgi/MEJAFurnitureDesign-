@@ -113,12 +113,13 @@ export const displayStand: ComponentDef = {
     // backsplash), the bottom pair flush with the bottom shelf's top surface.
     // Lower edges arched; lengths measured at the lower edge so the front end
     // runs inside the raked leg like a tenon.
+    // The front end of each side rail is trimmed to the rake angle so it lands
+    // tight on the raked leg's back face — length measured at the top edge, the
+    // angled trim making up the difference toward the lower edge.
+    const rakeRun = (D - topD) / H; // forward travel per unit of height
     const sideTopZ = H - SIDE_TOP_RAIL_H / 2;
-    const sideTopLen = outerAt(H - SIDE_TOP_RAIL_H) - 2 * legD;
-    // Rails are leg-thickness stock, but the rendered boards sit a hair under it:
-    // their ends run inside the raked leg like a tenon, and dead-flush faces would
-    // ghost the buried outline through the leg's surface.
-    const railT = legW - 1;
+    const sideTopLen = outerAt(H) - 2 * legD;
+    const sideTopSkew = rakeRun * SIDE_TOP_RAIL_H;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-top-${sx}`,
@@ -127,17 +128,19 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [railT, sideTopLen, SIDE_TOP_RAIL_H],
+            size: [legW, sideTopLen, SIDE_TOP_RAIL_H],
             at: [sx * legX, backY + legD + sideTopLen / 2, sideTopZ],
             arch: 'bottom-y',
             rise: sideTopRise,
             shoulder: inch(1),
+            endSkew: sideTopSkew,
           },
         ],
-        cut: { length: sideTopLen, width: SIDE_TOP_RAIL_H, thickness: legW },
+        cut: { length: sideTopLen + sideTopSkew, width: SIDE_TOP_RAIL_H, thickness: legW },
       });
     }
-    const sideBotLen = outerAt(sBottom - SIDE_BOTTOM_RAIL_H) - 2 * legD;
+    const sideBotLen = outerAt(sBottom) - 2 * legD;
+    const sideBotSkew = rakeRun * SIDE_BOTTOM_RAIL_H;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-bottom-${sx}`,
@@ -146,14 +149,15 @@ export const displayStand: ComponentDef = {
         primitives: [
           {
             shape: 'archedBoard',
-            size: [railT, sideBotLen, SIDE_BOTTOM_RAIL_H],
+            size: [legW, sideBotLen, SIDE_BOTTOM_RAIL_H],
             at: [sx * legX, backY + legD + sideBotLen / 2, sBottom - SIDE_BOTTOM_RAIL_H / 2],
             arch: 'bottom-y',
             rise: sideBotRise,
             shoulder: inch(1),
+            endSkew: sideBotSkew,
           },
         ],
-        cut: { length: sideBotLen, width: SIDE_BOTTOM_RAIL_H, thickness: legW },
+        cut: { length: sideBotLen + sideBotSkew, width: SIDE_BOTTOM_RAIL_H, thickness: legW },
       });
     }
 

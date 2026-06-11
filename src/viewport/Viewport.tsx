@@ -55,7 +55,14 @@ function PrimitiveMesh({
       return taperedBoxGeometry(prim.top, prim.bottom, prim.height, prim.align, prim.shift ?? [0, 0], offset);
     }
     if (prim.shape === 'archedBoard') {
-      return archedBoardGeometry(prim.size, prim.arch, prim.rise, prim.shoulder ?? 0, offset);
+      return archedBoardGeometry(
+        prim.size,
+        prim.arch,
+        prim.rise,
+        prim.shoulder ?? 0,
+        prim.endSkew ?? 0,
+        offset,
+      );
     }
     if (prim.shape === 'box' && mat.grain) {
       return grainBoxGeometry(prim.size, longestAxis(prim.size), offset);
