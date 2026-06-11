@@ -11,6 +11,7 @@ import {
   type MaterialInfo,
 } from './engine';
 import { buildStudioGroup } from './bridge';
+import { brandSnapshot } from './branding';
 import { DownloadIcon } from '../ui/icons';
 
 const BACKGROUNDS = [
@@ -80,7 +81,7 @@ export function StudioView() {
     if (!engine || rendering) return;
     setRendering(true);
     try {
-      const blob = await engine.renderSnapshot();
+      const blob = await brandSnapshot(await engine.renderSnapshot());
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${doc.name.replace(/[^\w.-]+/g, '-')}-4k.png`;
@@ -193,7 +194,8 @@ export function StudioView() {
               <DownloadIcon /> {rendering ? 'Rendering…' : 'Render 4K PNG'}
             </button>
             <p className="studio-render-hint">
-              3840 × 2160, supersampled, from the current camera view.
+              3840 × 2160, supersampled, from the current camera view — stamped with the
+              MEJA plate and distribution notice.
             </p>
           </div>
         </div>
