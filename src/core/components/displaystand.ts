@@ -18,7 +18,7 @@ const BOTTOM_RAIL_H = inch(2.5);
 const SIDE_TOP_RAIL_H = inch(2.75);
 const SIDE_BOTTOM_RAIL_H = inch(2.25);
 const BOTTOM_RAIL_Z = inch(2.4375); // floor to the bottom rails' lower edge
-const SHELF_RAIL_H = inch(1.25);
+const SHELF_SKIRT_H = inch(2.5); // skirt under each middle shelf's front edge
 const LEG_PROUD = inch(0.75); // leg tops stand this far above the top shelf
 const FRONT_BULGE = inch(0.75); // shelf front edge bow
 const BACKSPLASH_H = inch(1.75);
@@ -235,17 +235,17 @@ export const displayStand: ComponentDef = {
       });
       if (!isTop && !isBottom) {
         parts.push({
-          id: `shelf-rail-${i}`,
-          name: 'Shelf rail',
+          id: `shelf-skirt-${i}`,
+          name: 'Shelf skirt',
           material: mat,
           primitives: [
             {
               shape: 'box',
-              size: [innerW, t, SHELF_RAIL_H],
-              at: [0, backY + shelfD - t / 2, s - t - SHELF_RAIL_H / 2],
+              size: [innerW, t, SHELF_SKIRT_H],
+              at: [0, backY + shelfD - t / 2, s - t - SHELF_SKIRT_H / 2],
             },
           ],
-          cut: { length: innerW, width: SHELF_RAIL_H, thickness: t },
+          cut: { length: innerW, width: SHELF_SKIRT_H, thickness: t },
         });
       }
     }

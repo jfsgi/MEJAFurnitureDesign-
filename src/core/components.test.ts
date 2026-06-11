@@ -477,7 +477,9 @@ describe('tiered display stand', () => {
     expect(names.filter((n) => n === 'Shelf')).toHaveLength(3);
     expect(names.filter((n) => n === 'Shelf backsplash')).toHaveLength(4);
     // Middle shelves only: top rides the top rails, bottom sits on the bottom rails.
-    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Shelf skirt')).toHaveLength(2);
+    const skirt = model.parts.find((p) => p.name === 'Shelf skirt')!;
+    expect(skirt.cut.width).toBeCloseTo(inch(2.5), 5);
     const raked = model.parts.find((p) => p.name === 'Leg (raked)')!;
     const prim = raked.primitives[0] as { shape: string; shift?: [number, number] };
     expect(prim.shape).toBe('taperedBox');
