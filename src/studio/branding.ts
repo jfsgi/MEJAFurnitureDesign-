@@ -60,11 +60,7 @@ export async function brandSnapshot(blob: Blob, mimeType = 'image/png'): Promise
   ctx.strokeStyle = 'rgba(43, 39, 34, 0.25)';
   ctx.lineWidth = 2 * s;
   ctx.beginPath();
-  if ('roundRect' in ctx) {
-    ctx.roundRect(plateX, plateY, plateW, plateH, 16 * s);
-  } else {
-    ctx.rect(plateX, plateY, plateW, plateH);
-  }
+  ctx.roundRect(plateX, plateY, plateW, plateH, 16 * s);
   ctx.fill();
   ctx.stroke();
 
