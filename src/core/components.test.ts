@@ -351,6 +351,27 @@ describe('drawer unit', () => {
     expect(front.primitives[0].at[1]).toBeGreaterThan(caseDepthFront - 0.001);
   });
 
+  it('columns add case-stock dividers and a drawer bank per column', () => {
+    const base = defaultParams(def);
+    const model = def.generate({ ...base, columns: 3, width: inch(45) });
+    const dividers = model.parts.filter((p) => p.name === 'Divider');
+    expect(dividers).toHaveLength(2);
+    const t = base.thickness as number;
+    expect(dividers[0].cut.thickness).toBeCloseTo(t, 5);
+    // 3 columns × 2 rows: a front and a full box per cell.
+    expect(model.parts.filter((p) => p.name === 'Drawer front')).toHaveLength(6);
+    expect(model.parts.filter((p) => p.name === 'Drawer side')).toHaveLength(12);
+    // Columns split the interior evenly around the dividers.
+    const innerW = inch(45) - 2 * t;
+    const colW = (innerW - 2 * t) / 3;
+    const front = model.parts.find((p) => p.name === 'Drawer front')!;
+    expect(front.cut.length).toBeCloseTo(colW - 2 * (base.gap as number), 5);
+    // Divider planes land between the columns.
+    const xs = dividers.map((d) => d.primitives[0].at[0]).sort((a, b) => a - b);
+    expect(xs[0]).toBeCloseTo(-innerW / 2 + colW + t / 2, 5);
+    expect(xs[1]).toBeCloseTo(-innerW / 2 + 2 * colW + 1.5 * t, 5);
+  });
+
   it('inherits the slide-fit warning for in-between depths', () => {
     // depth 20" − front 0.625 − back 0.25 − gap 0.5 = 18.625" box → strands an 18" slide... within tolerance.
     // Use 21": box depth 19.625" → more than 0.75" past an 18" slide.

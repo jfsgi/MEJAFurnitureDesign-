@@ -21,11 +21,12 @@ export const drawerUnit: ComponentDef = {
   category: 'Drawers',
   description: 'Countertop case with sliding drawers, inset or overlay fronts.',
   params: [
-    { kind: 'length', key: 'width', label: 'Width', default: inch(24), min: inch(10), max: inch(48), tier: 'basic' },
-    { kind: 'length', key: 'depth', label: 'Depth', default: inch(14), min: inch(8), max: inch(30), tier: 'basic' },
+    { kind: 'length', key: 'width', label: 'Width', default: inch(24), min: inch(10), max: inch(60), tier: 'basic' },
     { kind: 'length', key: 'height', label: 'Height', default: inch(8), min: inch(3), max: inch(24), tier: 'basic' },
-    { kind: 'count', key: 'drawerCount', label: 'Drawers', default: 2, min: 1, max: 6, tier: 'basic' },
+    { kind: 'count', key: 'drawerCount', label: 'Drawers per column', default: 2, min: 1, max: 6, tier: 'basic' },
+    { kind: 'count', key: 'columns', label: 'Columns', default: 1, min: 1, max: 4, tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'walnut', tier: 'basic' },
+    { kind: 'length', key: 'depth', label: 'Depth', default: inch(14), min: inch(8), max: inch(30), tier: 'advanced' },
     { kind: 'enum', key: 'frontStyle', label: 'Front style', default: 'inset', tier: 'advanced',
       options: [
         { value: 'inset', label: 'Inset' },
@@ -92,46 +93,75 @@ export const drawerUnit: ComponentDef = {
     });
 
     // Openings: equal slices of the interior with a gap above, below, and between.
+    // Columns split the interior with full dividers of case stock; each column
+    // carries its own bank of drawers riding the case sides and the dividers.
+    const nCol = num(p, 'columns');
+    const colW = (innerW - (nCol - 1) * t) / nCol;
+    for (let c = 1; c < nCol; c++) {
+      parts.push({
+        id: `divider-${c}`,
+        name: 'Divider',
+        material: mat,
+        primitives: [
+          {
+            shape: 'box',
+            size: [t, D - backT, innerH],
+            at: [-innerW / 2 + c * (colW + t) - t / 2, backT / 2, H / 2],
+          },
+        ],
+        cut: { length: innerH, width: D - backT, thickness: t },
+      });
+    }
+
     const opening = (innerH - (n + 1) * gap) / n;
-    const boxW = innerW - 2 * SLIDE_CLEARANCE;
+    const boxW = colW - 2 * SLIDE_CLEARANCE;
     const boxD = D - backT - t - BACK_GAP;
     const boxY = D / 2 - t - boxD / 2;
 
-    // Overlay fronts cover the case edges; their own stack starts above the top edge.
-    const frontW = overlayFronts ? Math.min(innerW + 2 * overlay, W) : innerW - 2 * gap;
+    // Overlay fronts cover the case edges (and split the dividers between columns);
+    // their own stack starts above the top edge.
+    const frontW = overlayFronts
+      ? Math.min(colW + 2 * overlay, nCol > 1 ? colW + t - gap : W - 2 * gap)
+      : colW - 2 * gap;
     const frontH = overlayFronts ? (innerH + 2 * overlay - (n - 1) * gap) / n : opening;
     const frontY = overlayFronts ? D / 2 + t / 2 : D / 2 - t / 2;
 
-    let openingCursor = H - t;
-    let frontCursor = overlayFronts ? H - t + overlay : H - t;
-    for (let i = 0; i < n; i++) {
-      openingCursor -= gap;
-      const openingTop = openingCursor;
-      openingCursor -= opening;
-      if (!overlayFronts) frontCursor = openingTop;
+    for (let c = 0; c < nCol; c++) {
+      const colX = -innerW / 2 + c * (colW + t) + colW / 2;
+      let openingCursor = H - t;
+      let frontCursor = overlayFronts ? H - t + overlay : H - t;
+      for (let i = 0; i < n; i++) {
+        openingCursor -= gap;
+        const openingTop = openingCursor;
+        openingCursor -= opening;
+        if (!overlayFronts) frontCursor = openingTop;
 
-      parts.push({
-        id: `drawer-front-${i}`,
-        name: 'Drawer front',
-        material: mat,
-        primitives: [{ shape: 'box', size: [frontW, t, frontH], at: [0, frontY, frontCursor - frontH / 2] }],
-        cut: { length: frontW, width: frontH, thickness: t },
-      });
-      if (overlayFronts) frontCursor -= frontH + gap;
+        parts.push({
+          id: `drawer-front-${c}-${i}`,
+          name: 'Drawer front',
+          material: mat,
+          primitives: [
+            { shape: 'box', size: [frontW, t, frontH], at: [colX, frontY, frontCursor - frontH / 2] },
+          ],
+          cut: { length: frontW, width: frontH, thickness: t },
+        });
+        if (overlayFronts) frontCursor -= frontH + gap;
 
-      parts.push(
-        ...drawerBoxParts({
-          idPrefix: `drawer-${i}`,
-          boxW,
-          boxD,
-          boxH: Math.max(opening - BOX_HEIGHT_CLEARANCE, inch(0.75)),
-          centerY: boxY,
-          bottomZ: openingTop - opening + inch(0.25),
-          sideT,
-          bottomT: inch(0.25),
-          material: boxMat,
-        }),
-      );
+        parts.push(
+          ...drawerBoxParts({
+            idPrefix: `drawer-${c}-${i}`,
+            boxW,
+            boxD,
+            boxH: Math.max(opening - BOX_HEIGHT_CLEARANCE, inch(0.75)),
+            centerY: boxY,
+            bottomZ: openingTop - opening + inch(0.25),
+            sideT,
+            bottomT: inch(0.25),
+            material: boxMat,
+            centerX: colX,
+          }),
+        );
+      }
     }
 
     if (opening < MIN_OPENING) {
@@ -143,7 +173,7 @@ export const drawerUnit: ComponentDef = {
     if (boxW > inch(36)) {
       findings.push({
         severity: 'warning',
-        message: `Drawers ${formatLength(boxW, 'imperial')} wide tend to rack. Consider two banks of drawers.`,
+        message: `Drawers ${formatLength(boxW, 'imperial')} wide tend to rack. Add a column to split the bank.`,
       });
     }
     const slideWarning = slideFitWarning(boxD);

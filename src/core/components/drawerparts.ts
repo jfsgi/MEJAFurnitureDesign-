@@ -22,8 +22,11 @@ export function drawerBoxParts(opts: {
   material: string;
   /** Notch a finger-pull cutout into the top edge of the front. */
   pull?: boolean;
+  /** Column offset for multi-bank cases. */
+  centerX?: number;
 }): Part[] {
   const { idPrefix, boxW, boxD, boxH, centerY, bottomZ, sideT, bottomT, material, pull } = opts;
+  const cx = opts.centerX ?? 0;
   const boxZ = bottomZ + boxH / 2;
   const endW = boxW - 2 * sideT;
   const parts: Part[] = [];
@@ -34,7 +37,7 @@ export function drawerBoxParts(opts: {
       name: 'Drawer side',
       material,
       primitives: [
-        { shape: 'box', size: [sideT, boxD, boxH], at: [sx * (boxW / 2 - sideT / 2), centerY, boxZ] },
+        { shape: 'box', size: [sideT, boxD, boxH], at: [cx + sx * (boxW / 2 - sideT / 2), centerY, boxZ] },
       ],
       cut: { length: boxD, width: boxH, thickness: sideT },
     });
@@ -57,13 +60,13 @@ export function drawerBoxParts(opts: {
       part.primitives.push({
         shape: 'archedBoard',
         size: [endW, sideT, boxH],
-        at: [0, y, boxZ],
+        at: [cx, y, boxZ],
         arch: 'scoop',
         rise: pullD,
         shoulder: (endW - pullW) / 2,
       });
     } else {
-      part.primitives.push({ shape: 'box', size: [endW, sideT, boxH], at: [0, y, boxZ] });
+      part.primitives.push({ shape: 'box', size: [endW, sideT, boxH], at: [cx, y, boxZ] });
     }
     parts.push(part);
   }
@@ -75,7 +78,7 @@ export function drawerBoxParts(opts: {
       {
         shape: 'box',
         size: [endW, boxD - 2 * sideT, bottomT],
-        at: [0, centerY, bottomZ + BOTTOM_RECESS + bottomT / 2],
+        at: [cx, centerY, bottomZ + BOTTOM_RECESS + bottomT / 2],
       },
     ],
     cut: { length: endW, width: boxD - 2 * sideT, thickness: bottomT },
