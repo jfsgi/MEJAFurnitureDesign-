@@ -41,8 +41,8 @@ export const drawerUnit: ComponentDef = {
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
     { kind: 'enum', key: 'caseJoinery', label: 'Case joinery', default: 'half-blind-dovetail', tier: 'advanced',
       options: [
-        { value: 'half-blind-dovetail', label: 'Half-blind dovetail' },
-        { value: 'butt', label: 'Butt / screwed' },
+        { value: 'half-blind-dovetail', label: 'Dovetail' },
+        { value: 'butt', label: 'Screwed' },
       ] },
     { kind: 'length', key: 'thickness', label: 'Case thickness', default: inch(0.625), min: inch(0.5), max: inch(1), tier: 'advanced' },
     { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },

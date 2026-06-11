@@ -35,7 +35,7 @@ export const drawerBox: ComponentDef = {
     { kind: 'length', key: 'height', label: 'Height', default: inch(4), min: inch(1.5), max: inch(12), tier: 'basic' },
     { kind: 'enum', key: 'joinery', label: 'Joinery', default: 'dovetail', tier: 'basic',
       options: [
-        { value: 'dovetail', label: 'Half-blind dovetail' },
+        { value: 'dovetail', label: 'Dovetail' },
         { value: 'box-joint', label: 'Box joint' },
       ] },
     { kind: 'material', key: 'material', label: 'Material', default: 'maple', tier: 'basic' },

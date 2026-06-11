@@ -65,11 +65,13 @@ function ParamControl({ inst, def }: { inst: Instance; def: ParamDef }) {
         </div>
       );
     }
-    case 'enum':
+    case 'enum': {
+      // Segments only when every label fits a chip; long labels get a dropdown.
+      const segFits = def.options.length <= 3 && def.options.every((o) => o.label.length <= 10);
       return (
         <div className="dim-field">
           <span className="dim-label">{def.label}</span>
-          {def.options.length <= 3 ? (
+          {segFits ? (
             <div className="seg seg--small">
               {def.options.map((o) => (
                 <button
@@ -96,6 +98,7 @@ function ParamControl({ inst, def }: { inst: Instance; def: ParamDef }) {
           )}
         </div>
       );
+    }
     case 'boolean':
       return (
         <div className="dim-field">

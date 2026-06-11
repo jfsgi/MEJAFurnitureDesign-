@@ -819,6 +819,10 @@ button {
   color: var(--text-2);
 }
 
+.seg button {
+  white-space: nowrap;
+}
+
 /* ---------- Studio workspace ---------- */
 
 .studio {
