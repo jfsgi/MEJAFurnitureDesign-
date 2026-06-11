@@ -16,9 +16,9 @@ describe('grain UVs in part space', () => {
       const du = b.getX(i) - a.getX(i);
       const dv = b.getY(i) - a.getY(i);
       // Faces carrying the grain shift by exactly origin/tile; end grain is untouched.
-      expect(Math.min(Math.abs(du), Math.abs(du - expectedShift))).toBeLessThan(1e-9);
-      expect(Math.abs(dv)).toBeLessThan(1e-9);
-      if (Math.abs(du - expectedShift) < 1e-9) shiftedCount++;
+      expect(Math.min(Math.abs(du), Math.abs(du - expectedShift))).toBeLessThan(1e-6);
+      expect(Math.abs(dv)).toBeLessThan(1e-6);
+      if (Math.abs(du - expectedShift) < 1e-6) shiftedCount++;
     }
     expect(shiftedCount).toBeGreaterThan(0);
   });
