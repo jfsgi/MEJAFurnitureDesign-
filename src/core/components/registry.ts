@@ -3,6 +3,7 @@ import { board, panel, roundLeg, shelf, straightLeg, taperedLeg } from './primit
 import { coffeeTable, consoleTable, diningTable, sideTable } from './table';
 import { bookcase } from './bookcase';
 import { cabinet } from './cabinet';
+import { displayStand } from './displaystand';
 import { dresser } from './dresser';
 import { storageTower } from './tower';
 import { wineCube } from './winecube';
@@ -24,6 +25,7 @@ const ALL: ComponentDef[] = [
   dresser,
   storageTower,
   wineCube,
+  displayStand,
   wallShelf,
   spiceRack,
   drawerBox,
@@ -43,7 +45,7 @@ export const REGISTRY: Record<string, ComponentDef> = Object.fromEntries(
 export const CATEGORIES: { name: string; components: ComponentDef[] }[] = [
   { name: 'Tables', components: [diningTable, coffeeTable, consoleTable, sideTable] },
   { name: 'Seating', components: [bench, stool] },
-  { name: 'Storage', components: [bookcase, cabinet, dresser, storageTower, wineCube] },
+  { name: 'Storage', components: [bookcase, cabinet, dresser, storageTower, wineCube, displayStand] },
   { name: 'Wall-mounted', components: [wallShelf, spiceRack] },
   { name: 'Drawers', components: [drawerBox, drawerUnit] },
   { name: 'Legs', components: [taperedLeg, straightLeg, roundLeg] },

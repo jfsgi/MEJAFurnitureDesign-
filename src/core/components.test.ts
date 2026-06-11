@@ -441,6 +441,34 @@ describe('cut list part tracking', () => {
   });
 });
 
+describe('tiered display stand', () => {
+  const def = REGISTRY['display-stand'];
+
+  it('builds back legs, raked legs, and a shelf + rail per tier', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Leg (back)')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Leg (raked)')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Shelf')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(4);
+    const raked = model.parts.find((p) => p.name === 'Leg (raked)')!;
+    expect((raked.primitives[0] as { tiltX?: number }).tiltX ?? 0).toBeGreaterThan(0);
+  });
+
+  it('shelves deepen toward the floor, following the rake', () => {
+    const model = def.generate(defaultParams(def));
+    const depths = model.parts.filter((p) => p.name === 'Shelf').map((s) => s.cut.width);
+    for (let i = 1; i < depths.length; i++) expect(depths[i]).toBeGreaterThan(depths[i - 1]);
+  });
+
+  it('matches the drawing envelope: 36 × 20 × 38 at defaults', () => {
+    const box = modelBBox(def.generate(defaultParams(def)))!;
+    expect(box.max[0] - box.min[0]).toBeCloseTo(inch(36), 3);
+    expect(box.max[2] - box.min[2]).toBeCloseTo(inch(38), 1);
+    expect(Math.abs(box.max[1] - box.min[1] - inch(20))).toBeLessThan(10);
+  });
+});
+
 describe('stock breakdown', () => {
   const docWith = (componentId: string): ProjectDoc => ({
     schema: 1,
