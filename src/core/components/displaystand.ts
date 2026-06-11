@@ -1,8 +1,9 @@
-// Parametric tiered display stand, per the shop's frame drawing: rectangular legs
-// (1-1/2" x 3"), a raked front pair, side rails tying each leg pair top and bottom,
-// arched front/back rails (modeled straight until a curve primitive exists), a
-// full-width top cap, and lower shelves that notch around the legs, deepening with
-// the rake. Reference envelope: 36 x 20 x 38 with a 14" top.
+// Parametric tiered display stand, per the shop's drawings: rectangular legs
+// (1-1/2" x 3") standing 3/4" proud of the top shelf, a raked front pair with level
+// cuts, side rails with arched lower edges tying each pair, an arched front rail at
+// the floor, and shelves that deepen with the rake — each with a bowed front edge,
+// a short backsplash, and the bottom shelf seated on the cross supports.
+// Still pending a fillet profile: the bullnose on the shelf fronts.
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
@@ -18,6 +19,11 @@ const SIDE_TOP_RAIL_H = inch(2.75);
 const SIDE_BOTTOM_RAIL_H = inch(2.25);
 const BOTTOM_RAIL_Z = inch(2.4375); // floor to the bottom rails' lower edge
 const SHELF_RAIL_H = inch(1.25);
+const LEG_PROUD = inch(0.75); // leg tops stand this far above the top shelf
+const FRONT_BULGE = inch(0.75); // shelf front edge bow
+const BACKSPLASH_H = inch(1.75);
+const ARCH_RISE_FRONT = inch(2);
+const ARCH_RISE_SIDE = inch(1);
 
 export const displayStand: ComponentDef = {
   id: 'display-stand',
@@ -48,7 +54,6 @@ export const displayStand: ComponentDef = {
 
     const innerW = W - 2 * legW;
     const backY = -D / 2;
-    const legH = H - t; // legs stop under the full-width top cap
     const legX = W / 2 - legW / 2;
     /** Outer (front) face of the raked leg at height z. */
     const outerAt = (z: number) => topD + ((D - topD) * (H - z)) / H;
@@ -62,16 +67,15 @@ export const displayStand: ComponentDef = {
         name: 'Leg (back)',
         material: mat,
         primitives: [
-          { shape: 'box', size: [legW, legD, legH], at: [sx * legX, backY + legD / 2, legH / 2] },
+          { shape: 'box', size: [legW, legD, H], at: [sx * legX, backY + legD / 2, H / 2] },
         ],
-        cut: { length: legH, width: legD, thickness: legW },
+        cut: { length: H, width: legD, thickness: legW },
       });
     }
 
-    // Raked front legs: sheared prisms — level top and foot cuts, slanted faces —
-    // outer face landing at the top depth up high and the full base depth on the floor.
-    const shearY = D - outerAt(legH);
-    const rakeLen = Math.hypot(legH, shearY);
+    // Raked front legs: sheared prisms — level top and foot cuts, slanted faces.
+    const shearY = D - topD;
+    const rakeLen = Math.hypot(H, shearY);
     for (const sx of [-1, 1]) {
       parts.push({
         id: `leg-front-${sx}`,
@@ -82,8 +86,8 @@ export const displayStand: ComponentDef = {
             shape: 'taperedBox',
             top: [legW, legD],
             bottom: [legW, legD],
-            height: legH,
-            at: [sx * legX, backY + outerAt(legH) - legD / 2, legH / 2],
+            height: H,
+            at: [sx * legX, backY + topD - legD / 2, H / 2],
             align: [0, 0],
             shift: [0, shearY],
           },
@@ -92,10 +96,20 @@ export const displayStand: ComponentDef = {
       });
     }
 
-    // Side rails tie each back leg to its raked leg, top and bottom. Lengths are
-    // measured at the rail's lower edge — the longest gap — so the front end runs
-    // inside the raked leg like a tenon instead of leaving a wedge of daylight.
-    const sideTopLen = outerAt(legH - SIDE_TOP_RAIL_H) - 2 * legD;
+    // Shelf surfaces: the top shelf sits 3/4" below the proud leg tops; the bottom
+    // shelf is seated on the bottom cross supports; the rest space out evenly.
+    const sTop = H - LEG_PROUD;
+    const sBottom = BOTTOM_RAIL_Z + BOTTOM_RAIL_H + t;
+    const surfaces = Array.from(
+      { length: n },
+      (_, i) => sTop - ((sTop - sBottom) * i) / (n - 1),
+    );
+
+    // Side rails tie each back leg to its raked leg under the top shelf and at the
+    // bottom; lower edges arched, lengths measured at the lower edge so the front
+    // end runs inside the raked leg like a tenon.
+    const sideTopZ = sTop - t - SIDE_TOP_RAIL_H / 2;
+    const sideTopLen = outerAt(sTop - t - SIDE_TOP_RAIL_H) - 2 * legD;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-rail-top-${sx}`,
@@ -103,15 +117,17 @@ export const displayStand: ComponentDef = {
         material: mat,
         primitives: [
           {
-            shape: 'box',
+            shape: 'archedBoard',
             size: [RAIL_T, sideTopLen, SIDE_TOP_RAIL_H],
-            at: [sx * legX, backY + legD + sideTopLen / 2, legH - SIDE_TOP_RAIL_H / 2],
+            at: [sx * legX, backY + legD + sideTopLen / 2, sideTopZ],
+            arch: 'bottom-y',
+            rise: ARCH_RISE_SIDE,
+            shoulder: inch(1),
           },
         ],
         cut: { length: sideTopLen, width: SIDE_TOP_RAIL_H, thickness: RAIL_T },
       });
     }
-    const botRailZ = BOTTOM_RAIL_Z + SIDE_BOTTOM_RAIL_H / 2;
     const sideBotLen = outerAt(BOTTOM_RAIL_Z) - 2 * legD;
     for (const sx of [-1, 1]) {
       parts.push({
@@ -120,68 +136,114 @@ export const displayStand: ComponentDef = {
         material: mat,
         primitives: [
           {
-            shape: 'box',
+            shape: 'archedBoard',
             size: [RAIL_T, sideBotLen, SIDE_BOTTOM_RAIL_H],
-            at: [sx * legX, backY + legD + sideBotLen / 2, botRailZ],
+            at: [sx * legX, backY + legD + sideBotLen / 2, BOTTOM_RAIL_Z + SIDE_BOTTOM_RAIL_H / 2],
+            arch: 'bottom-y',
+            rise: inch(0.75),
+            shoulder: inch(1),
           },
         ],
         cut: { length: sideBotLen, width: SIDE_BOTTOM_RAIL_H, thickness: RAIL_T },
       });
     }
 
-    // Long rails between the leg pairs: under the top, and just above the floor.
-    // The shop pieces carry a 2" arch on the lower edges; straight until curves land.
-    const longRail = (id: string, name: string, y: number, z: number, h: number): Part => ({
-      id,
-      name,
-      material: mat,
-      primitives: [{ shape: 'box', size: [innerW, RAIL_T, h], at: [0, y, z] }],
-      cut: { length: innerW, width: h, thickness: RAIL_T },
-    });
-    const topRailZ = legH - TOP_RAIL_H / 2;
-    parts.push(longRail('rail-top-front', 'Top rail', backY + topD - legD / 2, topRailZ, TOP_RAIL_H));
-    parts.push(longRail('rail-top-back', 'Top rail', backY + legD / 2, topRailZ, TOP_RAIL_H));
-    const botZ = BOTTOM_RAIL_Z + BOTTOM_RAIL_H / 2;
-    parts.push(
-      longRail('rail-bottom-front', 'Bottom rail', backY + outerAt(botZ) - legD / 2, botZ, BOTTOM_RAIL_H),
-    );
-    parts.push(longRail('rail-bottom-back', 'Bottom rail', backY + legD / 2, botZ, BOTTOM_RAIL_H));
-
-    // Full-width top cap, then lower shelves notched around the legs, each deeper
-    // than the one above and carrying a rail under its front edge.
+    // Long rails: a pair under the top shelf, and a pair at the floor carrying the
+    // bottom shelf — the front one arched, per the drawing.
+    const topRailZ = sTop - t - TOP_RAIL_H / 2;
+    const botRailZ = BOTTOM_RAIL_Z + BOTTOM_RAIL_H / 2;
     parts.push({
-      id: 'top',
-      name: 'Top',
+      id: 'rail-top-front',
+      name: 'Top rail',
       material: mat,
-      primitives: [{ shape: 'box', size: [W, topD, t], at: [0, backY + topD / 2, H - t / 2] }],
-      cut: { length: W, width: topD, thickness: t },
+      primitives: [
+        { shape: 'box', size: [innerW, RAIL_T, TOP_RAIL_H], at: [0, backY + topD - legD / 2, topRailZ] },
+      ],
+      cut: { length: innerW, width: TOP_RAIL_H, thickness: RAIL_T },
     });
-    const spacing = H / n;
-    for (let i = 1; i < n; i++) {
-      const z = H - i * spacing;
-      const depth = outerAt(z) - legD;
+    parts.push({
+      id: 'rail-top-back',
+      name: 'Top rail',
+      material: mat,
+      primitives: [
+        { shape: 'box', size: [innerW, RAIL_T, TOP_RAIL_H], at: [0, backY + legD / 2, topRailZ] },
+      ],
+      cut: { length: innerW, width: TOP_RAIL_H, thickness: RAIL_T },
+    });
+    parts.push({
+      id: 'rail-bottom-front',
+      name: 'Bottom rail',
+      material: mat,
+      primitives: [
+        {
+          shape: 'archedBoard',
+          size: [innerW, RAIL_T, BOTTOM_RAIL_H],
+          at: [0, backY + outerAt(botRailZ) - legD / 2, botRailZ],
+          arch: 'bottom-x',
+          rise: ARCH_RISE_FRONT,
+          shoulder: inch(1.5),
+        },
+      ],
+      cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: RAIL_T },
+    });
+    parts.push({
+      id: 'rail-bottom-back',
+      name: 'Bottom rail',
+      material: mat,
+      primitives: [
+        { shape: 'box', size: [innerW, RAIL_T, BOTTOM_RAIL_H], at: [0, backY + legD / 2, botRailZ] },
+      ],
+      cut: { length: innerW, width: BOTTOM_RAIL_H, thickness: RAIL_T },
+    });
+
+    // Shelves: bowed front edge, short backsplash at the back; middles carry a rail
+    // under the front edge (the top shelf rides the top rails, the bottom shelf the
+    // bottom rails). Depths follow the rake, notched around the legs.
+    for (let i = 0; i < n; i++) {
+      const s = surfaces[i];
+      const depth = outerAt(s) - legD;
+      const isTop = i === 0;
+      const isBottom = i === n - 1;
       parts.push({
         id: `shelf-${i}`,
-        name: 'Shelf',
-        material: mat,
-        primitives: [
-          { shape: 'box', size: [innerW, depth, t], at: [0, backY + legD + depth / 2, z - t / 2] },
-        ],
-        cut: { length: innerW, width: depth, thickness: t },
-      });
-      parts.push({
-        id: `shelf-rail-${i}`,
-        name: 'Shelf rail',
+        name: isTop ? 'Top shelf' : 'Shelf',
         material: mat,
         primitives: [
           {
-            shape: 'box',
-            size: [innerW, t, SHELF_RAIL_H],
-            at: [0, backY + legD + depth - t / 2, z - t - SHELF_RAIL_H / 2],
+            shape: 'archedBoard',
+            size: [innerW, depth, t],
+            at: [0, backY + legD + depth / 2, s - t / 2],
+            arch: 'front',
+            rise: FRONT_BULGE,
           },
         ],
-        cut: { length: innerW, width: SHELF_RAIL_H, thickness: t },
+        cut: { length: innerW, width: depth + FRONT_BULGE, thickness: t },
       });
+      const splashH = isTop ? LEG_PROUD : BACKSPLASH_H;
+      parts.push({
+        id: `backsplash-${i}`,
+        name: 'Shelf backsplash',
+        material: mat,
+        primitives: [
+          { shape: 'box', size: [innerW, t, splashH], at: [0, backY + legD + t / 2, s + splashH / 2] },
+        ],
+        cut: { length: innerW, width: splashH, thickness: t },
+      });
+      if (!isTop && !isBottom) {
+        parts.push({
+          id: `shelf-rail-${i}`,
+          name: 'Shelf rail',
+          material: mat,
+          primitives: [
+            {
+              shape: 'box',
+              size: [innerW, t, SHELF_RAIL_H],
+              at: [0, backY + legD + depth - t / 2, s - t - SHELF_RAIL_H / 2],
+            },
+          ],
+          cut: { length: innerW, width: SHELF_RAIL_H, thickness: t },
+        });
+      }
     }
 
     if (innerW > maxShelfSpan(t)) {

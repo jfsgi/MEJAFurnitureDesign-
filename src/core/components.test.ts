@@ -464,7 +464,7 @@ describe('cut list part tracking', () => {
 describe('tiered display stand', () => {
   const def = REGISTRY['display-stand'];
 
-  it('builds the frame per the shop drawing: legs, side rails, long rails, top', () => {
+  it('builds the frame per the shop drawing: legs, side rails, long rails, shelves', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
     expect(names.filter((n) => n === 'Leg (back)')).toHaveLength(2);
@@ -473,27 +473,40 @@ describe('tiered display stand', () => {
     expect(names.filter((n) => n === 'Side rail (bottom)')).toHaveLength(2);
     expect(names.filter((n) => n === 'Top rail')).toHaveLength(2);
     expect(names.filter((n) => n === 'Bottom rail')).toHaveLength(2);
-    expect(names.filter((n) => n === 'Top')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Top shelf')).toHaveLength(1);
     expect(names.filter((n) => n === 'Shelf')).toHaveLength(3);
-    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(3);
+    expect(names.filter((n) => n === 'Shelf backsplash')).toHaveLength(4);
+    // Middle shelves only: top rides the top rails, bottom sits on the bottom rails.
+    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2);
     const raked = model.parts.find((p) => p.name === 'Leg (raked)')!;
     const prim = raked.primitives[0] as { shape: string; shift?: [number, number] };
-    // Sheared prism: level top/foot cuts, bottom face pushed forward by the rake.
     expect(prim.shape).toBe('taperedBox');
     expect(prim.shift?.[1] ?? 0).toBeGreaterThan(0);
   });
 
-  it('matches the drawing: 14" full-width top, ~8" top side rails, longer bottom ones', () => {
+  it('top shelf sits 3/4" below the proud leg tops; bottom shelf rides the rails', () => {
     const model = def.generate(defaultParams(def));
-    const top = model.parts.find((p) => p.name === 'Top')!;
-    expect(top.cut.length).toBeCloseTo(inch(36), 5);
-    expect(top.cut.width).toBeCloseTo(inch(14), 5);
-    const sideTop = model.parts.find((p) => p.name === 'Side rail (top)')!;
-    expect(sideTop.cut.length).toBeGreaterThan(inch(7.9));
-    expect(sideTop.cut.length).toBeLessThan(inch(9));
-    const sideBottom = model.parts.find((p) => p.name === 'Side rail (bottom)')!;
-    expect(sideBottom.cut.length).toBeGreaterThan(inch(12));
-    expect(sideBottom.cut.length).toBeLessThan(inch(14));
+    const box = modelBBox(model)!;
+    expect(box.max[2]).toBeCloseTo(inch(38), 3); // legs reach full height
+    const top = model.parts.find((p) => p.name === 'Top shelf')!;
+    const topSurface = top.primitives[0].at[2] + (defaultParams(def).thickness as number) / 2;
+    expect(topSurface).toBeCloseTo(inch(38) - inch(0.75), 3);
+    const shelves = model.parts.filter((p) => p.name === 'Shelf');
+    const bottom = shelves[shelves.length - 1];
+    const bottomUnderside = bottom.primitives[0].at[2] - (defaultParams(def).thickness as number) / 2;
+    expect(bottomUnderside).toBeCloseTo(inch(2.4375) + inch(2.5), 3); // seated on the rails
+  });
+
+  it('arches where the drawing has them: front rail, side rails, shelf fronts', () => {
+    const model = def.generate(defaultParams(def));
+    const shape = (name: string, id?: string) =>
+      model.parts.find((p) => (id ? p.id === id : p.name === name))!.primitives[0].shape;
+    expect(shape('', 'rail-bottom-front')).toBe('archedBoard');
+    expect(shape('', 'rail-bottom-back')).toBe('box');
+    expect(shape('Side rail (top)')).toBe('archedBoard');
+    expect(shape('Side rail (bottom)')).toBe('archedBoard');
+    expect(shape('Top shelf')).toBe('archedBoard');
+    expect(shape('Shelf')).toBe('archedBoard');
   });
 
   it('shelves deepen toward the floor, following the rake', () => {

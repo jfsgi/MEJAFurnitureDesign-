@@ -14,7 +14,7 @@ import { REGISTRY } from '../core/components/registry';
 import { docBBox, evaluateInstance, instanceBBox, modelBBox, type BBox } from '../core/evaluate';
 import { inch, snapMM } from '../core/units';
 import { useStore } from '../core/store';
-import { grainBoxGeometry, longestAxis, taperedBoxGeometry } from './geometry';
+import { archedBoardGeometry, grainBoxGeometry, longestAxis, taperedBoxGeometry } from './geometry';
 import { getWoodTexture, grainOffset } from './woodTexture';
 import { viewport, type ViewName } from './viewportApi';
 import { FrameIcon, FrameSelectionIcon, MinusIcon, PlusIcon, ZoomWindowIcon } from '../ui/icons';
@@ -53,6 +53,9 @@ function PrimitiveMesh({
     const offset = grainOffset(seed);
     if (prim.shape === 'taperedBox') {
       return taperedBoxGeometry(prim.top, prim.bottom, prim.height, prim.align, prim.shift ?? [0, 0], offset);
+    }
+    if (prim.shape === 'archedBoard') {
+      return archedBoardGeometry(prim.size, prim.arch, prim.rise, prim.shoulder ?? 0, offset);
     }
     if (prim.shape === 'box' && mat.grain) {
       return grainBoxGeometry(prim.size, longestAxis(prim.size), offset);

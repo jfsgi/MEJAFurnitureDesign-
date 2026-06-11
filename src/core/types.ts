@@ -77,6 +77,17 @@ export type Primitive =
       radiusBottom: number;
       height: number;
       at: [number, number, number]; // center; axis along Z
+    }
+  | {
+      shape: 'archedBoard';
+      size: [number, number, number];
+      at: [number, number, number];
+      /** bottom-x/-y: relief arch cut up into the lower edge along that axis;
+       *  front: convex plan bulge on the +Y edge, springing from the corners. */
+      arch: 'bottom-x' | 'bottom-y' | 'front';
+      rise: number;
+      /** Flat ends left at either side of a bottom arch. */
+      shoulder?: number;
     };
 
 export interface Part {

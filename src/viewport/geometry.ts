@@ -22,6 +22,103 @@ class MeshBuilder {
   }
 }
 
+const ARC_SEGMENTS = 24;
+
+/** Circular-arc sampler: chord half-length c, rise r, returns offset above the chord. */
+function arcOffset(u: number, c: number, r: number): number {
+  const R = (c * c + r * r) / (2 * r);
+  return Math.sqrt(Math.max(R * R - u * u, 0)) - (R - r);
+}
+
+/**
+ * Board with an arch: a relief arch cut up into the bottom edge (aprons, rails) or a
+ * convex bulge on the front edge in plan (shelf fronts). Grain runs along the length.
+ * Model space, Z-up; `size` is the rectangular stock the curve is cut from.
+ */
+export function archedBoardGeometry(
+  size: V3,
+  arch: 'bottom-x' | 'bottom-y' | 'front',
+  rise: number,
+  shoulder = 0,
+  uvOffset: UV = [0, 0],
+): THREE.BufferGeometry {
+  if (arch === 'bottom-y') {
+    // Build along X, then rotate the finished geometry into Y.
+    const geo = archedBoardGeometry([size[1], size[0], size[2]], 'bottom-x', rise, shoulder, uvOffset);
+    geo.rotateZ(Math.PI / 2);
+    return geo;
+  }
+
+  const [sx, sy, sz] = size;
+  const [hx, hy, hz] = [sx / 2, sy / 2, sz / 2];
+  const mb = new MeshBuilder();
+  const u = (x: number) => x / GRAIN_MM_U + uvOffset[0];
+  const v = (val: number) => val / GRAIN_MM_V + uvOffset[1];
+
+  if (arch === 'front') {
+    // Plan bulge: front edge curve from corner to corner, +rise at center.
+    const yAt = (x: number) => hy + arcOffset(x, hx, rise);
+    const xs: number[] = [];
+    for (let i = 0; i <= ARC_SEGMENTS; i++) xs.push(-hx + (sx * i) / ARC_SEGMENTS);
+    for (let i = 0; i < xs.length - 1; i++) {
+      const [x0, x1] = [xs[i], xs[i + 1]];
+      const [y0, y1] = [yAt(x0), yAt(x1)];
+      // top cap (+Z), bottom cap (−Z), and the curved front strip
+      mb.quad([x0, -hy, hz], [x1, -hy, hz], [x1, y1, hz], [x0, y0, hz],
+        [u(x0), v(-hy)], [u(x1), v(-hy)], [u(x1), v(y1)], [u(x0), v(y0)]);
+      mb.quad([x0, y0, -hz], [x1, y1, -hz], [x1, -hy, -hz], [x0, -hy, -hz],
+        [u(x0), v(y0)], [u(x1), v(y1)], [u(x1), v(-hy)], [u(x0), v(-hy)]);
+      mb.quad([x1, y1, -hz], [x0, y0, -hz], [x0, y0, hz], [x1, y1, hz],
+        [u(x1), v(-hz)], [u(x0), v(-hz)], [u(x0), v(hz)], [u(x1), v(hz)]);
+    }
+    mb.quad([hx, -hy, -hz], [hx, -hy, hz], [-hx, -hy, hz], [-hx, -hy, -hz],
+      [u(hx), v(-hz)], [u(hx), v(hz)], [u(-hx), v(hz)], [u(-hx), v(-hz)]);
+    for (const s of [-1, 1]) {
+      const p0: V3 = [s * hx, -hy, -hz];
+      const p1: V3 = [s * hx, hy, -hz];
+      const p2: V3 = [s * hx, hy, hz];
+      const p3: V3 = [s * hx, -hy, hz];
+      const quad = s > 0 ? [p0, p1, p2, p3] : [p1, p0, p3, p2];
+      mb.quad(quad[0], quad[1], quad[2], quad[3],
+        [v(quad[0][1]), v(quad[0][2])], [v(quad[1][1]), v(quad[1][2])],
+        [v(quad[2][1]), v(quad[2][2])], [v(quad[3][1]), v(quad[3][2])]);
+    }
+    return mb.build();
+  }
+
+  // bottom-x: relief arch along the length, flat shoulders at the ends.
+  const c = Math.max(hx - shoulder, 1);
+  const zAt = (x: number) => (Math.abs(x) >= c ? -hz : -hz + arcOffset(x, c, rise));
+  const xs: number[] = [-hx];
+  for (let i = 0; i <= ARC_SEGMENTS; i++) xs.push(-c + (2 * c * i) / ARC_SEGMENTS);
+  xs.push(hx);
+  for (let i = 0; i < xs.length - 1; i++) {
+    const [x0, x1] = [xs[i], xs[i + 1]];
+    if (x1 - x0 < 1e-6) continue;
+    const [z0, z1] = [zAt(x0), zAt(x1)];
+    // front cap (+Y), back cap (−Y), and the curved underside strip
+    mb.quad([x0, hy, hz], [x1, hy, hz], [x1, hy, z1], [x0, hy, z0],
+      [u(x0), v(hz)], [u(x1), v(hz)], [u(x1), v(z1)], [u(x0), v(z0)]);
+    mb.quad([x0, -hy, z0], [x1, -hy, z1], [x1, -hy, hz], [x0, -hy, hz],
+      [u(x0), v(z0)], [u(x1), v(z1)], [u(x1), v(hz)], [u(x0), v(hz)]);
+    mb.quad([x1, -hy, z1], [x0, -hy, z0], [x0, hy, z0], [x1, hy, z1],
+      [u(x1), v(-hy)], [u(x0), v(-hy)], [u(x0), v(hy)], [u(x1), v(hy)]);
+  }
+  mb.quad([-hx, -hy, hz], [hx, -hy, hz], [hx, hy, hz], [-hx, hy, hz],
+    [u(-hx), v(-hy)], [u(hx), v(-hy)], [u(hx), v(hy)], [u(-hx), v(hy)]);
+  for (const s of [-1, 1]) {
+    const p0: V3 = [s * hx, -hy, -hz];
+    const p1: V3 = [s * hx, hy, -hz];
+    const p2: V3 = [s * hx, hy, hz];
+    const p3: V3 = [s * hx, -hy, hz];
+    const quad = s > 0 ? [p0, p1, p2, p3] : [p1, p0, p3, p2];
+    mb.quad(quad[0], quad[1], quad[2], quad[3],
+      [v(quad[0][1]), v(quad[0][2])], [v(quad[1][1]), v(quad[1][2])],
+      [v(quad[2][1]), v(quad[2][2])], [v(quad[3][1]), v(quad[3][2])]);
+  }
+  return mb.build();
+}
+
 /** Index of the longest dimension — the grain runs along it (boards are cut that way). */
 export function longestAxis(size: V3): 0 | 1 | 2 {
   if (size[0] >= size[1] && size[0] >= size[2]) return 0;
