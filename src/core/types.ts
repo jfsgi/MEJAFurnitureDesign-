@@ -93,6 +93,8 @@ export interface ComponentDef {
   name: string;
   category: string;
   description: string;
+  /** Where the piece lives: on the floor (default) or hung on a wall. */
+  mount?: 'floor' | 'wall';
   params: ParamDef[];
   generate(params: ParamValues): GeneratedModel;
 }

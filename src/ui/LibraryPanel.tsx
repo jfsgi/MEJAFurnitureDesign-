@@ -61,6 +61,13 @@ function Glyph({ category }: { category: string }) {
           <path d="M11.5 4h5l-2.2 20h-1.6z" />
         </g>
       )}
+      {category === 'Wall-mounted' && (
+        <g {...stroke}>
+          <path d="M3 8h22" />
+          <path d="M8 8v5m6-5v5m6-5v5" />
+          <path d="M8 13c1.5 0 1.5 2 0 2m6-2c1.5 0 1.5 2 0 2m6-2c1.5 0 1.5 2 0 2" />
+        </g>
+      )}
       {category === 'Boards & panels' && (
         <g {...stroke}>
           <path d="M4 16l14-6 6 2.5-14 6z" />

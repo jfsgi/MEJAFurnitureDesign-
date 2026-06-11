@@ -10,8 +10,13 @@ describe('component registry', () => {
       expect(model.parts.length, def.id).toBeGreaterThan(0);
       const box = modelBBox(model);
       expect(box, def.id).not.toBeNull();
-      // Everything must stand on the floor, not float or sink.
-      expect(box!.min[2], def.id).toBeCloseTo(0, 0);
+      if (def.mount === 'wall') {
+        // Wall-mounted pieces hang above the floor.
+        expect(box!.min[2], def.id).toBeGreaterThan(0);
+      } else {
+        // Everything else must stand on the floor, not float or sink.
+        expect(box!.min[2], def.id).toBeCloseTo(0, 0);
+      }
     }
   });
 
@@ -202,6 +207,47 @@ describe('chest of drawers', () => {
   it('warns when the drawer count outgrows the height', () => {
     const crowded = def.generate({ ...defaultParams(def), height: inch(20), drawerCount: 8 });
     expect(crowded.findings.some((f) => f.message.includes('Reduce the count'))).toBe(true);
+  });
+});
+
+describe('wall shelf with hooks', () => {
+  const def = REGISTRY['wall-shelf'];
+
+  it('builds top, legs, back, rail, and the requested hooks', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Top')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Leg')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Tile back frame')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Hook rail')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Hook')).toHaveLength(3);
+  });
+
+  it('back styles swap the panel; open drops it', () => {
+    const base = defaultParams(def);
+    const art = def.generate({ ...base, back: 'art' });
+    expect(art.parts.some((p) => p.name === 'Art back panel')).toBe(true);
+    const open = def.generate({ ...base, back: 'open' });
+    expect(open.parts.some((p) => p.name.includes('back'))).toBe(false);
+  });
+
+  it('hooks are hardware, not lumber', () => {
+    const model = def.generate(defaultParams(def));
+    const hook = model.parts.find((p) => p.name === 'Hook')!;
+    expect(hook.material).toBe('steel-black');
+  });
+
+  it('hangs at mount height: nothing touches the floor', () => {
+    const box = modelBBox(def.generate(defaultParams(def)))!;
+    expect(box.min[2]).toBeGreaterThan(inch(36));
+    expect(box.max[2]).toBeCloseTo(inch(66), 5);
+  });
+
+  it('warns when hooks crowd a short shelf', () => {
+    const crowded = def.generate({ ...defaultParams(def), length: inch(20), hooks: 6 });
+    expect(crowded.findings.some((f) => f.message.includes('crowd'))).toBe(true);
+    const fine = def.generate({ ...defaultParams(def), length: inch(48), hooks: 6 });
+    expect(fine.findings).toHaveLength(0);
   });
 });
 
