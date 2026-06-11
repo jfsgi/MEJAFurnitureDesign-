@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { Instance, ParamDef } from '../core/types';
 import { REGISTRY } from '../core/components/registry';
-import { effectiveParams, evaluateInstance, modelBBox } from '../core/evaluate';
+import { effectiveParams, evaluateInstance, modelBBox, partsAffectedBy } from '../core/evaluate';
 import { buildCutList } from '../core/cutlist';
 import { MATERIALS } from '../core/materials';
 import { formatLength } from '../core/units';
@@ -132,6 +132,23 @@ function ParamControl({ inst, def }: { inst: Instance; def: ParamDef }) {
   }
 }
 
+/** Hovering an adjustment lights up the parts it drives in the viewport. */
+function ParamRow({ inst, def }: { inst: Instance; def: ParamDef }) {
+  const { setHoveredPart } = useStore.getState();
+  return (
+    <div
+      className="param-row-hover"
+      onMouseEnter={() => {
+        const partIds = partsAffectedBy(inst, def.key);
+        setHoveredPart(partIds.length ? { instanceId: inst.id, partIds } : null);
+      }}
+      onMouseLeave={() => setHoveredPart(null)}
+    >
+      <ParamControl inst={inst} def={def} />
+    </div>
+  );
+}
+
 function SelectionInspector({ inst }: { inst: Instance }) {
   const units = useStore((s) => s.doc.units);
   const { renameInstance, duplicateInstance, removeInstance, rotateInstance, setPosition, beginGesture, endGesture, setInspectorOpen } =
@@ -191,7 +208,7 @@ function SelectionInspector({ inst }: { inst: Instance }) {
 
         <section className="inspector-section">
           {basic.map((p) => (
-            <ParamControl key={p.key} inst={inst} def={p} />
+            <ParamRow key={p.key} inst={inst} def={p} />
           ))}
         </section>
 
@@ -202,7 +219,7 @@ function SelectionInspector({ inst }: { inst: Instance }) {
         {advancedOpen && (
           <section className="inspector-section">
             {advanced.map((p) => (
-              <ParamControl key={p.key} inst={inst} def={p} />
+              <ParamRow key={p.key} inst={inst} def={p} />
             ))}
             <h4 className="panel-heading">Placement</h4>
             <DimensionInput

@@ -5,6 +5,8 @@ import type {
   ComponentDef,
   GeneratedModel,
   Instance,
+  ParamDef,
+  ParamValue,
   ParamValues,
   Primitive,
   ProjectDoc,
@@ -33,6 +35,50 @@ export function evaluateInstance(inst: Instance): GeneratedModel {
       parts: [],
       findings: [{ severity: 'warning', message: `Could not build this component: ${String(err)}` }],
     };
+  }
+}
+
+/** A value meaningfully different from the current one, kept inside the param's range. */
+function nudgeValue(def: ParamDef, value: ParamValue): ParamValue {
+  switch (def.kind) {
+    case 'length': {
+      const v = value as number;
+      const step = Math.max(10, (def.max - def.min) * 0.05);
+      return v + step <= def.max ? v + step : Math.max(def.min, v - step);
+    }
+    case 'count': {
+      const v = value as number;
+      return v < def.max ? v + 1 : v - 1;
+    }
+    case 'boolean':
+      return !(value as boolean);
+    case 'enum':
+      return def.options.find((o) => o.value !== value)?.value ?? (value as string);
+    case 'material':
+      return value === 'walnut' ? 'maple' : 'walnut';
+  }
+}
+
+/**
+ * Ids of the parts a parameter drives, found by diffing the generated model
+ * against one with the parameter nudged — powers "highlight what this
+ * adjustment touches" with zero per-component annotation.
+ */
+export function partsAffectedBy(inst: Instance, paramKey: string): string[] {
+  const def = REGISTRY[inst.componentId];
+  const paramDef = def?.params.find((p) => p.key === paramKey);
+  if (!def || !paramDef) return [];
+  const base = effectiveParams(inst);
+  try {
+    const before = def.generate(base);
+    const after = def.generate({ ...base, [paramKey]: nudgeValue(paramDef, base[paramKey]) });
+    const byId = (model: GeneratedModel) => new Map(model.parts.map((p) => [p.id, p]));
+    const a = byId(before);
+    const b = byId(after);
+    const ids = new Set([...a.keys(), ...b.keys()]);
+    return [...ids].filter((id) => JSON.stringify(a.get(id)) !== JSON.stringify(b.get(id)));
+  } catch {
+    return [];
   }
 }
 

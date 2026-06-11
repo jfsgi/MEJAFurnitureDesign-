@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { REGISTRY } from './components/registry';
 import { buildCutList } from './cutlist';
 import { SHEET_L, SHEET_W, buildStockBreakdown } from './stock';
-import { defaultParams, modelBBox } from './evaluate';
+import { defaultParams, modelBBox, partsAffectedBy } from './evaluate';
 import { inch } from './units';
-import type { ProjectDoc } from './types';
+import type { Instance, ProjectDoc } from './types';
 
 describe('component registry', () => {
   it('every component generates parts at its defaults', () => {
@@ -439,6 +439,38 @@ describe('spice rack', () => {
     expect(box.max[2] - box.min[2]).toBeCloseTo(params.height as number, 1);
     // The aligned wedge must not inflate the bbox past the rack's depth.
     expect(box.max[1] - box.min[1]).toBeLessThanOrEqual((params.depth as number) + 1);
+  });
+});
+
+describe('parameter → part mapping (adjustment highlighting)', () => {
+  const inst = (componentId: string): Instance => ({
+    id: 'i',
+    componentId,
+    name: 'X',
+    position: [0, 0],
+    rotationZ: 0,
+    params: {},
+  });
+
+  it('isolates the single part a focused parameter drives', () => {
+    expect(partsAffectedBy(inst('display-stand'), 'frontArchRise')).toEqual(['rail-bottom-front']);
+    const sideTop = partsAffectedBy(inst('display-stand'), 'sideTopArchRise');
+    expect(sideTop.sort()).toEqual(['side-rail-top--1', 'side-rail-top-1']);
+  });
+
+  it('fans out for parameters that move the whole assembly', () => {
+    expect(partsAffectedBy(inst('display-stand'), 'width').length).toBeGreaterThan(10);
+  });
+
+  it('covers parts created or removed by repeat rules', () => {
+    const affected = partsAffectedBy(inst('bookcase'), 'shelfSpacing');
+    expect(affected.some((id) => id.startsWith('shelf-'))).toBe(true);
+    expect(affected.some((id) => id.startsWith('side-'))).toBe(false);
+  });
+
+  it('returns nothing for unknown keys or components', () => {
+    expect(partsAffectedBy(inst('display-stand'), 'nope')).toEqual([]);
+    expect(partsAffectedBy(inst('missing'), 'width')).toEqual([]);
   });
 });
 
