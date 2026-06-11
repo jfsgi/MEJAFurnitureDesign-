@@ -84,9 +84,26 @@ function Glyph({ category }: { category: string }) {
   );
 }
 
+/** Prefix marking a drag payload as a Workshop preset rather than a component id. */
+export const WORKSHOP_DND_PREFIX = 'workshop:';
+
+function presetSize(componentId: string, params: Record<string, unknown>): [number, number, number] | null {
+  const def = REGISTRY[componentId];
+  if (!def) return null;
+  try {
+    const box = modelBBox(def.generate({ ...defaultParams(def), ...(params as object) }));
+    return box
+      ? [box.max[0] - box.min[0], box.max[1] - box.min[1], box.max[2] - box.min[2]]
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function LibraryTab() {
   const units = useStore((s) => s.doc.units);
-  const { addInstance } = useStore.getState();
+  const workshop = useStore((s) => s.workshop);
+  const { addInstance, addFromWorkshop, removeWorkshopPreset } = useStore.getState();
   const [query, setQuery] = useState('');
 
   const q = query.trim().toLowerCase();
@@ -99,6 +116,15 @@ function LibraryTab() {
         ),
       })).filter((cat) => cat.components.length > 0),
     [q],
+  );
+  const presets = useMemo(
+    () =>
+      workshop.filter((p) => {
+        const def = REGISTRY[p.componentId];
+        if (!def) return false;
+        return !q || p.name.toLowerCase().includes(q) || def.name.toLowerCase().includes(q);
+      }),
+    [workshop, q],
   );
 
   return (
@@ -119,10 +145,55 @@ function LibraryTab() {
         )}
       </div>
       <div className="panel-scroll">
-        {categories.length === 0 && (
+        {categories.length === 0 && presets.length === 0 && (
           <div className="empty-state">
             <p>Nothing matches “{query}”.</p>
           </div>
+        )}
+        {presets.length > 0 && (
+          <section className="lib-section">
+            <h3 className="panel-heading">Workshop</h3>
+            {presets.map((p) => {
+              const def = REGISTRY[p.componentId];
+              const size = presetSize(p.componentId, p.params);
+              return (
+                <div
+                  key={p.id}
+                  className="lib-card"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(DND_MIME, WORKSHOP_DND_PREFIX + p.id);
+                    e.dataTransfer.effectAllowed = 'copy';
+                  }}
+                  onDoubleClick={() => addFromWorkshop(p.id)}
+                  title={`Your saved ${def.name.toLowerCase()} configuration.\nDrag into the scene, or double-click to add.`}
+                >
+                  <Glyph category={def.category} />
+                  <div className="lib-card-text">
+                    <div className="lib-card-name">{p.name}</div>
+                    {size && (
+                      <div className="lib-card-dims">
+                        {def.name} · {formatLengthBare(size[0], units)} ×{' '}
+                        {formatLengthBare(size[1], units)} × {formatLengthBare(size[2], units)}
+                        {units === 'imperial' ? '″' : ' mm'}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="btn btn--bare lib-card-remove"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeWorkshopPreset(p.id);
+                    }}
+                    title="Remove from Workshop"
+                    aria-label={`Remove "${p.name}" from Workshop`}
+                  >
+                    <CloseIcon />
+                  </button>
+                </div>
+              );
+            })}
+          </section>
         )}
         {categories.map((cat) => (
           <section key={cat.name} className="lib-section">

@@ -11,6 +11,7 @@ import { formatLength } from '../core/units';
 import { useStore } from '../core/store';
 import { DimensionInput } from './DimensionInput';
 import {
+  BookmarkIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -280,6 +281,13 @@ function SelectionInspector({ inst }: { inst: Instance }) {
         )}
 
         <div className="inspector-actions">
+          <button
+            className="btn"
+            onClick={() => useStore.getState().saveToWorkshop(inst.id)}
+            title="Save this configuration to your Workshop library for reuse"
+          >
+            <BookmarkIcon /> Save preset
+          </button>
           <button className="btn" onClick={() => duplicateInstance(inst.id)}>
             <CopyIcon /> Duplicate
           </button>

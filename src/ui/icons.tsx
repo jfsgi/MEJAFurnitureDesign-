@@ -99,6 +99,11 @@ export const FrameIcon = () => (
     <path d="M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13" />
   </I>
 );
+export const BookmarkIcon = () => (
+  <I>
+    <path d="M5.5 3.5h9A1 1 0 0 1 15.5 4.5V17l-5.5-3.2L4.5 17V4.5a1 1 0 0 1 1-1Z" />
+  </I>
+);
 export const FrameSelectionIcon = () => (
   <I>
     <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" />

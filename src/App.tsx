@@ -4,7 +4,7 @@ import { snapMM } from './core/units';
 import { Viewport } from './viewport/Viewport';
 import { viewport } from './viewport/viewportApi';
 import { TopBar } from './ui/TopBar';
-import { LibraryPanel, DND_MIME } from './ui/LibraryPanel';
+import { LibraryPanel, DND_MIME, WORKSHOP_DND_PREFIX } from './ui/LibraryPanel';
 import { Inspector } from './ui/Inspector';
 import { StatusBar } from './ui/StatusBar';
 import { Toast } from './ui/Toast';
@@ -128,7 +128,11 @@ export default function App() {
                 const pos: [number, number] = s.snap
                   ? [snapMM(pt[0], s.doc.units), snapMM(pt[1], s.doc.units)]
                   : pt;
-                s.addInstance(id, pos);
+                if (id.startsWith(WORKSHOP_DND_PREFIX)) {
+                  s.addFromWorkshop(id.slice(WORKSHOP_DND_PREFIX.length), pos);
+                } else {
+                  s.addInstance(id, pos);
+                }
               }}
             >
               <Viewport />

@@ -3,15 +3,45 @@
 // (UI standard §1.6). Gestures (scrubs/drags) snapshot once at start, commit once at end.
 
 import { create } from 'zustand';
-import type { ParamValue, ProjectDoc, Units } from './types';
+import type { ParamValue, ParamValues, ProjectDoc, Units } from './types';
 import { REGISTRY } from './components/registry';
 import { instanceBBox } from './evaluate';
 import { inch } from './units';
 
 const STORAGE_KEY = 'atelier3d.project.v1';
+const WORKSHOP_KEY = 'atelier3d.workshop.v1';
 const HISTORY_LIMIT = 100;
 
 export type Workspace = 'design' | 'studio' | 'documents';
+
+/** A saved configuration in the user's Workshop library: component + sparse overrides. */
+export interface WorkshopPreset {
+  id: string;
+  name: string;
+  componentId: string;
+  params: ParamValues;
+}
+
+function loadWorkshop(): WorkshopPreset[] {
+  try {
+    const raw = localStorage.getItem(WORKSHOP_KEY);
+    if (raw) {
+      const list = JSON.parse(raw) as WorkshopPreset[];
+      if (Array.isArray(list)) return list.filter((p) => p && p.id && p.componentId);
+    }
+  } catch {
+    // Corrupt or unavailable storage — start with an empty Workshop.
+  }
+  return [];
+}
+
+function persistWorkshop(list: WorkshopPreset[]) {
+  try {
+    localStorage.setItem(WORKSHOP_KEY, JSON.stringify(list));
+  } catch {
+    // Storage full/unavailable — the in-memory Workshop still works this session.
+  }
+}
 
 export interface Toast {
   id: number;
@@ -36,6 +66,7 @@ interface State {
   toast: Toast | null;
   /** Next viewport drag draws a zoom window instead of selecting/moving. */
   zoomWindowArmed: boolean;
+  workshop: WorkshopPreset[];
 
   commitDoc(mutate: (doc: ProjectDoc) => void): void;
   previewDoc(mutate: (doc: ProjectDoc) => void): void;
@@ -56,6 +87,9 @@ interface State {
   dismissToast(): void;
 
   addInstance(componentId: string, position?: [number, number]): void;
+  saveToWorkshop(instanceId: string): void;
+  removeWorkshopPreset(presetId: string): void;
+  addFromWorkshop(presetId: string, position?: [number, number]): void;
   removeInstance(id: string): void;
   duplicateInstance(id: string): void;
   renameInstance(id: string, name: string): void;
@@ -114,6 +148,29 @@ export const useStore = create<State>()((set, get) => {
     }
   };
 
+  const placeInstance = (
+    componentId: string,
+    name: string,
+    params: ParamValues,
+    position?: [number, number],
+  ) => {
+    const id = crypto.randomUUID();
+    let pos = position;
+    if (!pos) {
+      // Drop to the right of everything already in the scene.
+      let maxX = -Infinity;
+      for (const inst of get().doc.instances) {
+        const b = instanceBBox(inst);
+        if (b) maxX = Math.max(maxX, b.max[0]);
+      }
+      pos = maxX === -Infinity ? [0, 0] : [maxX + inch(24), 0];
+    }
+    get().commitDoc((doc) => {
+      doc.instances.push({ id, componentId, name, position: pos!, rotationZ: 0, params });
+    });
+    set({ selectedId: id });
+  };
+
   return {
     doc: loadInitialDoc(),
     past: [],
@@ -129,6 +186,7 @@ export const useStore = create<State>()((set, get) => {
     inspectorOpen: true,
     toast: null,
     zoomWindowArmed: false,
+    workshop: loadWorkshop(),
 
     commitDoc(mutate) {
       const prev = get().doc;
@@ -184,25 +242,41 @@ export const useStore = create<State>()((set, get) => {
     addInstance(componentId, position) {
       const def = REGISTRY[componentId];
       if (!def) return;
-      const id = crypto.randomUUID();
       const siblings = get().doc.instances.filter((i) => i.componentId === componentId).length;
       const name = siblings === 0 ? def.name : `${def.name} ${siblings + 1}`;
+      placeInstance(componentId, name, {}, position);
+    },
 
-      let pos = position;
-      if (!pos) {
-        // Drop to the right of everything already in the scene.
-        let maxX = -Infinity;
-        for (const inst of get().doc.instances) {
-          const b = instanceBBox(inst);
-          if (b) maxX = Math.max(maxX, b.max[0]);
-        }
-        pos = maxX === -Infinity ? [0, 0] : [maxX + inch(24), 0];
-      }
+    saveToWorkshop(instanceId) {
+      const inst = get().doc.instances.find((i) => i.id === instanceId);
+      if (!inst) return;
+      const preset: WorkshopPreset = {
+        id: crypto.randomUUID(),
+        name: inst.name,
+        componentId: inst.componentId,
+        params: { ...inst.params },
+      };
+      const workshop = [...get().workshop, preset];
+      set({ workshop });
+      persistWorkshop(workshop);
+      get().showToast(`Saved "${inst.name}" to the Workshop`);
+    },
 
-      get().commitDoc((doc) => {
-        doc.instances.push({ id, componentId, name, position: pos!, rotationZ: 0, params: {} });
-      });
-      set({ selectedId: id });
+    removeWorkshopPreset(presetId) {
+      const preset = get().workshop.find((p) => p.id === presetId);
+      const workshop = get().workshop.filter((p) => p.id !== presetId);
+      set({ workshop });
+      persistWorkshop(workshop);
+      if (preset) get().showToast(`Removed "${preset.name}" from the Workshop`);
+    },
+
+    addFromWorkshop(presetId, position) {
+      const preset = get().workshop.find((p) => p.id === presetId);
+      if (!preset || !REGISTRY[preset.componentId]) return;
+      const taken = new Set(get().doc.instances.map((i) => i.name));
+      let name = preset.name;
+      for (let n = 2; taken.has(name); n++) name = `${preset.name} ${n}`;
+      placeInstance(preset.componentId, name, { ...preset.params }, position);
     },
 
     removeInstance(id) {

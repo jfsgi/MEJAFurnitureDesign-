@@ -819,6 +819,18 @@ button {
   color: var(--text-2);
 }
 
+/* ---------- Workshop preset cards ---------- */
+
+.lib-card-remove {
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.lib-card:hover .lib-card-remove,
+.lib-card-remove:focus-visible {
+  opacity: 1;
+}
+
 /* ---------- Inspector parts list ---------- */
 
 .parts-list {
