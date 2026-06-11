@@ -464,15 +464,32 @@ describe('cut list part tracking', () => {
 describe('tiered display stand', () => {
   const def = REGISTRY['display-stand'];
 
-  it('builds back legs, raked legs, and a shelf + rail per tier', () => {
+  it('builds the frame per the shop drawing: legs, side rails, long rails, top', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
     expect(names.filter((n) => n === 'Leg (back)')).toHaveLength(2);
     expect(names.filter((n) => n === 'Leg (raked)')).toHaveLength(2);
-    expect(names.filter((n) => n === 'Shelf')).toHaveLength(4);
-    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Side rail (top)')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Side rail (bottom)')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Top rail')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Bottom rail')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Top')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Shelf')).toHaveLength(3);
+    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(3);
     const raked = model.parts.find((p) => p.name === 'Leg (raked)')!;
     expect((raked.primitives[0] as { tiltX?: number }).tiltX ?? 0).toBeGreaterThan(0);
+  });
+
+  it('matches the drawing: 14" full-width top, ~8" top side rails, longer bottom ones', () => {
+    const model = def.generate(defaultParams(def));
+    const top = model.parts.find((p) => p.name === 'Top')!;
+    expect(top.cut.length).toBeCloseTo(inch(36), 5);
+    expect(top.cut.width).toBeCloseTo(inch(14), 5);
+    const sideTop = model.parts.find((p) => p.name === 'Side rail (top)')!;
+    expect(sideTop.cut.length).toBeCloseTo(inch(8), 5);
+    const sideBottom = model.parts.find((p) => p.name === 'Side rail (bottom)')!;
+    expect(sideBottom.cut.length).toBeGreaterThan(inch(12));
+    expect(sideBottom.cut.length).toBeLessThan(inch(14));
   });
 
   it('shelves deepen toward the floor, following the rake', () => {
