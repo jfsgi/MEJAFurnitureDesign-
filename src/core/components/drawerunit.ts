@@ -37,7 +37,12 @@ function caseCornerFingers(opts: {
     const y = -D / 2 + (k + 0.5) * fy;
     const isTail = k % 2 === 0;
     if (flare === 0 || k === 0 || k === n - 1) {
-      (isTail ? sideFingers : capFingers).push({ shape: 'box', size: [t, fy, t], at: [x, y, zc] });
+      (isTail ? sideFingers : capFingers).push({
+        shape: 'box',
+        size: [t, fy, t],
+        at: [x, y, zc],
+        endGrain: !isTail,
+      });
       continue;
     }
     const wide: [number, number] = [t, fy + 2 * flare];
@@ -50,6 +55,7 @@ function caseCornerFingers(opts: {
       height: t,
       at: [x, y, zc],
       align: [0, 0],
+      endGrain: !isTail,
     });
   }
   return { sideFingers, capFingers };

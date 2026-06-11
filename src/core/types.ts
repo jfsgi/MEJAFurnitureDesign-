@@ -60,6 +60,8 @@ export type Primitive =
       tilt?: number;
       /** Rotation about the width (X) axis, radians — leaned shelves. Use one tilt at a time. */
       tiltX?: number;
+      /** Renders shaded like end grain (joint fingers of the mating board). */
+      endGrain?: boolean;
     }
   | {
       shape: 'taperedBox';
@@ -72,6 +74,8 @@ export type Primitive =
       shift?: [number, number];
       /** Taper axis (default 'z'). Horizontal tapers make dovetail tails and pins. */
       axis?: 'x' | 'y' | 'z';
+      /** Renders shaded like end grain (joint fingers of the mating board). */
+      endGrain?: boolean;
     }
   | {
       shape: 'cylinder';

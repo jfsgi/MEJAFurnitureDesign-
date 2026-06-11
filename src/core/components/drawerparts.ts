@@ -42,6 +42,7 @@ export function cornerFingerPrims(opts: {
         shape: 'box',
         size: [sideT, sideT, fh],
         at: [x, yCenter, z],
+        endGrain: !isTail,
       });
       continue;
     }
@@ -58,6 +59,7 @@ export function cornerFingerPrims(opts: {
       at: [x, yCenter, z],
       align: [0, 0],
       axis: 'y',
+      endGrain: !isTail,
     });
   }
   return { tails, pins };

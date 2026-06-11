@@ -116,12 +116,15 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
         if (prim.shape !== 'cylinder') toEngineUVs(geometry);
         // Engine materials run with vertexColors (applyBoxUVs bakes AO there);
         // our grain-mapped geometries must carry a white color attribute or
-        // they render black.
+        // they render black. Joint fingers of the mating board shade darker,
+        // the way end grain reads against face grain.
         if (!geometry.getAttribute('color')) {
           const count = geometry.getAttribute('position').count;
+          const shade =
+            (prim.shape === 'box' || prim.shape === 'taperedBox') && prim.endGrain ? 0.72 : 1;
           geometry.setAttribute(
             'color',
-            new THREE.BufferAttribute(new Float32Array(count * 3).fill(1), 3),
+            new THREE.BufferAttribute(new Float32Array(count * 3).fill(shade), 3),
           );
         }
         const mesh = new THREE.Mesh(geometry, material);
