@@ -3,6 +3,7 @@ import { board, panel, roundLeg, shelf, straightLeg, taperedLeg } from './primit
 import { coffeeTable, consoleTable, diningTable, sideTable } from './table';
 import { bookcase } from './bookcase';
 import { cabinet } from './cabinet';
+import { dresser } from './dresser';
 import { bench, stool } from './seating';
 
 const ALL: ComponentDef[] = [
@@ -14,6 +15,7 @@ const ALL: ComponentDef[] = [
   stool,
   bookcase,
   cabinet,
+  dresser,
   taperedLeg,
   straightLeg,
   roundLeg,
@@ -29,7 +31,7 @@ export const REGISTRY: Record<string, ComponentDef> = Object.fromEntries(
 export const CATEGORIES: { name: string; components: ComponentDef[] }[] = [
   { name: 'Tables', components: [diningTable, coffeeTable, consoleTable, sideTable] },
   { name: 'Seating', components: [bench, stool] },
-  { name: 'Storage', components: [bookcase, cabinet] },
+  { name: 'Storage', components: [bookcase, cabinet, dresser] },
   { name: 'Legs', components: [taperedLeg, straightLeg, roundLeg] },
   { name: 'Boards & panels', components: [board, panel, shelf] },
 ];

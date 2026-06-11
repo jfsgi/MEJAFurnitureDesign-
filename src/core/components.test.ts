@@ -152,6 +152,59 @@ describe('cabinet', () => {
   });
 });
 
+describe('chest of drawers', () => {
+  const def = REGISTRY['dresser'];
+
+  it('builds the carcase plus a full box behind every front', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Drawer front')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Drawer side')).toHaveLength(8);
+    expect(names.filter((n) => n === 'Drawer end')).toHaveLength(8);
+    expect(names.filter((n) => n === 'Drawer bottom')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Side')).toHaveLength(2);
+  });
+
+  it('fronts plus reveals exactly fill the interior height', () => {
+    const params = defaultParams(def);
+    const model = def.generate(params);
+    const fronts = model.parts.filter((p) => p.name === 'Drawer front');
+    const t = params.thickness as number;
+    const reveal = params.reveal as number;
+    const innerH = (params.height as number) - 2 * t;
+    const total =
+      fronts.reduce((sum, f) => sum + f.cut.width, 0) + (fronts.length + 1) * reveal;
+    expect(total).toBeCloseTo(innerH, 5);
+  });
+
+  it('graduates heights toward the top, and equalizes when turned off', () => {
+    const base = defaultParams(def);
+    const heightsOf = (params: typeof base) =>
+      def
+        .generate(params)
+        .parts.filter((p) => p.name === 'Drawer front')
+        .map((f) => f.cut.width);
+    const graduated = heightsOf(base);
+    // Generation order is top to bottom: each front at least as tall as the one above.
+    expect(graduated[0]).toBeLessThan(graduated[graduated.length - 1]);
+    const flat = heightsOf({ ...base, graduated: false });
+    expect(Math.max(...flat) - Math.min(...flat)).toBeCloseTo(0, 5);
+  });
+
+  it('uses the secondary material for drawer boxes', () => {
+    const model = def.generate(defaultParams(def));
+    const side = model.parts.find((p) => p.name === 'Drawer side')!;
+    const front = model.parts.find((p) => p.name === 'Drawer front')!;
+    expect(side.material).toBe('maple');
+    expect(front.material).toBe('walnut');
+  });
+
+  it('warns when the drawer count outgrows the height', () => {
+    const crowded = def.generate({ ...defaultParams(def), height: inch(20), drawerCount: 8 });
+    expect(crowded.findings.some((f) => f.message.includes('Reduce the count'))).toBe(true);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 
