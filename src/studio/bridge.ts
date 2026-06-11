@@ -12,7 +12,7 @@ import {
   longestAxis,
   taperedBoxGeometry,
 } from '../viewport/geometry';
-import { GRAIN_MM_U, grainOffset } from '../viewport/woodTexture';
+import { GRAIN_MM_U, GRAIN_MM_V, grainOffset } from '../viewport/woodTexture';
 import { applyBoxUVs } from './engine/materials/uv';
 import type { MaterialLibrary } from './engine/materials/MaterialLibrary';
 
@@ -33,6 +33,26 @@ export const ENGINE_MATERIAL_MAP: Record<string, string> = {
 
 export function engineMaterialFor(designMaterialId: string): string {
   return ENGINE_MATERIAL_MAP[designMaterialId] ?? 'oak';
+}
+
+/** Engine texture tile in model millimeters (2.4 m of wood per repeat). */
+const ENGINE_TILE_MM = 2400;
+
+/**
+ * Converts the design builders' grain UVs (grain along U at 1200 mm, 300 mm
+ * across) into the engine's convention: grain along V, square tile, so a board
+ * samples one plank of the texture lengthwise instead of marching across the
+ * panel's plank joints (the "spliced" look), with figure running the board.
+ */
+function toEngineUVs(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  const uv = geometry.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) {
+    const along = uv.getX(i) * GRAIN_MM_U; // back to millimeters along the grain
+    const across = uv.getY(i) * GRAIN_MM_V;
+    uv.setXY(i, across / ENGINE_TILE_MM, along / ENGINE_TILE_MM);
+  }
+  uv.needsUpdate = true;
+  return geometry;
 }
 
 /** Builds the whole document as one engine-ready group (Y-up, meters). */
@@ -92,6 +112,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
           // Grain along the cylinder axis (pre-rotation Y).
           applyBoxUVs(geometry, GRAIN_MM_U, 'y', offset[0], offset[1]);
         }
+        if (prim.shape !== 'cylinder') toEngineUVs(geometry);
         // Engine materials run with vertexColors (applyBoxUVs bakes AO there);
         // our grain-mapped geometries must carry a white color attribute or
         // they render black.
