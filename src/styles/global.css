@@ -819,6 +819,47 @@ button {
   color: var(--text-2);
 }
 
+/* ---------- Stock breakdown diagrams ---------- */
+
+.stock-sheet {
+  margin: 0 0 20px;
+}
+
+.stock-sheet-caption {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+
+.stock-sheet-svg {
+  width: 100%;
+  max-width: 760px;
+  display: block;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-ctl);
+}
+
+.stock-sheet-stock {
+  fill: #efeadf;
+  stroke: var(--border-strong);
+  stroke-width: 3;
+}
+
+.stock-part {
+  stroke: #6e675c;
+  stroke-width: 3;
+}
+
+.stock-part-label {
+  font-size: 52px;
+  fill: #2b2722;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-family: var(--font);
+}
+
 /* ---------- Workshop preset cards ---------- */
 
 .lib-card-remove {

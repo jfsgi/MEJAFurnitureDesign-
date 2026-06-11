@@ -1,13 +1,53 @@
-// Documents workspace: live cut list & BOM. Drawings and CNC exports arrive in Phase 2.
+// Documents workspace: live cut list & BOM, stock breakdown with sheet nesting.
+// Drawings and CNC exports arrive in Phase 2.
 
+import { useState } from 'react';
 import { boardFeet, buildCutList, cutListCSV, totalBoardFeet } from '../core/cutlist';
+import { SHEET_L, SHEET_W, buildStockBreakdown, type SheetLayout } from '../core/stock';
 import { MATERIAL_BY_ID } from '../core/materials';
-import { formatLengthBare } from '../core/units';
+import { formatLength, formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
-import { DownloadIcon } from './icons';
+import { DownloadIcon, WarningIcon } from './icons';
+
+function SheetDiagram({ layout, index, units }: { layout: SheetLayout; index: number; units: 'imperial' | 'metric' }) {
+  const matName = MATERIAL_BY_ID[layout.material]?.name ?? layout.material;
+  const fill = MATERIAL_BY_ID[layout.material]?.color ?? '#D9CFBA';
+  return (
+    <figure className="stock-sheet">
+      <figcaption className="stock-sheet-caption">
+        Sheet {index + 1} — {matName} {formatLength(layout.thickness, units)} ·{' '}
+        {Math.round(layout.usedFraction * 100)}% used
+      </figcaption>
+      <svg
+        className="stock-sheet-svg"
+        viewBox={`-10 -10 ${SHEET_L + 20} ${SHEET_W + 20}`}
+        role="img"
+        aria-label={`Cutting layout for sheet ${index + 1}`}
+      >
+        <rect x={0} y={0} width={SHEET_L} height={SHEET_W} className="stock-sheet-stock" />
+        {layout.placements.map((pl, i) => (
+          <g key={i}>
+            <rect x={pl.x} y={pl.y} width={pl.w} height={pl.h} fill={fill} className="stock-part" />
+            {pl.w > 220 && pl.h > 90 && (
+              <text x={pl.x + pl.w / 2} y={pl.y + pl.h / 2} className="stock-part-label">
+                {pl.part.name}
+                {pl.h > 170 && (
+                  <tspan x={pl.x + pl.w / 2} dy={56}>
+                    {formatLengthBare(pl.part.length, units)} × {formatLengthBare(pl.part.width, units)}
+                  </tspan>
+                )}
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
+    </figure>
+  );
+}
 
 export function DocumentsView() {
   const doc = useStore((s) => s.doc);
+  const [page, setPage] = useState<'cutlist' | 'stock'>('cutlist');
   const groups = buildCutList(doc);
   const units = doc.units;
   const unitMark = units === 'imperial' ? 'inches' : 'mm';
@@ -22,6 +62,8 @@ export function DocumentsView() {
     URL.revokeObjectURL(a.href);
   };
 
+  const stock = page === 'stock' ? buildStockBreakdown(doc) : null;
+
   return (
     <div className="documents">
       <aside className="panel panel--left">
@@ -29,7 +71,18 @@ export function DocumentsView() {
           <span className="panel-title">Documents</span>
         </div>
         <div className="panel-scroll">
-          <button className="doc-item doc-item--active">Cut list &amp; BOM</button>
+          <button
+            className={`doc-item${page === 'cutlist' ? ' doc-item--active' : ''}`}
+            onClick={() => setPage('cutlist')}
+          >
+            Cut list &amp; BOM
+          </button>
+          <button
+            className={`doc-item${page === 'stock' ? ' doc-item--active' : ''}`}
+            onClick={() => setPage('stock')}
+          >
+            Stock breakdown
+          </button>
           <button className="doc-item" disabled title="Arrives in Phase 2">
             Assembly drawings
           </button>
@@ -40,64 +93,136 @@ export function DocumentsView() {
       </aside>
 
       <main className="documents-main">
-        <div className="sheet">
-          <div className="sheet-header">
-            <div>
-              <h1 className="sheet-title">Cut list</h1>
-              <div className="sheet-sub">
-                {doc.name} · regenerated live from the model · dimensions in {unitMark}
+        {page === 'cutlist' && (
+          <div className="sheet">
+            <div className="sheet-header">
+              <div>
+                <h1 className="sheet-title">Cut list</h1>
+                <div className="sheet-sub">
+                  {doc.name} · regenerated live from the model · dimensions in {unitMark}
+                </div>
+              </div>
+              <button className="btn" onClick={exportCSV}>
+                <DownloadIcon /> Export CSV
+              </button>
+            </div>
+
+            {groups.length === 0 && (
+              <div className="empty-state">
+                <p>No parts yet.</p>
+                <p className="empty-hint">Add components in the Design workspace first.</p>
+              </div>
+            )}
+
+            {groups.map((group) => (
+              <section key={group.instance.id} className="sheet-section">
+                <h2 className="sheet-section-title">{group.instance.name}</h2>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Part</th>
+                      <th className="num">Qty</th>
+                      <th className="num">Length</th>
+                      <th className="num">Width</th>
+                      <th className="num">Thickness</th>
+                      <th>Material</th>
+                      <th className="num">Bd ft</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.rows.map((row, i) => (
+                      <tr key={i}>
+                        <td>{row.part}</td>
+                        <td className="num">{row.qty}</td>
+                        <td className="num">{dim(row.length)}</td>
+                        <td className="num">{dim(row.width)}</td>
+                        <td className="num">{dim(row.thickness)}</td>
+                        <td>{MATERIAL_BY_ID[row.material]?.name ?? row.material}</td>
+                        <td className="num">{boardFeet(row).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            ))}
+
+            {groups.length > 0 && (
+              <div className="sheet-total">
+                Total lumber: <b>{totalBoardFeet(groups).toFixed(1)} board feet</b>
+              </div>
+            )}
+          </div>
+        )}
+
+        {page === 'stock' && stock && (
+          <div className="sheet">
+            <div className="sheet-header">
+              <div>
+                <h1 className="sheet-title">Stock breakdown</h1>
+                <div className="sheet-sub">
+                  {doc.name} · sheet goods nested on 4×8 sheets with ⅛″ kerf · lumber with 15%
+                  milling allowance
+                </div>
               </div>
             </div>
-            <button className="btn" onClick={exportCSV}>
-              <DownloadIcon /> Export CSV
-            </button>
-          </div>
 
-          {groups.length === 0 && (
-            <div className="empty-state">
-              <p>No parts yet.</p>
-              <p className="empty-hint">Add components in the Design workspace first.</p>
-            </div>
-          )}
+            {stock.lumber.length === 0 && stock.sheets.length === 0 && (
+              <div className="empty-state">
+                <p>No parts yet.</p>
+                <p className="empty-hint">Add components in the Design workspace first.</p>
+              </div>
+            )}
 
-          {groups.map((group) => (
-            <section key={group.instance.id} className="sheet-section">
-              <h2 className="sheet-section-title">{group.instance.name}</h2>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Part</th>
-                    <th className="num">Qty</th>
-                    <th className="num">Length</th>
-                    <th className="num">Width</th>
-                    <th className="num">Thickness</th>
-                    <th>Material</th>
-                    <th className="num">Bd ft</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rows.map((row, i) => (
-                    <tr key={i}>
-                      <td>{row.part}</td>
-                      <td className="num">{row.qty}</td>
-                      <td className="num">{dim(row.length)}</td>
-                      <td className="num">{dim(row.width)}</td>
-                      <td className="num">{dim(row.thickness)}</td>
-                      <td>{MATERIAL_BY_ID[row.material]?.name ?? row.material}</td>
-                      <td className="num">{boardFeet(row).toFixed(2)}</td>
+            {stock.unplaced.length > 0 && (
+              <div className="check-warning">
+                <WarningIcon />
+                <span>
+                  {stock.unplaced.length} part{stock.unplaced.length === 1 ? '' : 's'} exceed a 4×8
+                  sheet and need special stock: {stock.unplaced.map((p) => p.name).join(', ')}.
+                </span>
+              </div>
+            )}
+
+            {stock.lumber.length > 0 && (
+              <section className="sheet-section">
+                <h2 className="sheet-section-title">Solid lumber</h2>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Material</th>
+                      <th className="num">Thickness</th>
+                      <th className="num">In parts</th>
+                      <th className="num">Buy (≈15% waste)</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          ))}
+                  </thead>
+                  <tbody>
+                    {stock.lumber.map((line, i) => (
+                      <tr key={i}>
+                        <td>{MATERIAL_BY_ID[line.material]?.name ?? line.material}</td>
+                        <td className="num">{dim(line.thickness)}</td>
+                        <td className="num">{line.boardFeet.toFixed(1)} bd ft</td>
+                        <td className="num">
+                          <b>{line.buyBoardFeet.toFixed(1)} bd ft</b>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            )}
 
-          {groups.length > 0 && (
-            <div className="sheet-total">
-              Total lumber: <b>{totalBoardFeet(groups).toFixed(1)} board feet</b>
-            </div>
-          )}
-        </div>
+            {stock.sheets.length > 0 && (
+              <section className="sheet-section">
+                <h2 className="sheet-section-title">
+                  Sheet goods — {stock.sheets.length} sheet{stock.sheets.length === 1 ? '' : 's'}
+                </h2>
+                {stock.sheets.map((layout, i) => (
+                  <SheetDiagram key={i} layout={layout} index={i} units={units} />
+                ))}
+              </section>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

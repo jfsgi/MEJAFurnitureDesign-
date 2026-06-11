@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { REGISTRY } from './components/registry';
 import { buildCutList } from './cutlist';
+import { SHEET_L, SHEET_W, buildStockBreakdown } from './stock';
 import { defaultParams, modelBBox } from './evaluate';
 import { inch } from './units';
 import type { ProjectDoc } from './types';
@@ -437,6 +438,51 @@ describe('cut list part tracking', () => {
     expect(legs.partIds).toHaveLength(4);
     expect(new Set(legs.partIds).size).toBe(4);
     for (const row of rows) expect(row.partIds).toHaveLength(row.qty);
+  });
+});
+
+describe('stock breakdown', () => {
+  const docWith = (componentId: string): ProjectDoc => ({
+    schema: 1,
+    name: 'test',
+    units: 'imperial',
+    instances: [{ id: 'i1', componentId, name: 'X', position: [0, 0], rotationZ: 0, params: {} }],
+  });
+
+  it('splits lumber from sheet stock and adds a purchase allowance', () => {
+    const stock = buildStockBreakdown(docWith('cabinet'));
+    // Walnut carcase boards are lumber; the 1/4" back panel goes to sheet stock.
+    const walnut = stock.lumber.find((l) => l.material === 'walnut')!;
+    expect(walnut.boardFeet).toBeGreaterThan(0);
+    expect(walnut.buyBoardFeet).toBeGreaterThan(walnut.boardFeet);
+    expect(stock.sheets.length).toBeGreaterThan(0);
+    expect(stock.unplaced).toHaveLength(0);
+  });
+
+  it('nests parts inside the sheet without overlaps', () => {
+    const stock = buildStockBreakdown(docWith('storage-tower'));
+    for (const sheet of stock.sheets) {
+      for (const a of sheet.placements) {
+        expect(a.x).toBeGreaterThanOrEqual(0);
+        expect(a.y).toBeGreaterThanOrEqual(0);
+        expect(a.x + a.w).toBeLessThanOrEqual(SHEET_L + 1e-6);
+        expect(a.y + a.h).toBeLessThanOrEqual(SHEET_W + 1e-6);
+      }
+      for (let i = 0; i < sheet.placements.length; i++) {
+        for (let j = i + 1; j < sheet.placements.length; j++) {
+          const a = sheet.placements[i];
+          const b = sheet.placements[j];
+          const overlap =
+            a.x < b.x + b.w - 1e-6 &&
+            b.x < a.x + a.w - 1e-6 &&
+            a.y < b.y + b.h - 1e-6 &&
+            b.y < a.y + a.h - 1e-6;
+          expect(overlap, `placements ${i}/${j} overlap`).toBe(false);
+        }
+      }
+      expect(sheet.usedFraction).toBeGreaterThan(0);
+      expect(sheet.usedFraction).toBeLessThanOrEqual(1);
+    }
   });
 });
 
