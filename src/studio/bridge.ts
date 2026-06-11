@@ -92,6 +92,16 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
           // Grain along the cylinder axis (pre-rotation Y).
           applyBoxUVs(geometry, GRAIN_MM_U, 'y', offset[0], offset[1]);
         }
+        // Engine materials run with vertexColors (applyBoxUVs bakes AO there);
+        // our grain-mapped geometries must carry a white color attribute or
+        // they render black.
+        if (!geometry.getAttribute('color')) {
+          const count = geometry.getAttribute('position').count;
+          geometry.setAttribute(
+            'color',
+            new THREE.BufferAttribute(new Float32Array(count * 3).fill(1), 3),
+          );
+        }
         const mesh = new THREE.Mesh(geometry, material);
         mesh.name = `${inst.name} · ${part.name}`;
         mesh.position.set(...prim.at);
