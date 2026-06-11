@@ -471,15 +471,14 @@ describe('tiered display stand', () => {
     expect(names.filter((n) => n === 'Leg (raked)')).toHaveLength(2);
     expect(names.filter((n) => n === 'Side rail (top)')).toHaveLength(2);
     expect(names.filter((n) => n === 'Side rail (bottom)')).toHaveLength(2);
-    expect(names.filter((n) => n === 'Top rail')).toHaveLength(2);
+    // One long rail at the back under the top shelf; the bottom pair at the floor.
+    expect(names.filter((n) => n === 'Top rail')).toHaveLength(1);
     expect(names.filter((n) => n === 'Bottom rail')).toHaveLength(2);
     expect(names.filter((n) => n === 'Top shelf')).toHaveLength(1);
     expect(names.filter((n) => n === 'Shelf')).toHaveLength(3);
     expect(names.filter((n) => n === 'Shelf backsplash')).toHaveLength(4);
-    // Middle shelves only: top rides the top rails, bottom sits on the bottom rails.
-    expect(names.filter((n) => n === 'Shelf skirt')).toHaveLength(2);
-    const skirt = model.parts.find((p) => p.name === 'Shelf skirt')!;
-    expect(skirt.cut.width).toBeCloseTo(inch(2.5), 5);
+    // Shelves are clean bowed boards — no skirts or rails under the fronts.
+    expect(names.some((n) => n === 'Shelf skirt' || n === 'Shelf rail')).toBe(false);
     const raked = model.parts.find((p) => p.name === 'Leg (raked)')!;
     const prim = raked.primitives[0] as { shape: string; shift?: [number, number] };
     expect(prim.shape).toBe('taperedBox');

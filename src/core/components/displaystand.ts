@@ -18,7 +18,6 @@ const BOTTOM_RAIL_H = inch(2.5);
 const SIDE_TOP_RAIL_H = inch(2.75);
 const SIDE_BOTTOM_RAIL_H = inch(2.25);
 const BOTTOM_RAIL_Z = inch(2.4375); // floor to the bottom rails' lower edge
-const SHELF_SKIRT_H = inch(2.5); // skirt under each middle shelf's front edge
 const LEG_PROUD = inch(0.75); // leg tops stand this far above the top shelf
 const FRONT_BULGE = inch(0.75); // shelf front edge bow
 const BACKSPLASH_H = inch(1.75);
@@ -150,19 +149,10 @@ export const displayStand: ComponentDef = {
       });
     }
 
-    // Long rails: a pair under the top shelf, and a pair at the floor carrying the
-    // bottom shelf — the front one arched, per the drawing.
+    // Long rails: one at the back under the top shelf, and the bottom pair carrying
+    // the bottom shelf — the front one arched, per the drawing.
     const topRailZ = sTop - t - TOP_RAIL_H / 2;
     const botRailZ = BOTTOM_RAIL_Z + BOTTOM_RAIL_H / 2;
-    parts.push({
-      id: 'rail-top-front',
-      name: 'Top rail',
-      material: mat,
-      primitives: [
-        { shape: 'box', size: [innerW, legW, TOP_RAIL_H], at: [0, backY + topD - legD / 2, topRailZ] },
-      ],
-      cut: { length: innerW, width: TOP_RAIL_H, thickness: legW },
-    });
     parts.push({
       id: 'rail-top-back',
       name: 'Top rail',
@@ -200,14 +190,12 @@ export const displayStand: ComponentDef = {
 
     // Shelves: full depth — from the rear leg plane to the front arch peak at the
     // piece's full depth — passing between the raked legs and cantilevering past
-    // the bottom cross piece. Bowed front edge, short backsplash at the back;
-    // middles carry a rail under the front edge (the top shelf rides the top
-    // rails, the bottom shelf the bottom cross supports).
+    // the bottom cross piece. Clean bowed boards with a short backsplash; the top
+    // shelf rides the back rail, the bottom shelf the bottom cross supports.
     const shelfD = D - FRONT_BULGE; // board depth; the bow peaks at the full depth
     for (let i = 0; i < n; i++) {
       const s = surfaces[i];
       const isTop = i === 0;
-      const isBottom = i === n - 1;
       parts.push({
         id: `shelf-${i}`,
         name: isTop ? 'Top shelf' : 'Shelf',
@@ -233,21 +221,6 @@ export const displayStand: ComponentDef = {
         ],
         cut: { length: innerW, width: splashH, thickness: t },
       });
-      if (!isTop && !isBottom) {
-        parts.push({
-          id: `shelf-skirt-${i}`,
-          name: 'Shelf skirt',
-          material: mat,
-          primitives: [
-            {
-              shape: 'box',
-              size: [innerW, t, SHELF_SKIRT_H],
-              at: [0, backY + shelfD - t / 2, s - t - SHELF_SKIRT_H / 2],
-            },
-          ],
-          cut: { length: innerW, width: SHELF_SKIRT_H, thickness: t },
-        });
-      }
     }
 
     if (innerW > maxShelfSpan(t)) {
