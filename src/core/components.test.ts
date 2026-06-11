@@ -323,7 +323,7 @@ describe('drawer unit', () => {
   it('builds the case plus a front and full box per drawer', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
-    expect(names.filter((n) => n === 'Side')).toHaveLength(2);
+    expect(names.filter((n) => n.startsWith('Side'))).toHaveLength(2);
     expect(names.filter((n) => n === 'Drawer front')).toHaveLength(2);
     expect(names.filter((n) => n === 'Drawer side')).toHaveLength(4);
     expect(names.filter((n) => n === 'Drawer end')).toHaveLength(4);
@@ -363,6 +363,22 @@ describe('drawer unit', () => {
     expect(gapBetween).toBeCloseTo(r, 5);
     // Proud of the case face.
     expect(fronts[0].primitives[0].at[1]).toBeGreaterThan((base.depth as number) / 2 - 0.001);
+  });
+
+  it('half-blind dovetailed case: labeled parts, top/bottom stock runs into the sockets', () => {
+    const params = defaultParams(def);
+    const model = def.generate(params);
+    const t = params.thickness as number;
+    const innerW = (params.width as number) - 2 * t;
+    const top = model.parts.find((p) => p.id === 'top')!;
+    expect(top.name).toBe('Top (half-blind DT)');
+    expect(top.cut.length).toBeCloseTo(innerW + t, 5); // half the side thickness per end
+    const side = model.parts.find((p) => p.id === 'side-1')!;
+    expect(side.name).toBe('Side (half-blind DT)');
+    expect(side.cut.length).toBeCloseTo(params.height as number, 5); // tails over full height
+    const butt = def.generate({ ...params, caseJoinery: 'butt' });
+    expect(butt.parts.find((p) => p.id === 'top')!.cut.length).toBeCloseTo(innerW, 5);
+    expect(butt.parts.find((p) => p.id === 'top')!.name).toBe('Top');
   });
 
   it('back panel insets 1/4" from the rear of the box', () => {

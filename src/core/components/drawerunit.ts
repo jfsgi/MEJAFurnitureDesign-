@@ -38,6 +38,11 @@ export const drawerUnit: ComponentDef = {
         { value: 'overlay', label: 'Overlay' },
       ] },
     { kind: 'material', key: 'boxMaterial', label: 'Drawer box material', default: 'maple', tier: 'advanced' },
+    { kind: 'enum', key: 'caseJoinery', label: 'Case joinery', default: 'half-blind-dovetail', tier: 'advanced',
+      options: [
+        { value: 'half-blind-dovetail', label: 'Half-blind dovetail' },
+        { value: 'butt', label: 'Butt / screwed' },
+      ] },
     { kind: 'length', key: 'thickness', label: 'Case thickness', default: inch(0.625), min: inch(0.5), max: inch(1), tier: 'advanced' },
     { kind: 'length', key: 'backThickness', label: 'Back thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'boxSideThickness', label: 'Box side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
@@ -64,10 +69,18 @@ export const drawerUnit: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
+    // Half-blind dovetails join the sides to the top and bottom: the sides carry
+    // the tails over their full height, and the top/bottom stock runs into the
+    // sockets — half the side thickness deep at each end — so their cut length is
+    // longer than the clear interior span. (Joint geometry renders square until
+    // the joinery system lands.)
+    const dovetailed = str(p, 'caseJoinery') === 'half-blind-dovetail';
+    const jointTag = dovetailed ? ' (half-blind DT)' : '';
+    const capLen = dovetailed ? innerW + t : innerW;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-${sx}`,
-        name: 'Side',
+        name: `Side${jointTag}`,
         material: mat,
         primitives: [{ shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] }],
         cut: { length: H, width: D, thickness: t },
@@ -75,17 +88,17 @@ export const drawerUnit: ComponentDef = {
     }
     parts.push({
       id: 'bottom',
-      name: 'Bottom',
+      name: `Bottom${jointTag}`,
       material: mat,
       primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, t / 2] }],
-      cut: { length: innerW, width: D, thickness: t },
+      cut: { length: capLen, width: D, thickness: t },
     });
     parts.push({
       id: 'top',
-      name: 'Top',
+      name: `Top${jointTag}`,
       material: mat,
       primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, H - t / 2] }],
-      cut: { length: innerW, width: D, thickness: t },
+      cut: { length: capLen, width: D, thickness: t },
     });
     // Back panel, inset from the rear of the box per the shop standard.
     parts.push({
