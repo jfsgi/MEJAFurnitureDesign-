@@ -51,6 +51,50 @@ describe('dining table', () => {
   });
 });
 
+describe('bench', () => {
+  const def = REGISTRY['bench'];
+
+  it('builds 4 legs, 4 aprons, and a solid seat at defaults', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Leg')).toHaveLength(4);
+    expect(names.filter((n) => n.startsWith('Apron'))).toHaveLength(4);
+    expect(names.filter((n) => n === 'Seat')).toHaveLength(1);
+  });
+
+  it('slat seat follows the repeat rule: count recomputes from depth', () => {
+    const base = { ...defaultParams(def), seatStyle: 'slats' };
+    const slatsAt = (depth: number) =>
+      def.generate({ ...base, depth }).parts.filter((p) => p.name === 'Seat slat').length;
+    const narrow = slatsAt(inch(10));
+    const deep = slatsAt(inch(20));
+    expect(narrow).toBeGreaterThanOrEqual(2);
+    expect(deep).toBeGreaterThan(narrow);
+  });
+
+  it('slats and gaps exactly fill the seat depth', () => {
+    const D = inch(14);
+    const gap = inch(0.5);
+    const params = { ...defaultParams(def), seatStyle: 'slats', depth: D, slatGap: gap };
+    const slats = def.generate(params).parts.filter((p) => p.name === 'Seat slat');
+    const total = slats.reduce((sum, s) => sum + s.cut.width, 0) + (slats.length - 1) * gap;
+    expect(total).toBeCloseTo(D, 5);
+  });
+
+  it('scales parametrically: overall bbox follows W/D/H', () => {
+    const params = { ...defaultParams(def), width: inch(60), depth: inch(16), height: inch(19) };
+    const box = modelBBox(def.generate(params))!;
+    expect(box.max[0] - box.min[0]).toBeCloseTo(inch(60), 5);
+    expect(box.max[1] - box.min[1]).toBeCloseTo(inch(16), 5);
+    expect(box.max[2] - box.min[2]).toBeCloseTo(inch(19), 5);
+  });
+
+  it('warns when the apron span calls for a center support', () => {
+    const long = def.generate({ ...defaultParams(def), width: inch(84) });
+    expect(long.findings.some((f) => f.message.includes('center leg or stretcher'))).toBe(true);
+  });
+});
+
 describe('bookcase repeat rule', () => {
   const def = REGISTRY['bookcase'];
 

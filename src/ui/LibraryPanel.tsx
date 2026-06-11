@@ -44,6 +44,12 @@ function Glyph({ category }: { category: string }) {
           <path d="M5.5 9.5 5 21M22.5 9.5l.5 11.5" />
         </g>
       )}
+      {category === 'Seating' && (
+        <g {...stroke}>
+          <path d="M4 14h20" />
+          <path d="M6 14l-.7 9M22 14l.7 9" />
+        </g>
+      )}
       {category === 'Storage' && (
         <g {...stroke}>
           <rect x="5" y="4" width="18" height="20" rx="1" />
