@@ -2,7 +2,7 @@
 // scroll = zoom to cursor, right-drag = orbit, middle-drag = pan, left = select/move.
 // Model space is Z-up mm; the root group rotation maps it into three.js's Y-up world.
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { ContactShadows, Edges, Grid, OrbitControls, useCursor } from '@react-three/drei';
@@ -16,6 +16,7 @@ import { useStore } from '../core/store';
 import { grainBoxGeometry, longestAxis, taperedBoxGeometry } from './geometry';
 import { getWoodTexture, grainOffset } from './woodTexture';
 import { viewport, type ViewName } from './viewportApi';
+import { FrameIcon, FrameSelectionIcon, MinusIcon, PlusIcon, ZoomWindowIcon } from '../ui/icons';
 
 const FALLBACK_MATERIAL = MATERIALS[0];
 
@@ -159,6 +160,10 @@ function InstanceGroup({ inst }: { inst: Instance }) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        viewport.api?.frameSelection();
+      }}
       onPointerOver={(e) => {
         e.stopPropagation();
         hover(inst.id);
@@ -251,6 +256,35 @@ function Rig() {
         frame(inst ? instanceBBox(inst) : docBBox(doc));
       },
       setView: (view) => frame(docBBox(useStore.getState().doc), VIEW_DIRS[view]),
+      zoomBy: (factor) => {
+        const offset = camera.position.clone().sub(controls.target);
+        const len = THREE.MathUtils.clamp(offset.length() * factor, 220, 38000);
+        tween(controls.target.clone().add(offset.normalize().multiplyScalar(len)), controls.target.clone(), 150);
+      },
+      zoomWindow: (x0, y0, x1, y1) => {
+        const rect = gl.domElement.getBoundingClientRect();
+        const ndc = new THREE.Vector2(
+          (((x0 + x1) / 2 - rect.left) / rect.width) * 2 - 1,
+          -(((y0 + y1) / 2 - rect.top) / rect.height) * 2 + 1,
+        );
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(ndc, camera);
+        const ray = raycaster.ray;
+        // Re-target onto the horizontal plane at the current target height (keeps
+        // wall-mounted work centered); fall back to a straight dolly if the ray misses.
+        let newTarget = controls.target.clone();
+        if (Math.abs(ray.direction.y) > 1e-6) {
+          const tt = (controls.target.y - ray.origin.y) / ray.direction.y;
+          if (tt > 0) newTarget = ray.origin.clone().addScaledVector(ray.direction, tt);
+        }
+        const scale = Math.min(
+          1,
+          Math.max(Math.abs(x1 - x0) / rect.width, Math.abs(y1 - y0) / rect.height, 0.02),
+        );
+        const offset = camera.position.clone().sub(controls.target);
+        const len = Math.max(offset.length() * scale, 220);
+        tween(newTarget.clone().add(offset.normalize().multiplyScalar(len)), newTarget, 250);
+      },
       groundPoint: (clientX, clientY) => {
         const rect = gl.domElement.getBoundingClientRect();
         const ndc = new THREE.Vector2(
@@ -277,11 +311,103 @@ function Rig() {
   return null;
 }
 
+/** Rubber-band rectangle for zoom-window mode; lives on top of the canvas. */
+function ZoomWindowOverlay() {
+  const armed = useStore((s) => s.zoomWindowArmed);
+  const [band, setBand] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const ref = useRef<HTMLDivElement>(null);
+  if (!armed) return null;
+
+  const disarm = () => {
+    setBand(null);
+    useStore.getState().setZoomWindowArmed(false);
+  };
+
+  const style = (() => {
+    if (!band || !ref.current) return undefined;
+    const host = ref.current.getBoundingClientRect();
+    return {
+      left: Math.min(band.x0, band.x1) - host.left,
+      top: Math.min(band.y0, band.y1) - host.top,
+      width: Math.abs(band.x1 - band.x0),
+      height: Math.abs(band.y1 - band.y0),
+    };
+  })();
+
+  return (
+    <div
+      ref={ref}
+      className="zoom-overlay"
+      onPointerDown={(e) => {
+        if (e.button !== 0) {
+          disarm();
+          return;
+        }
+        (e.target as Element).setPointerCapture(e.pointerId);
+        setBand({ x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY });
+      }}
+      onPointerMove={(e) => {
+        setBand((b) => (b ? { ...b, x1: e.clientX, y1: e.clientY } : b));
+      }}
+      onPointerUp={() => {
+        if (band && Math.abs(band.x1 - band.x0) > 8 && Math.abs(band.y1 - band.y0) > 8) {
+          viewport.api?.zoomWindow(band.x0, band.y0, band.x1, band.y1);
+        }
+        disarm();
+      }}
+    >
+      {style && <div className="zoom-rubberband" style={style} />}
+    </div>
+  );
+}
+
+/** Floating zoom cluster, bottom-right of the viewport. */
+function ViewportTools() {
+  const armed = useStore((s) => s.zoomWindowArmed);
+  const { setZoomWindowArmed } = useStore.getState();
+  return (
+    <div className="viewport-tools" role="toolbar" aria-label="Zoom tools">
+      <button className="btn btn--icon" onClick={() => viewport.api?.zoomBy(0.7)} title="Zoom in — +" aria-label="Zoom in">
+        <PlusIcon />
+      </button>
+      <button className="btn btn--icon" onClick={() => viewport.api?.zoomBy(1.4)} title="Zoom out — −" aria-label="Zoom out">
+        <MinusIcon />
+      </button>
+      <button
+        className={`btn btn--icon${armed ? ' btn--toggle-on' : ''}`}
+        onClick={() => setZoomWindowArmed(!armed)}
+        title="Zoom window — Z, then drag a box"
+        aria-label="Zoom window"
+        aria-pressed={armed}
+      >
+        <ZoomWindowIcon />
+      </button>
+      <button
+        className="btn btn--icon"
+        onClick={() => viewport.api?.frameSelection()}
+        title="Zoom to selection — F"
+        aria-label="Zoom to selection"
+      >
+        <FrameSelectionIcon />
+      </button>
+      <button
+        className="btn btn--icon"
+        onClick={() => viewport.api?.frameAll()}
+        title="Zoom all — A or double-click empty space"
+        aria-label="Zoom all"
+      >
+        <FrameIcon />
+      </button>
+    </div>
+  );
+}
+
 export function Viewport() {
   const instances = useStore((s) => s.doc.instances);
   const units = useStore((s) => s.doc.units);
 
   return (
+    <>
     <Canvas
       gl={{ toneMapping: THREE.NeutralToneMapping }}
       camera={{ position: [2800, 2000, -2800], fov: 35, near: 10, far: 80000 }}
@@ -336,5 +462,8 @@ export function Viewport() {
       />
       <Rig />
     </Canvas>
+    <ZoomWindowOverlay />
+    <ViewportTools />
+    </>
   );
 }

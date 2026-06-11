@@ -99,6 +99,24 @@ export const FrameIcon = () => (
     <path d="M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13" />
   </I>
 );
+export const FrameSelectionIcon = () => (
+  <I>
+    <path d="M3 7V4.5A1.5 1.5 0 0 1 4.5 3H7" />
+    <path d="M13 3h2.5A1.5 1.5 0 0 1 17 4.5V7" />
+    <path d="M17 13v2.5a1.5 1.5 0 0 1-1.5 1.5H13" />
+    <path d="M7 17H4.5A1.5 1.5 0 0 1 3 15.5V13" />
+    <rect x="7.5" y="7.5" width="5" height="5" rx="1" />
+  </I>
+);
+export const ZoomWindowIcon = () => (
+  <I>
+    <path d="M3 6V4.5A1.5 1.5 0 0 1 4.5 3H6" />
+    <path d="M11 3h1.5A1.5 1.5 0 0 1 14 4.5V6" />
+    <path d="M3 11v1.5A1.5 1.5 0 0 0 4.5 14H6" />
+    <circle cx="11.5" cy="11.5" r="3.5" />
+    <path d="M14.2 14.2 17 17" />
+  </I>
+);
 export const RotateIcon = () => (
   <I>
     <path d="M16 10a6 6 0 1 1-2-4.47" />

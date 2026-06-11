@@ -815,6 +815,42 @@ button {
   white-space: nowrap;
 }
 
+.statusbar-hint--active {
+  color: var(--text-2);
+}
+
+/* ---------- Viewport zoom tools ---------- */
+
+.viewport-tools {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-ctl);
+  box-shadow: var(--shadow-pop);
+  z-index: 5;
+}
+
+.zoom-overlay {
+  position: absolute;
+  inset: 0;
+  cursor: crosshair;
+  z-index: 6;
+}
+
+.zoom-rubberband {
+  position: absolute;
+  border: 1.5px dashed var(--accent);
+  background: rgba(15, 118, 110, 0.08);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 /* ---------- Empty states & hints ---------- */
 
 .empty-state {

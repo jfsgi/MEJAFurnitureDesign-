@@ -32,6 +32,8 @@ interface State {
   libraryOpen: boolean;
   inspectorOpen: boolean;
   toast: Toast | null;
+  /** Next viewport drag draws a zoom window instead of selecting/moving. */
+  zoomWindowArmed: boolean;
 
   commitDoc(mutate: (doc: ProjectDoc) => void): void;
   previewDoc(mutate: (doc: ProjectDoc) => void): void;
@@ -46,6 +48,7 @@ interface State {
   toggleSnap(): void;
   setLibraryOpen(open: boolean): void;
   setInspectorOpen(open: boolean): void;
+  setZoomWindowArmed(on: boolean): void;
   showToast(message: string, undoable?: boolean): void;
   dismissToast(): void;
 
@@ -121,6 +124,7 @@ export const useStore = create<State>()((set, get) => {
     libraryOpen: true,
     inspectorOpen: true,
     toast: null,
+    zoomWindowArmed: false,
 
     commitDoc(mutate) {
       const prev = get().doc;
@@ -168,6 +172,7 @@ export const useStore = create<State>()((set, get) => {
     toggleSnap: () => set({ snap: !get().snap }),
     setLibraryOpen: (open) => set({ libraryOpen: open }),
     setInspectorOpen: (open) => set({ inspectorOpen: open }),
+    setZoomWindowArmed: (on) => set({ zoomWindowArmed: on }),
     showToast: (message, undoable = false) => set({ toast: { id: ++toastSeq, message, undoable } }),
     dismissToast: () => set({ toast: null }),
 

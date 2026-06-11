@@ -48,11 +48,28 @@ export default function App() {
           if (s.selectedId) s.removeInstance(s.selectedId);
           break;
         case 'Escape':
-          s.select(null);
+          if (s.zoomWindowArmed) s.setZoomWindowArmed(false);
+          else s.select(null);
           break;
         case 'f':
         case 'F':
           viewport.api?.frameSelection();
+          break;
+        case 'a':
+        case 'A':
+          viewport.api?.frameAll();
+          break;
+        case 'z':
+        case 'Z':
+          s.setZoomWindowArmed(!s.zoomWindowArmed);
+          break;
+        case '+':
+        case '=':
+          viewport.api?.zoomBy(0.7);
+          break;
+        case '-':
+        case '_':
+          viewport.api?.zoomBy(1.4);
           break;
         case '1':
           viewport.api?.setView('front');
