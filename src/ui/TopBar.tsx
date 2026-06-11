@@ -56,6 +56,9 @@ export function TopBar() {
             />
           </svg>
           <span className="logo-name">Atelier3D</span>
+          <span className="build-tag" title={`Build ${__BUILD_ID__} · ${__BUILD_DATE__}`}>
+            {__BUILD_ID__}
+          </span>
         </div>
         <div className="topbar-divider" />
         <input
