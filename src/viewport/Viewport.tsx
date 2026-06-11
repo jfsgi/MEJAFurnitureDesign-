@@ -50,9 +50,20 @@ function PrimitiveMesh({
   const grainTex = mat.grain ? getWoodTexture(mat.id, prim.shape === 'cylinder') : null;
 
   const geo = useMemo(() => {
+    // The offset is per part and UVs are computed in part space (uvOrigin), so the
+    // grain runs solid across every board of a part instead of cutting at
+    // primitive seams (a leg's shoulder and taper read as one piece of wood).
     const offset = grainOffset(seed);
     if (prim.shape === 'taperedBox') {
-      return taperedBoxGeometry(prim.top, prim.bottom, prim.height, prim.align, prim.shift ?? [0, 0], offset);
+      return taperedBoxGeometry(
+        prim.top,
+        prim.bottom,
+        prim.height,
+        prim.align,
+        prim.shift ?? [0, 0],
+        offset,
+        prim.at,
+      );
     }
     if (prim.shape === 'archedBoard') {
       return archedBoardGeometry(
@@ -65,7 +76,7 @@ function PrimitiveMesh({
       );
     }
     if (prim.shape === 'box' && mat.grain) {
-      return grainBoxGeometry(prim.size, longestAxis(prim.size), offset);
+      return grainBoxGeometry(prim.size, longestAxis(prim.size), offset, prim.at);
     }
     return null;
   }, [prim, mat.grain, seed]);
@@ -243,7 +254,7 @@ function InstanceGroup({ inst }: { inst: Instance }) {
             selected={selected}
             hovered={hovered}
             partHovered={hoveredPartIds?.includes(part.id) ?? false}
-            seed={`${inst.id}/${part.id}/${i}`}
+            seed={`${inst.id}/${part.id}`}
             partId={part.id}
           />
         ));

@@ -194,6 +194,7 @@ export function grainBoxGeometry(
   size: V3,
   grainAxis: 0 | 1 | 2,
   uvOffset: UV = [0, 0],
+  uvOrigin: V3 = [0, 0, 0],
 ): THREE.BufferGeometry {
   const h: V3 = [size[0] / 2, size[1] / 2, size[2] / 2];
   const mb = new MeshBuilder();
@@ -217,8 +218,8 @@ export function grainBoxGeometry(
         return p;
       };
       const uv = (p: V3): UV => [
-        p[uAxis] / GRAIN_MM_U + uvOffset[0],
-        p[vAxis] / GRAIN_MM_V + uvOffset[1],
+        (p[uAxis] + uvOrigin[uAxis]) / GRAIN_MM_U + uvOffset[0],
+        (p[vAxis] + uvOrigin[vAxis]) / GRAIN_MM_V + uvOffset[1],
       ];
       const p0 = corner(-1, -1);
       const p1 = corner(1, -1);
@@ -244,6 +245,7 @@ export function taperedBoxGeometry(
   align: [number, number],
   shift: UV = [0, 0],
   uvOffset: UV = [0, 0],
+  uvOrigin: V3 = [0, 0, 0],
 ): THREE.BufferGeometry {
   const [tw, td] = top;
   const [bw, bd] = bottom;
@@ -266,10 +268,13 @@ export function taperedBoxGeometry(
 
   // Sides: grain (u) along Z; v from the perimeter coordinate. Caps: end grain.
   const side = (p: V3): UV => [
-    p[2] / GRAIN_MM_U + uvOffset[0],
-    (p[0] + p[1]) / GRAIN_MM_V + uvOffset[1],
+    (p[2] + uvOrigin[2]) / GRAIN_MM_U + uvOffset[0],
+    (p[0] + uvOrigin[0] + p[1] + uvOrigin[1]) / GRAIN_MM_V + uvOffset[1],
   ];
-  const cap = (p: V3): UV => [p[0] / GRAIN_MM_U + uvOffset[0], p[1] / GRAIN_MM_V + uvOffset[1]];
+  const cap = (p: V3): UV => [
+    (p[0] + uvOrigin[0]) / GRAIN_MM_U + uvOffset[0],
+    (p[1] + uvOrigin[1]) / GRAIN_MM_V + uvOffset[1],
+  ];
 
   const mb = new MeshBuilder();
   mb.quad(t[0], t[1], t[2], t[3], cap(t[0]), cap(t[1]), cap(t[2]), cap(t[3])); // top (+Z)
