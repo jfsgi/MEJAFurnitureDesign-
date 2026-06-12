@@ -28,7 +28,7 @@ export const entryBench: ComponentDef = {
     { kind: 'length', key: 'shelfHeight', label: 'Shelf height', default: inch(5), min: inch(2.5), max: inch(10), tier: 'advanced' },
     { kind: 'length', key: 'seatThickness', label: 'Seat thickness', default: inch(0.8125), min: inch(0.625), max: inch(2), tier: 'advanced' },
     { kind: 'length', key: 'legThickness', label: 'Leg thickness', default: inch(2.5), min: inch(1.5), max: inch(3.5), tier: 'advanced' },
-    { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(1), min: inch(0.75), max: inch(1.5), tier: 'advanced' },
+    { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(0.8125), min: inch(0.625), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'endOverhang', label: 'Seat end overhang', default: inch(1), min: 0, max: inch(3), tier: 'advanced' },
     { kind: 'length', key: 'frontOverhang', label: 'Seat front overhang', default: inch(0.75), min: 0, max: inch(2), tier: 'advanced' },
   ],
