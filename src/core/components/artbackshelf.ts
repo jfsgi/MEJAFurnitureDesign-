@@ -60,8 +60,8 @@ export const artBackShelf: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Bullnosed shelf: a full half-radius wraps the edge all around, with
-    // small corner radii in plan.
+    // Bullnosed shelf: a full half-radius wraps the edge all around, the
+    // front corners radiused 1" in plan.
     parts.push({
       id: 'shelf',
       name: 'Shelf',
@@ -71,7 +71,7 @@ export const artBackShelf: ComponentDef = {
           shape: 'roundedSlab',
           size: [L, D, st],
           at: [0, 0, mount - st / 2],
-          radius: inch(0.5),
+          radius: inch(1),
           edge: st / 2,
         },
       ],
