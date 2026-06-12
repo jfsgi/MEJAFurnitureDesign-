@@ -78,7 +78,8 @@ export const artBackShelf: ComponentDef = {
       cut: { length: L, width: D, thickness: st },
     });
 
-    // Pilaster stiles with a stepped base block at the foot.
+    // Pilaster stiles with a button base block at the foot — the button's
+    // face carries a 3/8" roundover on all four sides.
     for (const sx of [-1, 1]) {
       parts.push({
         id: `stile-${sx}`,
@@ -91,13 +92,17 @@ export const artBackShelf: ComponentDef = {
             at: [sx * (F / 2 - stileW / 2), frameY, frameBottom + frameH / 2],
           },
           {
-            shape: 'box',
+            shape: 'roundedSlab',
             size: [stileW, fd + BASE_BLOCK_STEP, BASE_BLOCK_H],
             at: [
               sx * (F / 2 - stileW / 2),
               frameY + BASE_BLOCK_STEP / 2,
               frameBottom + BASE_BLOCK_H / 2,
             ],
+            radius: inch(0.375),
+            edge: inch(0.375),
+            axis: 'y',
+            corners: 'all',
           },
         ],
         cut: { length: frameH, width: fd, thickness: stileW },

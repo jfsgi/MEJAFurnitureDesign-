@@ -95,8 +95,15 @@ function PrimitiveMesh({
       );
     }
     if (prim.shape === 'roundedSlab') {
-      const geo = roundedSlabGeometry(prim.size, prim.radius, prim.edge ?? 0);
-      applyBoxUVs(geo, GRAIN_MM_U, 'x', offset[0], offset[1]);
+      // 'y' axis stands the slab against the wall: build it flat, then tip
+      // it up so the outline faces +Y and the thickness runs along depth.
+      const vertical = prim.axis === 'y';
+      const planSize: [number, number, number] = vertical
+        ? [prim.size[0], prim.size[2], prim.size[1]]
+        : prim.size;
+      const geo = roundedSlabGeometry(planSize, prim.radius, prim.edge ?? 0, prim.corners ?? 'front');
+      if (vertical) geo.rotateX(-Math.PI / 2);
+      applyBoxUVs(geo, GRAIN_MM_U, vertical ? 'z' : 'x', offset[0], offset[1]);
       return geo;
     }
     if (prim.shape === 'box' && mat.grain) {

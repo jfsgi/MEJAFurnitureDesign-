@@ -195,11 +195,28 @@ export function archedBoardGeometry(
  * W × D × T stays exact. The caller applies engine box UVs
  * (ExtrudeGeometry's own UVs are unusable).
  */
-export function roundedSlabGeometry(size: V3, radius: number, edge = 0): THREE.BufferGeometry {
+export function roundedSlabGeometry(
+  size: V3,
+  radius: number,
+  edge = 0,
+  corners: 'front' | 'all' = 'front',
+): THREE.BufferGeometry {
   const [w, d, t] = size;
   const re = Math.max(0, Math.min(edge, t / 2 - 0.1, w / 4, d / 4));
   const outline = (ww: number, dd: number, r: number) => {
     const shape = new THREE.Shape();
+    if (corners === 'all') {
+      shape.moveTo(-ww / 2 + r, -dd / 2);
+      shape.lineTo(ww / 2 - r, -dd / 2);
+      shape.absarc(ww / 2 - r, -dd / 2 + r, r, -Math.PI / 2, 0, false);
+      shape.lineTo(ww / 2, dd / 2 - r);
+      shape.absarc(ww / 2 - r, dd / 2 - r, r, 0, Math.PI / 2, false);
+      shape.lineTo(-ww / 2 + r, dd / 2);
+      shape.absarc(-ww / 2 + r, dd / 2 - r, r, Math.PI / 2, Math.PI, false);
+      shape.lineTo(-ww / 2, -dd / 2 + r);
+      shape.absarc(-ww / 2 + r, -dd / 2 + r, r, Math.PI, Math.PI * 1.5, false);
+      return shape;
+    }
     shape.moveTo(-ww / 2, -dd / 2);
     shape.lineTo(ww / 2, -dd / 2);
     shape.lineTo(ww / 2, dd / 2 - r);

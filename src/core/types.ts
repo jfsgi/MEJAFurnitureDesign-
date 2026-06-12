@@ -91,10 +91,15 @@ export type Primitive =
       shape: 'roundedSlab';
       size: [number, number, number];
       at: [number, number, number];
-      /** Corner radius on the front (+Y) corners; the wall side stays square. */
+      /** Corner radius in plan ('front' = the +Y corners; 'all' = every corner). */
       radius: number;
       /** Roundover radius on the top and bottom edges (0 = square arris). */
       edge?: number;
+      /** Thickness axis: 'z' lies flat (default); 'y' stands the slab on the
+       *  wall like a button, face toward +Y. */
+      axis?: 'z' | 'y';
+      /** Which outline corners round (default 'front'). */
+      corners?: 'front' | 'all';
     }
   | {
       shape: 'jointedBoard';

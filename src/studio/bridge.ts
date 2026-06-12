@@ -93,8 +93,15 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
           );
           grain = prim.arch === 'bottom-y' ? 'y' : 'x';
         } else if (prim.shape === 'roundedSlab') {
-          geometry = roundedSlabGeometry(prim.size, prim.radius, prim.edge ?? 0);
-          grain = 'x';
+          const vertical = prim.axis === 'y';
+          geometry = roundedSlabGeometry(
+            vertical ? [prim.size[0], prim.size[2], prim.size[1]] : prim.size,
+            prim.radius,
+            prim.edge ?? 0,
+            prim.corners ?? 'front',
+          );
+          if (vertical) geometry.rotateX(-Math.PI / 2);
+          grain = vertical ? 'z' : 'x';
         } else {
           geometry = new THREE.CylinderGeometry(
             prim.radiusTop,
