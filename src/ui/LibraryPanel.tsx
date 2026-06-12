@@ -7,8 +7,15 @@ import { defaultParams, evaluateInstance, modelBBox } from '../core/evaluate';
 import { formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
 import { CloseIcon, SearchIcon, WarningIcon } from './icons';
+import { viewport } from '../viewport/viewportApi';
 
 export const DND_MIME = 'application/x-atelier-component';
+
+/** Adding a piece frames it: the new part zooms to fit the window. */
+function addAndFrame(add: () => void): void {
+  add();
+  viewport.api?.frameSelection();
+}
 
 const defSizeCache = new Map<string, [number, number, number] | null>();
 function defSize(def: ComponentDef): [number, number, number] | null {
@@ -165,7 +172,7 @@ function LibraryTab() {
                     e.dataTransfer.setData(DND_MIME, WORKSHOP_DND_PREFIX + p.id);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
-                  onDoubleClick={() => addFromWorkshop(p.id)}
+                  onDoubleClick={() => addAndFrame(() => addFromWorkshop(p.id))}
                   title={`Your saved ${def.name.toLowerCase()} configuration.\nDrag into the scene, or double-click to add.`}
                 >
                   <Glyph category={def.category} />
@@ -209,7 +216,7 @@ function LibraryTab() {
                     e.dataTransfer.setData(DND_MIME, def.id);
                     e.dataTransfer.effectAllowed = 'copy';
                   }}
-                  onDoubleClick={() => addInstance(def.id)}
+                  onDoubleClick={() => addAndFrame(() => addInstance(def.id))}
                   title={`${def.description}\nDrag into the scene, or double-click to add.`}
                 >
                   <Glyph category={def.category} />

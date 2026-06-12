@@ -136,6 +136,8 @@ export default function App() {
                 } else {
                   s.addInstance(id, pos);
                 }
+                // A newly placed piece frames itself to the window.
+                viewport.api?.frameSelection();
               }}
             >
               <Viewport />
