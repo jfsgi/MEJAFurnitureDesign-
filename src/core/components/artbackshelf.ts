@@ -60,8 +60,9 @@ export const artBackShelf: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Shelf: 1" front corner radii in plan; the top arris carries a
-    // half-stock corner radius and the bottom edge stays square.
+    // Shelf: 1" front corner radii in plan; the edge is a full corner
+    // radius — the quarter-round springs from the square bottom arris and
+    // sweeps the whole thickness up to the top face.
     parts.push({
       id: 'shelf',
       name: 'Shelf',
@@ -72,7 +73,7 @@ export const artBackShelf: ComponentDef = {
           size: [L, D, st],
           at: [0, 0, mount - st / 2],
           radius: inch(1),
-          edge: st / 2,
+          edge: st,
           edgeMode: 'top',
         },
       ],
