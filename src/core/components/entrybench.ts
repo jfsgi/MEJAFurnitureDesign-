@@ -1,7 +1,8 @@
-// Entryway bench, after the MEJA original: a thick solid seat sitting
-// directly on four square posts — no aprons — with a boot shelf below,
-// notched around the legs so its edges run flush with the leg faces, and a
-// rail under each end of the shelf between the leg pairs.
+// Entryway bench, after the MEJA original: a thick solid seat on four
+// square posts with front and back aprons under it, a boot shelf below
+// notched around the legs so its edges run flush with the leg faces,
+// front and back rails under the shelf edges, and a rail under each end
+// of the shelf between the leg pairs.
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
@@ -10,6 +11,7 @@ const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
 
 const RAIL_HEIGHT = inch(2.25);
+const APRON_T = inch(1);
 const SAG_SPAN = inch(54);
 
 export const entryBench: ComponentDef = {
@@ -100,12 +102,48 @@ export const entryBench: ComponentDef = {
       cut: { length: envW, width: envD, thickness: shelfT },
     });
 
+    // Aprons under the seat and rails under the shelf's front and back
+    // edges, running between the legs flush with their outer faces; end
+    // rails (toggleable) close the shelf frame between each leg pair.
+    const span = envW - 2 * legT;
+    const apronH = Math.min(RAIL_HEIGHT, legH - seatT);
+    for (const sy of [-1, 1]) {
+      parts.push({
+        id: `apron-${sy}`,
+        name: 'Apron',
+        material: mat,
+        primitives: [
+          {
+            shape: 'box',
+            size: [span, APRON_T, apronH],
+            at: [0, sy * (envD / 2 - APRON_T / 2), H - seatT - apronH / 2],
+          },
+        ],
+        cut: { length: span, width: apronH, thickness: APRON_T },
+      });
+    }
+    const railH = Math.min(RAIL_HEIGHT, shelfH - shelfT);
+    for (const sy of [-1, 1]) {
+      parts.push({
+        id: `shelf-rail-${sy}`,
+        name: 'Shelf rail',
+        material: mat,
+        primitives: [
+          {
+            shape: 'box',
+            size: [span, APRON_T, railH],
+            at: [0, sy * (envD / 2 - APRON_T / 2), shelfH - shelfT - railH / 2],
+          },
+        ],
+        cut: { length: span, width: railH, thickness: APRON_T },
+      });
+    }
+
     if (p['shelfRails'] as boolean) {
-      const railH = Math.min(RAIL_HEIGHT, shelfH - shelfT);
       for (const sx of [-1, 1]) {
         parts.push({
           id: `rail-${sx}`,
-          name: 'Shelf rail',
+          name: 'Shelf end rail',
           material: mat,
           primitives: [
             {

@@ -938,12 +938,14 @@ describe('coastal end table', () => {
 describe('entryway bench', () => {
   const def = REGISTRY['entry-bench'];
 
-  it('builds the seat on four posts with a notched boot shelf and end rails', () => {
+  it('builds the seat on four posts with aprons, a notched boot shelf, and rails', () => {
     const model = def.generate(defaultParams(def));
     const names = model.parts.map((p) => p.name);
     expect(names.filter((n) => n === 'Leg')).toHaveLength(4);
     expect(names.filter((n) => n === 'Seat')).toHaveLength(1);
-    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2);
+    expect(names.filter((n) => n === 'Apron')).toHaveLength(2); // under the seat, front and back
+    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2); // under the shelf's front and back edges
+    expect(names.filter((n) => n === 'Shelf end rail')).toHaveLength(2);
     const shelf = model.parts.find((p) => p.id === 'shelf')!;
     expect(shelf.primitives).toHaveLength(3); // center board + a tongue between each leg pair
     // The tongues keep the slab's grain running along the bench.
