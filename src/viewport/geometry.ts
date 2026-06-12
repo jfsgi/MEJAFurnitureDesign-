@@ -98,17 +98,32 @@ export function archedBoardGeometry(
   }
 
   if (arch === 'scoop') {
-    // Finger pull, to the shop pattern: a flat-bottomed scoop with smooth
-    // S-curve shoulders easing back up to the top edge.
+    // Finger pull, digitized from MEJA's to-scale drawing (15_3PULL): a
+    // flat bottom with S-shoulders built from two 60° arcs of radius 5/6 ×
+    // depth — the top arc tangent to the edge, the bottom arc tangent to
+    // the flat — joined by a 60° straight. Scales uniformly with depth.
     const c = Math.max(hx - shoulder, 1);
-    const sCurve = Math.min(c * 0.4, Math.max(rise * 1.8, 1));
-    const flatHalf = c - sCurve;
+    const R = (5 / 6) * rise;
+    const arcDx = R * (Math.sqrt(3) / 2);
+    const lineDx = (rise - R) / Math.sqrt(3);
+    const run = 2 * arcDx + lineDx;
+    // Openings too narrow for the full pattern compress the shoulders
+    // horizontally; the cut depth holds.
+    const k = Math.min(1, c / run);
+    const drop = (t: number) => {
+      if (t <= 0) return 0;
+      if (t <= arcDx) return R - Math.sqrt(Math.max(R * R - t * t, 0));
+      if (t <= arcDx + lineDx) return R / 2 + (t - arcDx) * Math.sqrt(3);
+      if (t < run) {
+        const tb = run - t; // distance to the flat
+        return rise - (R - Math.sqrt(Math.max(R * R - tb * tb, 0)));
+      }
+      return rise;
+    };
     const ztAt = (x: number) => {
       const ax = Math.abs(x);
       if (ax >= c) return hz;
-      if (ax <= flatHalf) return hz - rise;
-      const tt = (ax - flatHalf) / sCurve;
-      return hz - rise * 0.5 * (1 + Math.cos(Math.PI * tt));
+      return hz - drop((c - ax) / k);
     };
     const segments = ARC_SEGMENTS * 2; // the S-curves need the extra samples
     const xs: number[] = [-hx];

@@ -42,7 +42,57 @@
      clearcoat: 0,
 --- a/packages/engine/src/parametric/joinery.ts
 +++ b/packages/engine/src/parametric/joinery.ts
-@@ -73,18 +73,25 @@
+@@ -32,8 +32,12 @@
+ }
+ 
+ /**
+- * Board outline in the (x, y) plane with an optional elliptical finger
+- * scoop in the top edge, as a centered extrusion along z.
++ * Board outline in the (x, y) plane with an optional finger scoop in the
++ * top edge, as a centered extrusion along z. Atelier3D extension: the
++ * scoop follows MEJA's to-scale pull drawing (15_3PULL) — a flat bottom
++ * with S-shoulders built from two 60° arcs of radius 5/6 × depth joined
++ * by a 60° straight, the top arc tangent to the edge and the bottom arc
++ * tangent to the flat. Scales uniformly with depth.
+  */
+ export function scoopedBoardGeometry(
+   length: number,
+@@ -43,15 +47,31 @@
+ ): THREE.BufferGeometry {
+   const a = Math.min(scoop.width / 2, length * 0.45);
+   const b = Math.min(scoop.depth, height * 0.6);
++  const top = height / 2;
++  const R = (5 / 6) * b;
++  const arcDx = R * (Math.sqrt(3) / 2);
++  const lineDx = (b - R) / Math.sqrt(3);
++  const run = 2 * arcDx + lineDx;
++  const k = Math.min(1, a / run);
++  const drop = (t: number) => {
++    if (t <= 0) return 0;
++    if (t <= arcDx) return R - Math.sqrt(Math.max(R * R - t * t, 0));
++    if (t <= arcDx + lineDx) return R / 2 + (t - arcDx) * Math.sqrt(3);
++    if (t < run) {
++      const tb = run - t;
++      return b - (R - Math.sqrt(Math.max(R * R - tb * tb, 0)));
++    }
++    return b;
++  };
+   const pts: THREE.Vector2[] = [
+     new THREE.Vector2(-length / 2, -height / 2),
+     new THREE.Vector2(length / 2, -height / 2),
+     new THREE.Vector2(length / 2, height / 2),
+   ];
+-  const segments = 18;
++  const segments = 48;
+   for (let i = 0; i <= segments; i++) {
+-    const theta = (i / segments) * Math.PI;
+-    pts.push(new THREE.Vector2(a * Math.cos(theta), height / 2 - b * Math.sin(theta)));
++    const x = a - (2 * a * i) / segments; // +a → −a across the opening
++    pts.push(new THREE.Vector2(x, top - drop((a - Math.abs(x)) / k)));
+   }
+   pts.push(new THREE.Vector2(-length / 2, height / 2));
+   const shape = new THREE.Shape(pts);
+@@ -73,18 +93,25 @@
  
  function layoutJoint(height: number, spec: JointSpec): JointLayout | null {
    const flare = spec.type === 'dovetail' ? spec.depth * 0.17 : 0;

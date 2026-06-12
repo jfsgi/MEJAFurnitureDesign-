@@ -125,7 +125,7 @@ export const drawerBox: ComponentDef = {
             jointDepth: sideT,
             lip: halfBlind ? HALF_BLIND_LIP : undefined,
             scoop: scooped
-              ? { width: Math.min(inch(4.5), endW * 0.4), depth: Math.min(inch(1.125), H * 0.4) }
+              ? { width: Math.min(inch(5.5877), endW * 0.4), depth: Math.min(inch(0.75), H * 0.4) }
               : undefined,
           },
         ],

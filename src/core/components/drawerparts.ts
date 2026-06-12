@@ -12,8 +12,10 @@ const BOTTOM_RECESS = inch(0.25); // drawer bottom sits up in its groove
  * inside dimension in both directions. */
 export const BOTTOM_GROOVE = inch(0.25);
 
-const PULL_WIDTH_MAX = inch(4.5);
-const PULL_DEPTH_MAX = inch(1.125);
+// Pull cutout at full pattern size, from MEJA's to-scale drawing
+// (15_3PULL): a 5.588" opening cut 3/4" deep.
+const PULL_WIDTH_MAX = inch(5.5877);
+const PULL_DEPTH_MAX = inch(0.75);
 
 /** Half-blind sockets stop this short of the mating board's show face: the
  * pins run to within 1/16" of the case's top and bottom faces, MEJA's

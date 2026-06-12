@@ -242,9 +242,10 @@ export const drawerUnit: ComponentDef = {
           : H - t - rIns - i * (opening + rIns);
         const frontTop = overlayFronts ? H - rOv - i * (frontH + rOv) : openingTop;
 
-        // Finger pull scooped from the top middle of the front, to the shop pattern.
-        const pullW = Math.min(inch(4.5), frontW * 0.4);
-        const pullD = Math.min(inch(1.125), frontH * 0.4);
+        // Finger pull scooped from the top middle of the front, to the shop
+        // pattern (15_3PULL: 5.588" opening, 3/4" deep at full size).
+        const pullW = Math.min(inch(5.5877), frontW * 0.4);
+        const pullD = Math.min(inch(0.75), frontH * 0.4);
         parts.push({
           id: `drawer-front-${c}-${i}`,
           name: pulls ? 'Drawer front (pull)' : 'Drawer front',

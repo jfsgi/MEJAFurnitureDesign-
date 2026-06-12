@@ -16,6 +16,9 @@ the Studio workspace. Local modifications, all marked "Atelier3D extension"
 - `parametric/joinery.ts` `layoutJoint()` — shop dovetail proportions: slim
   1/16" half-pins at the board edges, pins about a stock-thickness wide
   between the tails (box joints unchanged).
+- `parametric/joinery.ts` `scoopedBoardGeometry()` — the finger scoop
+  follows MEJA's to-scale pull drawing (15_3PULL): flat bottom, 60° arc
+  S-shoulders at radius 5/6 × depth, replacing the half-ellipse.
 
 To update: re-copy `packages/engine/src` from the source repo (minus tests)
 and re-apply the extensions — or upstream the patch and drop this list.
