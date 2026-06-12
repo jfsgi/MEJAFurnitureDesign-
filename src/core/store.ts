@@ -66,6 +66,9 @@ interface State {
   toast: Toast | null;
   /** Next viewport drag draws a zoom window instead of selecting/moving. */
   zoomWindowArmed: boolean;
+  /** Exploded-view spread, 0 (assembled) to 1 — parts fan out from each
+   *  assembly's center to show the construction. */
+  explode: number;
   workshop: WorkshopPreset[];
 
   commitDoc(mutate: (doc: ProjectDoc) => void): void;
@@ -83,6 +86,7 @@ interface State {
   setLibraryOpen(open: boolean): void;
   setInspectorOpen(open: boolean): void;
   setZoomWindowArmed(on: boolean): void;
+  setExplode(spread: number): void;
   showToast(message: string, undoable?: boolean): void;
   dismissToast(): void;
 
@@ -178,6 +182,7 @@ export const useStore = create<State>()((set, get) => {
     inspectorOpen: true,
     toast: null,
     zoomWindowArmed: false,
+    explode: 0,
     workshop: loadWorkshop(),
 
     commitDoc(mutate) {
@@ -228,6 +233,7 @@ export const useStore = create<State>()((set, get) => {
     setLibraryOpen: (open) => set({ libraryOpen: open }),
     setInspectorOpen: (open) => set({ inspectorOpen: open }),
     setZoomWindowArmed: (on) => set({ zoomWindowArmed: on }),
+    setExplode: (spread) => set({ explode: spread }),
     showToast: (message, undoable = false) => set({ toast: { id: ++toastSeq, message, undoable } }),
     dismissToast: () => set({ toast: null }),
 

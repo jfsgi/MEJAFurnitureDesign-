@@ -166,20 +166,36 @@ function primCorners(prim: Primitive): [number, number, number][] {
   return corners;
 }
 
+/** Instance-local bbox of one part (exploded views offset parts by it). */
+export function partBBox(part: GeneratedModel['parts'][number]): BBox | null {
+  let box: BBox | null = null;
+  for (const prim of part.primitives) {
+    for (const c of primCorners(prim)) {
+      if (!box) {
+        box = { min: [...c], max: [...c] };
+      } else {
+        for (let i = 0; i < 3; i++) {
+          box.min[i] = Math.min(box.min[i], c[i]);
+          box.max[i] = Math.max(box.max[i], c[i]);
+        }
+      }
+    }
+  }
+  return box;
+}
+
 /** Instance-local bbox of a generated model (no position/rotation applied). */
 export function modelBBox(model: GeneratedModel): BBox | null {
   let box: BBox | null = null;
   for (const part of model.parts) {
-    for (const prim of part.primitives) {
-      for (const c of primCorners(prim)) {
-        if (!box) {
-          box = { min: [...c], max: [...c] };
-        } else {
-          for (let i = 0; i < 3; i++) {
-            box.min[i] = Math.min(box.min[i], c[i]);
-            box.max[i] = Math.max(box.max[i], c[i]);
-          }
-        }
+    const b = partBBox(part);
+    if (!b) continue;
+    if (!box) {
+      box = { min: [...b.min], max: [...b.max] };
+    } else {
+      for (let i = 0; i < 3; i++) {
+        box.min[i] = Math.min(box.min[i], b.min[i]);
+        box.max[i] = Math.max(box.max[i], b.max[i]);
       }
     }
   }

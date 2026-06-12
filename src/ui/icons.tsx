@@ -122,6 +122,15 @@ export const ZoomWindowIcon = () => (
     <path d="M14.2 14.2 17 17" />
   </I>
 );
+export const ExplodeIcon = () => (
+  <I>
+    <rect x="8" y="8" width="4" height="4" rx="0.5" />
+    <path d="M6.5 6.5 4 4M3.5 6.25V3.5h2.75" />
+    <path d="M13.5 6.5 16 4M13.75 3.5h2.75v2.75" />
+    <path d="M6.5 13.5 4 16M3.5 13.75v2.75h2.75" />
+    <path d="M13.5 13.5 16 16M16.5 13.75v2.75h-2.75" />
+  </I>
+);
 export const RotateIcon = () => (
   <I>
     <path d="M16 10a6 6 0 1 1-2-4.47" />

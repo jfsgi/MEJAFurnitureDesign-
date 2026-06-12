@@ -1185,3 +1185,12 @@ button {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Exploded-view distance slider, stacked in the zoom cluster. */
+.explode-slider {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  height: 92px;
+  margin: 4px auto 2px;
+  accent-color: var(--accent, #4a6f5d);
+}

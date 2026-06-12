@@ -11,7 +11,14 @@ import type { Instance, Primitive } from '../core/types';
 import type { MaterialDef } from '../core/materials';
 import { MATERIAL_BY_ID, MATERIALS } from '../core/materials';
 import { REGISTRY } from '../core/components/registry';
-import { docBBox, evaluateInstance, instanceBBox, modelBBox, type BBox } from '../core/evaluate';
+import {
+  docBBox,
+  evaluateInstance,
+  instanceBBox,
+  modelBBox,
+  partBBox,
+  type BBox,
+} from '../core/evaluate';
 import { inch, snapMM } from '../core/units';
 import { useStore } from '../core/store';
 import {
@@ -25,7 +32,14 @@ import { GRAIN_MM_U, getWoodTexture, grainOffset } from './woodTexture';
 import { jointedBoardGeometry } from './jointBoards';
 import { applyBoxUVs } from '../studio/engine/materials/uv';
 import { viewport, type ViewName } from './viewportApi';
-import { FrameIcon, FrameSelectionIcon, MinusIcon, PlusIcon, ZoomWindowIcon } from '../ui/icons';
+import {
+  ExplodeIcon,
+  FrameIcon,
+  FrameSelectionIcon,
+  MinusIcon,
+  PlusIcon,
+  ZoomWindowIcon,
+} from '../ui/icons';
 
 const FALLBACK_MATERIAL = MATERIALS[0];
 
@@ -181,6 +195,34 @@ function InstanceGroup({ inst }: { inst: Instance }) {
     () => (REGISTRY[inst.componentId]?.mount === 'wall' ? modelBBox(model) : null),
     [inst.componentId, model],
   );
+  // Exploded view: parts fan out from the assembly center by the global
+  // spread. Floor-standing pieces explode upward off the floor (z scales
+  // about 0) so nothing sinks through the grid; wall pieces spread about
+  // their own center.
+  const explode = useStore((s) => s.explode);
+  const explodeOffsets = useMemo(() => {
+    if (!explode) return null;
+    const box = modelBBox(model);
+    if (!box) return null;
+    const wall = REGISTRY[inst.componentId]?.mount === 'wall';
+    const cx = (box.min[0] + box.max[0]) / 2;
+    const cy = (box.min[1] + box.max[1]) / 2;
+    const cz = (box.min[2] + box.max[2]) / 2;
+    const offsets = new Map<string, [number, number, number]>();
+    for (const part of model.parts) {
+      const b = partBBox(part);
+      if (!b) continue;
+      const px = (b.min[0] + b.max[0]) / 2;
+      const py = (b.min[1] + b.max[1]) / 2;
+      const pz = (b.min[2] + b.max[2]) / 2;
+      offsets.set(part.id, [
+        (px - cx) * explode,
+        (py - cy) * explode,
+        (wall ? pz - cz : pz) * explode,
+      ]);
+    }
+    return offsets;
+  }, [explode, model, inst.componentId]);
   const selected = useStore((s) => s.selectedId === inst.id);
   const hovered = useStore((s) => s.hoveredId === inst.id && s.selectedId !== inst.id);
   const hoveredPartIds = useStore((s) =>
@@ -286,18 +328,22 @@ function InstanceGroup({ inst }: { inst: Instance }) {
       )}
       {model.parts.map((part) => {
         const mat = MATERIAL_BY_ID[part.material] ?? FALLBACK_MATERIAL;
-        return part.primitives.map((prim, i) => (
-          <PrimitiveMesh
-            key={`${part.id}-${i}-${JSON.stringify(prim)}`}
-            prim={prim}
-            mat={mat}
-            selected={selected}
-            hovered={hovered}
-            partHovered={hoveredPartIds?.includes(part.id) ?? false}
-            seed={`${inst.id}/${part.id}`}
-            partId={part.id}
-          />
-        ));
+        return (
+          <group key={part.id} position={explodeOffsets?.get(part.id) ?? [0, 0, 0]}>
+            {part.primitives.map((prim, i) => (
+              <PrimitiveMesh
+                key={`${i}-${JSON.stringify(prim)}`}
+                prim={prim}
+                mat={mat}
+                selected={selected}
+                hovered={hovered}
+                partHovered={hoveredPartIds?.includes(part.id) ?? false}
+                seed={`${inst.id}/${part.id}`}
+                partId={part.id}
+              />
+            ))}
+          </group>
+        );
       })}
     </group>
   );
@@ -480,9 +526,32 @@ function ZoomWindowOverlay() {
 /** Floating zoom cluster, bottom-right of the viewport. */
 function ViewportTools() {
   const armed = useStore((s) => s.zoomWindowArmed);
-  const { setZoomWindowArmed } = useStore.getState();
+  const explode = useStore((s) => s.explode);
+  const { setZoomWindowArmed, setExplode } = useStore.getState();
   return (
     <div className="viewport-tools" role="toolbar" aria-label="Zoom tools">
+      {explode > 0 && (
+        <input
+          type="range"
+          className="explode-slider"
+          min={0}
+          max={1}
+          step={0.05}
+          value={explode}
+          onChange={(e) => setExplode(Number(e.target.value))}
+          title="Explode distance"
+          aria-label="Explode distance"
+        />
+      )}
+      <button
+        className={`btn btn--icon${explode > 0 ? ' btn--toggle-on' : ''}`}
+        onClick={() => setExplode(explode > 0 ? 0 : 0.5)}
+        title="Exploded view — see how it's built"
+        aria-label="Exploded view"
+        aria-pressed={explode > 0}
+      >
+        <ExplodeIcon />
+      </button>
       <button className="btn btn--icon" onClick={() => viewport.api?.zoomBy(0.7)} title="Zoom in — +" aria-label="Zoom in">
         <PlusIcon />
       </button>
