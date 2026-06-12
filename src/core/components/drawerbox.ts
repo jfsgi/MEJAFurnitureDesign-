@@ -4,6 +4,7 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
+import { HALF_BLIND_LIP } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -33,13 +34,15 @@ export const drawerBox: ComponentDef = {
     { kind: 'length', key: 'width', label: 'Width', default: inch(18), min: inch(4), max: inch(42), tier: 'basic' },
     { kind: 'length', key: 'depth', label: 'Depth', default: inch(21), min: inch(6), max: inch(30), tier: 'basic' },
     { kind: 'length', key: 'height', label: 'Height', default: inch(4), min: inch(1.5), max: inch(12), tier: 'basic' },
-    { kind: 'enum', key: 'joinery', label: 'Joinery', default: 'dovetail', tier: 'basic',
+    { kind: 'enum', key: 'joinery', label: 'Joinery', default: 'half-blind', tier: 'basic',
       options: [
-        { value: 'dovetail', label: 'Dovetail' },
+        { value: 'half-blind', label: 'Half-blind dovetail' },
+        { value: 'dovetail', label: 'Through dovetail' },
         { value: 'box-joint', label: 'Box joint' },
       ] },
     { kind: 'material', key: 'material', label: 'Material', default: 'maple', tier: 'basic' },
     { kind: 'boolean', key: 'pull', label: 'Finger pull cutout', default: false, tier: 'advanced' },
+    { kind: 'material', key: 'bottomMaterial', label: 'Bottom material', default: 'baltic-birch', tier: 'advanced' },
     { kind: 'length', key: 'sideThickness', label: 'Side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
     { kind: 'length', key: 'bottomThickness', label: 'Bottom thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'bottomRecess', label: 'Bottom recess', default: inch(0.25), min: inch(0.125), max: inch(0.75), tier: 'advanced' },
@@ -52,7 +55,14 @@ export const drawerBox: ComponentDef = {
     const bottomT = num(p, 'bottomThickness');
     const recess = num(p, 'bottomRecess');
     const mat = str(p, 'material');
-    const joinery = str(p, 'joinery') === 'dovetail' ? 'dovetailed' : 'box-jointed';
+    const joinery = str(p, 'joinery');
+    const halfBlind = joinery === 'half-blind';
+    const label = halfBlind
+      ? 'half-blind dovetailed'
+      : joinery === 'dovetail'
+        ? 'dovetailed'
+        : 'box-jointed';
+    const jointType = joinery === 'box-joint' ? ('box-joint' as const) : ('dovetail' as const);
 
     const endW = W - 2 * sideT;
 
@@ -61,27 +71,31 @@ export const drawerBox: ComponentDef = {
 
     // Engine joinery end to end: tails boards for the sides, pins boards for
     // the front and back (the front optionally scooped for the pull).
-    const jointType = str(p, 'joinery') === 'dovetail' ? ('dovetail' as const) : ('box-joint' as const);
+    // Half-blind is the engine construction: the front carries blind sockets
+    // and the lap; the sides stop a lip short of it; the back stays through.
+    const sideLen = halfBlind ? D - HALF_BLIND_LIP : D;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-${sx}`,
-        name: `Side (${joinery})`,
+        name: `Side (${label})`,
         material: mat,
         primitives: [
           {
             shape: 'jointedBoard',
             role: 'tails',
-            length: D,
+            length: sideLen,
             height: H,
             thickness: sideT,
-            at: [sx * (W / 2 - sideT / 2), 0, H / 2],
+            at: [sx * (W / 2 - sideT / 2), halfBlind ? -HALF_BLIND_LIP / 2 : 0, H / 2],
             lengthAxis: 'y',
             thicknessAxis: 'x',
             joint: jointType,
             jointDepth: sideT,
+            lip: halfBlind ? HALF_BLIND_LIP : undefined,
+            lipEnd: halfBlind ? 'positive' : undefined,
           },
         ],
-        cut: { length: D, width: H, thickness: sideT },
+        cut: { length: sideLen, width: H, thickness: sideT },
       });
     }
     for (const sy of [-1, 1] as const) {
@@ -89,7 +103,7 @@ export const drawerBox: ComponentDef = {
       const scooped = isFront && (p['pull'] as boolean);
       parts.push({
         id: isFront ? 'front' : 'back',
-        name: isFront ? `Front (${joinery})` : `Back (${joinery})`,
+        name: isFront ? `Front (${label})` : `Back (${halfBlind ? 'dovetailed' : label})`,
         material: mat,
         primitives: [
           {
@@ -104,6 +118,7 @@ export const drawerBox: ComponentDef = {
             outerSign: sy,
             joint: jointType,
             jointDepth: sideT,
+            lip: halfBlind && isFront ? HALF_BLIND_LIP : undefined,
             scoop: scooped
               ? { width: Math.min(inch(4.5), endW * 0.4), depth: Math.min(inch(1.125), H * 0.4) }
               : undefined,
@@ -116,7 +131,7 @@ export const drawerBox: ComponentDef = {
     parts.push({
       id: 'bottom',
       name: 'Bottom',
-      material: mat,
+      material: str(p, 'bottomMaterial'),
       primitives: [
         { shape: 'box', size: [endW, D - 2 * sideT, bottomT], at: [0, 0, recess + bottomT / 2] },
       ],

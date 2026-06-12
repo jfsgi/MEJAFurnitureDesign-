@@ -331,6 +331,25 @@ describe('drawer box', () => {
     const standard = def.generate({ ...defaultParams(def), depth: inch(18) });
     expect(standard.findings).toHaveLength(0);
   });
+
+  it('half-blind default: lapped front, through back, sides stop at the lip', () => {
+    const base = defaultParams(def);
+    expect(base.joinery).toBe('half-blind');
+    const model = def.generate(base);
+    const D = base.depth as number;
+    const side = model.parts.find((p) => p.id === 'side-1')!;
+    const tails = side.primitives[0] as { length?: number; lip?: number; lipEnd?: string };
+    expect(tails.length).toBeCloseTo(D - HALF_BLIND_LIP, 5);
+    expect(tails.lip).toBeCloseTo(HALF_BLIND_LIP, 5);
+    expect(tails.lipEnd).toBe('positive'); // lap at the show front; through behind
+    const front = model.parts.find((p) => p.id === 'front')!;
+    expect(front.name).toContain('half-blind');
+    expect((front.primitives[0] as { lip?: number }).lip).toBeCloseTo(HALF_BLIND_LIP, 5);
+    const back = model.parts.find((p) => p.id === 'back')!;
+    expect((back.primitives[0] as { lip?: number }).lip).toBeUndefined();
+    // The captured bottom carries its own stock.
+    expect(model.parts.find((p) => p.id === 'bottom')!.material).toBe('baltic-birch');
+  });
 });
 
 describe('drawer unit', () => {

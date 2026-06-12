@@ -41,14 +41,20 @@ export function jointedBoardGeometry(prim: JointedBoard): THREE.BufferGeometry {
   const engagement = prim.lip ? spec.depth - prim.lip * M : undefined;
 
   if (prim.role === 'tails') {
-    // Native axes: x = thickness, y = height, z = length.
+    // Native axes: x = thickness, y = height, z = length. Model ends map
+    // onto the native ±z ends: (z, x) keeps native +z on model +length;
+    // the (y, x) drawer orientation's rotation flips it (native +z lands
+    // on model −y).
+    const positiveIsNativeFront = prim.lengthAxis === 'z';
     let frontDepth = engagement;
     let backDepth = engagement;
+    if (engagement !== undefined && prim.lipEnd) {
+      // Lap one end only; the other stays a through joint.
+      const lipIsFront = (prim.lipEnd === 'positive') === positiveIsNativeFront;
+      if (lipIsFront) backDepth = undefined;
+      else frontDepth = undefined;
+    }
     if (prim.plainEnd) {
-      // Map the model-space plain end onto the native ±z ends: (z, x) keeps
-      // native +z on model +length; the (y, x) drawer orientation's rotation
-      // flips it (native +z lands on model −y).
-      const positiveIsNativeFront = prim.lengthAxis === 'z';
       const plainIsFront = (prim.plainEnd === 'positive') === positiveIsNativeFront;
       if (plainIsFront) frontDepth = 0;
       else backDepth = 0;
