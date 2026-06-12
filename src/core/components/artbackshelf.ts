@@ -34,7 +34,7 @@ export const artBackShelf: ComponentDef = {
     { kind: 'length', key: 'stileWidth', label: 'Stile width', default: inch(2.5), min: inch(1.5), max: inch(4), tier: 'advanced' },
     { kind: 'length', key: 'railHeight', label: 'Hook rail height', default: inch(2.75), min: inch(2), max: inch(4), tier: 'advanced' },
     { kind: 'length', key: 'frameDepth', label: 'Frame depth', default: inch(1.75), min: inch(1.25), max: inch(3), tier: 'advanced' },
-    { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(1), min: inch(0.75), max: inch(1.25), tier: 'advanced' },
+    { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(0.8125), min: inch(0.625), max: inch(1.25), tier: 'advanced' },
   ],
   generate(p): GeneratedModel {
     const L = num(p, 'length');
@@ -60,9 +60,10 @@ export const artBackShelf: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Shelf: 1" front corner radii in plan; the edge is a full corner
-    // radius — the quarter-round springs from the square bottom arris and
-    // sweeps the whole thickness up to the top face.
+    // Shelf edge to the scale drawing (shelftop.dwg, shared with the entry
+    // bench seat): 13/16" stock, a quarter-round of radius = the full
+    // thickness springing from the square bottom arris and sweeping flush
+    // into the top face. 1" front corner radii in plan; wall side square.
     parts.push({
       id: 'shelf',
       name: 'Shelf',
