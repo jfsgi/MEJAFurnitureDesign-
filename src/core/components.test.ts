@@ -955,17 +955,24 @@ describe('entryway bench', () => {
     }
   });
 
-  it('shelf edges run flush with the leg envelope under the seat overhang', () => {
+  it('shelf edges set back half a leg thickness from the leg faces', () => {
     const base = defaultParams(def);
     const model = def.generate(base);
     const W = base.width as number;
     const ovEnd = base.endOverhang as number;
+    const legT = base.legThickness as number;
     const shelf = model.parts.find((p) => p.id === 'shelf')!;
     const xs = shelf.primitives.map(
       (pr) => (pr as { at: number[]; size: number[] }).at[0] + (pr as { size: number[] }).size[0] / 2,
     );
-    expect(Math.max(...xs)).toBeCloseTo(W / 2 - ovEnd, 5); // flush with the legs' outer faces
-    expect(shelf.cut.length).toBeCloseTo(W - 2 * ovEnd, 5);
+    expect(Math.max(...xs)).toBeCloseTo(W / 2 - ovEnd - legT / 2, 5);
+    expect(shelf.cut.length).toBeCloseTo(W - 2 * ovEnd - legT, 5);
+    // Aprons share the same setback from the leg faces.
+    const apron = model.parts.find((p) => p.id === 'apron-1')!;
+    const prim = apron.primitives[0] as { at: number[]; size: number[] };
+    const D = base.depth as number;
+    const ovFront = base.frontOverhang as number;
+    expect(prim.at[1] + prim.size[1] / 2).toBeCloseTo(D / 2 - ovFront - legT / 2, 5);
   });
 
   it('stands on the floor with the seat at the requested height', () => {

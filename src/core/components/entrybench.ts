@@ -90,34 +90,40 @@ export const entryBench: ComponentDef = {
       }
     }
 
-    // Boot shelf: one slab notched around the four posts — its edges run
-    // flush with the leg faces. Modeled as the center board plus a corner
-    // tongue between each leg pair; the tongues keep the slab's grain.
+    // Everything between the legs — boot shelf edges, shelf rails, and the
+    // seat aprons — sets back half the leg thickness from the leg faces.
+    const SB = legT / 2;
+    const shelfW = envW - 2 * SB;
+    const shelfD = envD - 2 * SB;
+
+    // Boot shelf: one slab notched around the four posts, its edges inset
+    // the half-leg setback. Modeled as the center board plus a corner
+    // tongue beside each leg pair; the tongues keep the slab's grain.
     parts.push({
       id: 'shelf',
       name: 'Boot shelf',
       material: mat,
       primitives: [
-        { shape: 'box', size: [envW - 2 * legT, envD, shelfT], at: [0, 0, shelfZ], grain: 'x' },
+        { shape: 'box', size: [envW - 2 * legT, shelfD, shelfT], at: [0, 0, shelfZ], grain: 'x' },
         {
           shape: 'box',
-          size: [legT, envD - 2 * legT, shelfT],
-          at: [-legX, 0, shelfZ],
+          size: [legT - SB, envD - 2 * legT, shelfT],
+          at: [-(envW / 2 - (legT + SB) / 2), 0, shelfZ],
           grain: 'x',
         },
         {
           shape: 'box',
-          size: [legT, envD - 2 * legT, shelfT],
-          at: [legX, 0, shelfZ],
+          size: [legT - SB, envD - 2 * legT, shelfT],
+          at: [envW / 2 - (legT + SB) / 2, 0, shelfZ],
           grain: 'x',
         },
       ],
-      cut: { length: envW, width: envD, thickness: shelfT },
+      cut: { length: shelfW, width: shelfD, thickness: shelfT },
     });
 
     // Aprons under the seat and rails under the shelf's front and back
-    // edges, running between the legs flush with their outer faces; end
-    // rails (toggleable) close the shelf frame between each leg pair.
+    // edges, running between the legs at the half-leg setback; end rails
+    // (toggleable) close the shelf frame between each leg pair.
     const span = envW - 2 * legT;
     const apronH = Math.min(RAIL_HEIGHT, legH - seatT);
     for (const sy of [-1, 1]) {
@@ -129,7 +135,7 @@ export const entryBench: ComponentDef = {
           {
             shape: 'box',
             size: [span, APRON_T, apronH],
-            at: [0, sy * (envD / 2 - APRON_T / 2), H - seatT - apronH / 2],
+            at: [0, sy * (envD / 2 - SB - APRON_T / 2), H - seatT - apronH / 2],
           },
         ],
         cut: { length: span, width: apronH, thickness: APRON_T },
@@ -144,7 +150,7 @@ export const entryBench: ComponentDef = {
           {
             shape: 'box',
             size: [APRON_T, envD - 2 * legT, apronH],
-            at: [sx * (envW / 2 - APRON_T / 2), 0, H - seatT - apronH / 2],
+            at: [sx * (envW / 2 - SB - APRON_T / 2), 0, H - seatT - apronH / 2],
           },
         ],
         cut: { length: envD - 2 * legT, width: apronH, thickness: APRON_T },
@@ -160,7 +166,7 @@ export const entryBench: ComponentDef = {
           {
             shape: 'box',
             size: [span, APRON_T, railH],
-            at: [0, sy * (envD / 2 - APRON_T / 2), shelfH - shelfT - railH / 2],
+            at: [0, sy * (envD / 2 - SB - APRON_T / 2), shelfH - shelfT - railH / 2],
           },
         ],
         cut: { length: span, width: railH, thickness: APRON_T },
@@ -176,11 +182,11 @@ export const entryBench: ComponentDef = {
           primitives: [
             {
               shape: 'box',
-              size: [legT, envD - 2 * legT, railH],
-              at: [sx * legX, 0, shelfH - shelfT - railH / 2],
+              size: [legT - SB, envD - 2 * legT, railH],
+              at: [sx * (envW / 2 - (legT + SB) / 2), 0, shelfH - shelfT - railH / 2],
             },
           ],
-          cut: { length: envD - 2 * legT, width: railH, thickness: legT },
+          cut: { length: envD - 2 * legT, width: railH, thickness: legT - SB },
         });
       }
     }
