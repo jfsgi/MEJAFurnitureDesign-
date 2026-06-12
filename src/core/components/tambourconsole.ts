@@ -26,6 +26,7 @@ export const tambourConsole: ComponentDef = {
     { kind: 'length', key: 'mountHeight', label: 'Mount height', default: inch(32), min: inch(20), max: inch(44), tier: 'basic' },
     { kind: 'material', key: 'material', label: 'Material', default: 'white-oak', tier: 'basic' },
     { kind: 'length', key: 'cornerRadius', label: 'Corner radius', default: inch(3), min: inch(1.5), max: inch(5), tier: 'advanced' },
+    { kind: 'length', key: 'edgeRadius', label: 'Edge roundover', default: inch(0.375), min: 0, max: inch(0.5), tier: 'advanced' },
     { kind: 'length', key: 'slatWidth', label: 'Reed width', default: inch(0.6875), min: inch(0.5), max: inch(1), tier: 'advanced' },
     { kind: 'length', key: 'slabThickness', label: 'Slab thickness', default: inch(1), min: inch(0.75), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'slatInset', label: 'Reed inset', default: inch(0.125), min: 0, max: inch(0.5), tier: 'advanced' },
@@ -37,6 +38,8 @@ export const tambourConsole: ComponentDef = {
     const H = num(p, 'height');
     const mount = num(p, 'mountHeight'); // floor to the top surface
     const rc = num(p, 'cornerRadius');
+    // The roundover can't exceed half the stock; leave a hair of flat wall.
+    const edge = Math.min(num(p, 'edgeRadius'), num(p, 'slabThickness') / 2 - 0.5);
     const slatW = num(p, 'slatWidth');
     const t = num(p, 'slabThickness');
     const inset = num(p, 'slatInset');
@@ -63,7 +66,7 @@ export const tambourConsole: ComponentDef = {
         id,
         name,
         material: mat,
-        primitives: [{ shape: 'roundedSlab', size: [W, D, t], at: [0, 0, z], radius: rc }],
+        primitives: [{ shape: 'roundedSlab', size: [W, D, t], at: [0, 0, z], radius: rc, edge }],
         cut: { length: W, width: D, thickness: t },
       });
     }

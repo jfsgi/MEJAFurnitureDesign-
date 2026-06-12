@@ -93,6 +93,8 @@ export type Primitive =
       at: [number, number, number];
       /** Corner radius on the front (+Y) corners; the wall side stays square. */
       radius: number;
+      /** Roundover radius on the top and bottom edges (0 = square arris). */
+      edge?: number;
     }
   | {
       shape: 'jointedBoard';

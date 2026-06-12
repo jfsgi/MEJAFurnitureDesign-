@@ -95,7 +95,7 @@ function PrimitiveMesh({
       );
     }
     if (prim.shape === 'roundedSlab') {
-      const geo = roundedSlabGeometry(prim.size, prim.radius);
+      const geo = roundedSlabGeometry(prim.size, prim.radius, prim.edge ?? 0);
       applyBoxUVs(geo, GRAIN_MM_U, 'x', offset[0], offset[1]);
       return geo;
     }

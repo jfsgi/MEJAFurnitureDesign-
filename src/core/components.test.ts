@@ -979,3 +979,18 @@ describe('tambour floating console', () => {
     expect(count(inch(90))).toBeGreaterThan(count(inch(48)));
   });
 });
+
+describe('rounded slab edge roundover', () => {
+  const def = REGISTRY['tambour-console'];
+
+  it('slabs carry the edge roundover and it never exceeds half the stock', () => {
+    const base = defaultParams(def);
+    const model = def.generate(base);
+    const top = model.parts.find((p) => p.id === 'top')!;
+    const slab = top.primitives[0] as { edge?: number };
+    expect(slab.edge).toBeCloseTo(base.edgeRadius as number, 5);
+    const thin = def.generate({ ...base, slabThickness: inch(0.75), edgeRadius: inch(0.5) });
+    const thinSlab = thin.parts.find((p) => p.id === 'top')!.primitives[0] as { edge?: number };
+    expect(thinSlab.edge!).toBeLessThan(inch(0.75) / 2);
+  });
+});

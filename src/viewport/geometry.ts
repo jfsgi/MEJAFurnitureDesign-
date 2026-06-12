@@ -189,26 +189,48 @@ export function archedBoardGeometry(
 
 /**
  * Slab with rounded front (+Y) corners — tambour console tops and bottoms.
- * Extruded flat through its thickness; the wall side stays square. The
- * caller applies engine box UVs (ExtrudeGeometry's own UVs are unusable).
+ * Extruded flat through its thickness. `edge` rounds the top and bottom
+ * arrises: the outline insets by the edge radius and circular extrude
+ * bevels (bevelSize = bevelThickness) carry it back out, so the overall
+ * W × D × T stays exact. The caller applies engine box UVs
+ * (ExtrudeGeometry's own UVs are unusable).
  */
-export function roundedSlabGeometry(size: V3, radius: number): THREE.BufferGeometry {
+export function roundedSlabGeometry(size: V3, radius: number, edge = 0): THREE.BufferGeometry {
   const [w, d, t] = size;
-  const r = Math.min(radius, w / 2 - 0.1, d - 0.1);
-  const shape = new THREE.Shape();
-  shape.moveTo(-w / 2, -d / 2);
-  shape.lineTo(w / 2, -d / 2);
-  shape.lineTo(w / 2, d / 2 - r);
-  shape.absarc(w / 2 - r, d / 2 - r, r, 0, Math.PI / 2, false);
-  shape.lineTo(-w / 2 + r, d / 2);
-  shape.absarc(-w / 2 + r, d / 2 - r, r, Math.PI / 2, Math.PI, false);
-  shape.lineTo(-w / 2, -d / 2);
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: t,
-    bevelEnabled: false,
+  const re = Math.max(0, Math.min(edge, t / 2 - 0.1, w / 4, d / 4));
+  const outline = (ww: number, dd: number, r: number) => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-ww / 2, -dd / 2);
+    shape.lineTo(ww / 2, -dd / 2);
+    shape.lineTo(ww / 2, dd / 2 - r);
+    shape.absarc(ww / 2 - r, dd / 2 - r, r, 0, Math.PI / 2, false);
+    shape.lineTo(-ww / 2 + r, dd / 2);
+    shape.absarc(-ww / 2 + r, dd / 2 - r, r, Math.PI / 2, Math.PI, false);
+    shape.lineTo(-ww / 2, -dd / 2);
+    return shape;
+  };
+  if (re < 0.5) {
+    const r = Math.min(radius, w / 2 - 0.1, d - 0.1);
+    const geometry = new THREE.ExtrudeGeometry(outline(w, d, r), {
+      depth: t,
+      bevelEnabled: false,
+      curveSegments: ARC_SEGMENTS,
+    });
+    geometry.translate(0, 0, -t / 2);
+    return geometry;
+  }
+  const r = Math.min(Math.max(radius - re, 0.5), (w - 2 * re) / 2 - 0.1, d - 2 * re - 0.1);
+  const band = t - 2 * re;
+  const geometry = new THREE.ExtrudeGeometry(outline(w - 2 * re, d - 2 * re, r), {
+    depth: band,
+    bevelEnabled: true,
+    bevelThickness: re,
+    bevelSize: re,
+    bevelOffset: 0,
+    bevelSegments: 5,
     curveSegments: ARC_SEGMENTS,
   });
-  geometry.translate(0, 0, -t / 2);
+  geometry.translate(0, 0, -band / 2);
   return geometry;
 }
 
