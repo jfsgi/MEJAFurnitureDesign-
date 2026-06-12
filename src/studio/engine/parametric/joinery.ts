@@ -73,18 +73,25 @@ interface JointLayout {
 
 function layoutJoint(height: number, spec: JointSpec): JointLayout | null {
   const flare = spec.type === 'dovetail' ? spec.depth * 0.17 : 0;
-  const pinTip = Math.min(Math.max(spec.depth * 0.6, 0.006), 0.014);
+  // Atelier3D extension: shop dovetail proportions — slim 1/16" half-pins at
+  // the board edges with pins about a stock-thickness wide between the tails.
+  // Box joints keep even fingers running from the edges.
+  const pinTip =
+    spec.type === 'dovetail'
+      ? Math.min(Math.max(spec.depth, 0.0095), 0.019)
+      : Math.min(Math.max(spec.depth * 0.6, 0.006), 0.014);
+  const edgePin = spec.type === 'dovetail' ? 0.0015875 : pinTip;
   let tailCount = Math.max(1, Math.floor(height / 0.045));
   let tailWide = 0;
   while (tailCount >= 1) {
-    tailWide = (height - (tailCount + 1) * pinTip) / tailCount;
+    tailWide = (height - 2 * edgePin - (tailCount - 1) * pinTip) / tailCount;
     if (tailWide >= Math.max(pinTip * 1.2, 2 * flare + 0.004)) break;
     tailCount -= 1;
   }
   if (tailCount < 1) return null; // board too small — caller falls back to a plain box
   const tailCenters: number[] = [];
   for (let k = 0; k < tailCount; k++) {
-    tailCenters.push(pinTip + tailWide / 2 + k * (pinTip + tailWide));
+    tailCenters.push(edgePin + tailWide / 2 + k * (pinTip + tailWide));
   }
   return { pinTip, tailWide, flare, tailCenters };
 }
