@@ -933,3 +933,49 @@ describe('entryway bench', () => {
     expect(box.max[2]).toBeCloseTo(base.height as number, 5);
   });
 });
+
+describe('tambour floating console', () => {
+  const def = REGISTRY['tambour-console'];
+
+  it('hangs on the wall: slabs at mount height, cleat behind, stud warning', () => {
+    const base = defaultParams(def);
+    const mount = base.mountHeight as number;
+    const H = base.height as number;
+    const model = def.generate(base);
+    const box = modelBBox(model)!;
+    expect(box.max[2]).toBeCloseTo(mount, 5);
+    expect(box.min[2]).toBeCloseTo(mount - H, 5);
+    expect(model.parts.find((p) => p.id === 'cleat')).toBeDefined();
+    expect(model.findings.some((f) => f.message.includes('stud'))).toBe(true);
+  });
+
+  it('reeds wrap front, corners, and ends inside the slab outline', () => {
+    const base = defaultParams(def);
+    const W = base.width as number;
+    const D = base.depth as number;
+    const inset = base.slatInset as number;
+    const slatW = base.slatWidth as number;
+    const model = def.generate(base);
+    const reeds = model.parts.filter((p) => p.name === 'Tambour reed');
+    // Enough reeds to cover the front run plus both corners and end runs.
+    expect(reeds.length * slatW).toBeGreaterThan(W * 0.95);
+    for (const r of reeds) {
+      const prim = r.primitives[0] as { at: [number, number, number]; radiusTop: number };
+      // Every reed's outer surface stays at or behind the slat inset line.
+      expect(prim.at[1] + prim.radiusTop).toBeLessThanOrEqual(D / 2 - inset + 1e-6);
+      expect(Math.abs(prim.at[0]) + prim.radiusTop).toBeLessThanOrEqual(W / 2 - inset + 1e-6);
+    }
+  });
+
+  it('slabs carry the rounded corners; reeds scale with width', () => {
+    const base = defaultParams(def);
+    const model = def.generate(base);
+    const top = model.parts.find((p) => p.id === 'top')!;
+    const slab = top.primitives[0] as { shape: string; radius?: number };
+    expect(slab.shape).toBe('roundedSlab');
+    expect(slab.radius).toBeCloseTo(base.cornerRadius as number, 5);
+    const count = (w: number) =>
+      def.generate({ ...base, width: w }).parts.filter((p) => p.name === 'Tambour reed').length;
+    expect(count(inch(90))).toBeGreaterThan(count(inch(48)));
+  });
+});

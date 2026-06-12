@@ -88,6 +88,13 @@ export type Primitive =
       at: [number, number, number]; // center; axis along Z
     }
   | {
+      shape: 'roundedSlab';
+      size: [number, number, number];
+      at: [number, number, number];
+      /** Corner radius on the front (+Y) corners; the wall side stays square. */
+      radius: number;
+    }
+  | {
       shape: 'jointedBoard';
       /** Tails carry the toothed ends (sides); pins carry the complements. */
       role: 'tails' | 'pins';

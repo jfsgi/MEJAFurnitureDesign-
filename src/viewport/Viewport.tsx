@@ -14,7 +14,13 @@ import { REGISTRY } from '../core/components/registry';
 import { docBBox, evaluateInstance, instanceBBox, modelBBox, type BBox } from '../core/evaluate';
 import { inch, snapMM } from '../core/units';
 import { useStore } from '../core/store';
-import { archedBoardGeometry, grainBoxGeometry, longestAxis, taperedBoxGeometry } from './geometry';
+import {
+  archedBoardGeometry,
+  grainBoxGeometry,
+  longestAxis,
+  roundedSlabGeometry,
+  taperedBoxGeometry,
+} from './geometry';
 import { GRAIN_MM_U, getWoodTexture, grainOffset } from './woodTexture';
 import { jointedBoardGeometry } from './jointBoards';
 import { applyBoxUVs } from '../studio/engine/materials/uv';
@@ -49,8 +55,10 @@ function PrimitiveMesh({
   seed: string;
   partId: string;
 }) {
-  // Cylinders and engine-jointed boards carry grain along V — rotated texture.
-  const rotatedGrain = prim.shape === 'cylinder' || prim.shape === 'jointedBoard';
+  // Cylinders, engine-jointed boards, and rounded slabs (engine box UVs)
+  // carry grain along V — rotated texture.
+  const rotatedGrain =
+    prim.shape === 'cylinder' || prim.shape === 'jointedBoard' || prim.shape === 'roundedSlab';
   const grainTex = mat.grain ? getWoodTexture(mat.id, rotatedGrain) : null;
 
   const geo = useMemo(() => {
@@ -85,6 +93,11 @@ function PrimitiveMesh({
         prim.endSkew ?? 0,
         offset,
       );
+    }
+    if (prim.shape === 'roundedSlab') {
+      const geo = roundedSlabGeometry(prim.size, prim.radius);
+      applyBoxUVs(geo, GRAIN_MM_U, 'x', offset[0], offset[1]);
+      return geo;
     }
     if (prim.shape === 'box' && mat.grain) {
       const axis = prim.grain

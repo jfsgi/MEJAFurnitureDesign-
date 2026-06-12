@@ -140,6 +140,8 @@ function primCorners(prim: Primitive): [number, number, number][] {
     )!;
     size[rest] = prim.height;
     [hx, hy, hz] = [size.x / 2, size.y / 2, size.z / 2];
+  } else if (prim.shape === 'roundedSlab') {
+    [hx, hy, hz] = [prim.size[0] / 2, prim.size[1] / 2, prim.size[2] / 2];
   } else if (prim.shape === 'archedBoard') {
     // Stock extents; a front bulge reaches past +Y by its rise, an angled end
     // trim past the +length face by its skew.

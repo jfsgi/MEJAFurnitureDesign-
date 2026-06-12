@@ -187,6 +187,31 @@ export function archedBoardGeometry(
   return mb.build();
 }
 
+/**
+ * Slab with rounded front (+Y) corners — tambour console tops and bottoms.
+ * Extruded flat through its thickness; the wall side stays square. The
+ * caller applies engine box UVs (ExtrudeGeometry's own UVs are unusable).
+ */
+export function roundedSlabGeometry(size: V3, radius: number): THREE.BufferGeometry {
+  const [w, d, t] = size;
+  const r = Math.min(radius, w / 2 - 0.1, d - 0.1);
+  const shape = new THREE.Shape();
+  shape.moveTo(-w / 2, -d / 2);
+  shape.lineTo(w / 2, -d / 2);
+  shape.lineTo(w / 2, d / 2 - r);
+  shape.absarc(w / 2 - r, d / 2 - r, r, 0, Math.PI / 2, false);
+  shape.lineTo(-w / 2 + r, d / 2);
+  shape.absarc(-w / 2 + r, d / 2 - r, r, Math.PI / 2, Math.PI, false);
+  shape.lineTo(-w / 2, -d / 2);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: t,
+    bevelEnabled: false,
+    curveSegments: ARC_SEGMENTS,
+  });
+  geometry.translate(0, 0, -t / 2);
+  return geometry;
+}
+
 /** Index of the longest dimension — the grain runs along it (boards are cut that way). */
 export function longestAxis(size: V3): 0 | 1 | 2 {
   if (size[0] >= size[1] && size[0] >= size[2]) return 0;

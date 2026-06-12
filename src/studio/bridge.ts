@@ -6,7 +6,12 @@
 import * as THREE from 'three';
 import type { ProjectDoc } from '../core/types';
 import { evaluateInstance } from '../core/evaluate';
-import { archedBoardGeometry, longestAxis, taperedBoxGeometry } from '../viewport/geometry';
+import {
+  archedBoardGeometry,
+  longestAxis,
+  roundedSlabGeometry,
+  taperedBoxGeometry,
+} from '../viewport/geometry';
 import { jointedBoardGeometry } from '../viewport/jointBoards';
 import { grainOffset } from '../viewport/woodTexture';
 import { applyBoxUVs } from './engine/materials/uv';
@@ -87,6 +92,9 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.endSkew ?? 0,
           );
           grain = prim.arch === 'bottom-y' ? 'y' : 'x';
+        } else if (prim.shape === 'roundedSlab') {
+          geometry = roundedSlabGeometry(prim.size, prim.radius);
+          grain = 'x';
         } else {
           geometry = new THREE.CylinderGeometry(
             prim.radiusTop,
