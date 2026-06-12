@@ -994,3 +994,38 @@ describe('rounded slab edge roundover', () => {
     expect(thinSlab.edge!).toBeLessThan(inch(0.75) / 2);
   });
 });
+
+describe('art-back entry shelf', () => {
+  const def = REGISTRY['art-back-shelf'];
+
+  it('frames the art between pilasters under an overhanging eased shelf', () => {
+    const base = defaultParams(def);
+    const L = base.length as number;
+    const ov = base.overhang as number;
+    const stileW = base.stileWidth as number;
+    const model = def.generate(base);
+    const shelf = model.parts.find((p) => p.id === 'shelf')!;
+    expect(shelf.primitives[0].shape).toBe('roundedSlab');
+    const stiles = model.parts.filter((p) => p.name === 'Stile');
+    expect(stiles).toHaveLength(2);
+    expect(stiles[0].primitives).toHaveLength(2); // stile + stepped base block
+    const stileOuter = Math.max(
+      ...stiles.map((s) => Math.abs((s.primitives[0] as { at: number[] }).at[0]) + stileW / 2),
+    );
+    expect(stileOuter).toBeCloseTo(L / 2 - ov, 5); // shelf overhangs the frame
+    const art = model.parts.find((p) => p.id === 'art')!;
+    expect(art.material).toBe(base.artMaterial);
+    expect(art.cut.length).toBeCloseTo(L - 2 * ov - 2 * stileW, 5); // full-bleed field
+  });
+
+  it('hangs at mount height with hooks on the rail and warns when crowded', () => {
+    const base = defaultParams(def);
+    const model = def.generate(base);
+    const box = modelBBox(model)!;
+    expect(box.max[2]).toBeCloseTo(base.mountHeight as number, 1);
+    expect(box.min[2]).toBeGreaterThan(0);
+    expect(model.parts.filter((p) => p.name === 'Hook')).toHaveLength(4);
+    const crowded = def.generate({ ...base, length: inch(24), hooks: 6 });
+    expect(crowded.findings.some((f) => f.message.includes('crowd'))).toBe(true);
+  });
+});
