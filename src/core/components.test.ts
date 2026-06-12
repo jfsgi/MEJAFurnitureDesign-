@@ -308,20 +308,23 @@ describe('drawer box', () => {
     expect(back.primitives[0].shape).toBe('box');
   });
 
-  it('renders the corner joinery: flared dovetail tails, square box-joint fingers', () => {
+  it('renders the corner joinery: slim proud pins over solid tail columns', () => {
     const base = defaultParams(def);
     const dovetail = def.generate(base); // dovetail is the default
     const side = dovetail.parts.find((p) => p.id === 'side-1')!;
-    const tails = side.primitives.filter((pr) => pr.shape === 'taperedBox');
-    expect(tails.length).toBeGreaterThan(2);
-    expect((tails[0] as { axis?: string }).axis).toBe('y');
+    // Panel plus a solid corner column at front and back.
+    expect(side.primitives.length).toBe(3);
+    expect(side.primitives.every((pr) => pr.shape === 'box')).toBe(true);
     const front = dovetail.parts.find((p) => p.id === 'front')!;
-    expect(front.primitives.filter((pr) => pr.shape === 'taperedBox').length).toBeGreaterThan(0);
+    const pins = front.primitives.filter((pr) => pr.shape === 'taperedBox');
+    expect(pins.length).toBeGreaterThan(1);
+    expect((pins[0] as { axis?: string; endGrain?: boolean }).axis).toBe('y');
+    expect((pins[0] as { endGrain?: boolean }).endGrain).toBe(true);
 
     const boxJoint = def.generate({ ...base, joinery: 'box-joint' });
-    const bjSide = boxJoint.parts.find((p) => p.id === 'side-1')!;
-    expect(bjSide.primitives.every((pr) => pr.shape === 'box')).toBe(true);
-    expect(bjSide.primitives.length).toBeGreaterThan(2); // panel + square fingers
+    const bjFront = boxJoint.parts.find((p) => p.id === 'front')!;
+    expect(bjFront.primitives.every((pr) => pr.shape === 'box' || pr.shape === 'archedBoard')).toBe(true);
+    expect(bjFront.primitives.length).toBeGreaterThan(2); // panel + square pins
   });
 
   it('warns when the depth strands a standard slide length', () => {
@@ -385,17 +388,20 @@ describe('drawer unit', () => {
     const through = def.generate({ ...base, caseJoinery: 'through-dovetail' });
     const side = through.parts.find((p) => p.id === 'side-1')!;
     expect(side.name).toBe('Side (dovetail)');
-    expect(side.primitives.filter((pr) => pr.shape === 'taperedBox').length).toBeGreaterThan(2);
+    // Panel plus a solid joint band at top and bottom on each corner.
+    expect(side.primitives.length).toBeGreaterThan(2);
     const top = through.parts.find((p) => p.id === 'top')!;
-    expect(top.primitives.length).toBeGreaterThan(1);
+    const pins = top.primitives.filter((pr) => pr.shape === 'taperedBox');
+    expect(pins.length).toBeGreaterThan(2);
+    expect((pins[0] as { endGrain?: boolean }).endGrain).toBe(true);
     expect(top.cut.length).toBeCloseTo(
       (base.width as number) - 2 * (base.thickness as number) + 2 * (base.thickness as number),
       5,
     );
     const boxJoint = def.generate({ ...base, caseJoinery: 'box-joint' });
-    const bjSide = boxJoint.parts.find((p) => p.id === 'side-1')!;
-    expect(bjSide.primitives.length).toBeGreaterThan(2);
-    expect(bjSide.primitives.every((pr) => pr.shape === 'box')).toBe(true);
+    const bjTop = boxJoint.parts.find((p) => p.id === 'top')!;
+    expect(bjTop.primitives.length).toBeGreaterThan(2);
+    expect(bjTop.primitives.every((pr) => pr.shape === 'box')).toBe(true);
     // Half-blind: tails show on the side face, but never pierce the cap face —
     // the cap's lap strip covers the joint from above.
     const t = base.thickness as number;

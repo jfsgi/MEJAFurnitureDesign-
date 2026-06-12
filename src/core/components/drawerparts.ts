@@ -12,6 +12,34 @@ const PULL_DEPTH_MAX = inch(1.125);
 
 export type BoxJoinery = 'dovetail' | 'box-joint';
 
+/**
+ * Classic dovetail layout along a joint line: slim pins at an even pitch
+ * (half-pins at both ends), wide tails filling between — the proportions a
+ * dovetail jig or hand layout produces, not 50/50 fingers. `wOuter` is the
+ * width at the outer (cap/end-grain) face, `wInner` at the joint root.
+ */
+function dovetailSlots(length: number, t: number) {
+  const pw = Math.min(t * 0.6, length / 4); // pin width at the outer face
+  const tip = pw * 0.35; // pin width at the root
+  const np = Math.max(2, Math.round(length / (t * 1.9)));
+  const span = length - pw;
+  const pins = Array.from({ length: np }, (_, i) => ({
+    c: -length / 2 + pw / 2 + (np === 1 ? span / 2 : (i * span) / (np - 1)),
+    wOuter: pw,
+    wInner: tip,
+  }));
+  const tails = [];
+  for (let i = 0; i < np - 1; i++) {
+    const c = (pins[i].c + pins[i + 1].c) / 2;
+    const gap = pins[i + 1].c - pins[i].c;
+    tails.push({ c, wOuter: gap - pw, wInner: gap - tip });
+  }
+  return { pins, tails };
+}
+
+/** Pins render a hair proud of the joint faces so they never z-fight the column. */
+const PIN_PROUD = 0.4;
+
 export type CaseJoinery = 'half-blind-dovetail' | 'through-dovetail' | 'box-joint';
 
 /**
@@ -35,35 +63,37 @@ export function caseCornerFingers(opts: {
   const lap = style === 'half-blind-dovetail' ? t / 3 : 0;
   const bandH = t - lap;
   const zc = top ? H - t + bandH / 2 : t - bandH / 2;
-  const n = Math.max(3, 2 * Math.round(D / (t * 3)) + 1); // odd: tails cap both ends
-  const fy = D / n;
-  const flare = style === 'box-joint' ? 0 : Math.min(fy * 0.2, t * 0.4);
   const sideFingers: Primitive[] = [];
   const capFingers: Primitive[] = [];
-  for (let k = 0; k < n; k++) {
-    const y = -D / 2 + (k + 0.5) * fy;
-    const isTail = k % 2 === 0;
-    if (flare === 0 || k === 0 || k === n - 1) {
-      (isTail ? sideFingers : capFingers).push({
+
+  // Solid band of side material fills the corner; the cap's pins render a hair
+  // proud over it — no complementary-face math, so no voids and no z-fighting.
+  sideFingers.push({ shape: 'box', size: [t, D, bandH], at: [x, 0, zc] });
+
+  if (style === 'box-joint') {
+    const n = Math.max(3, 2 * Math.round(D / (t * 3)) + 1);
+    const fy = D / n;
+    for (let k = 1; k < n; k += 2) {
+      capFingers.push({
         shape: 'box',
-        size: [t, fy, bandH],
-        at: [x, y, zc],
-        endGrain: !isTail,
+        size: [t + PIN_PROUD, fy, bandH + PIN_PROUD],
+        at: [x, -D / 2 + (k + 0.5) * fy, zc],
+        endGrain: true,
       });
-      continue;
     }
-    const wide: [number, number] = [t, fy + 2 * flare];
-    const narrow: [number, number] = [t, fy - 2 * flare];
-    const tailGrows = isTail === top; // tails widen toward the cap face
-    (isTail ? sideFingers : capFingers).push({
-      shape: 'taperedBox',
-      top: tailGrows ? wide : narrow,
-      bottom: tailGrows ? narrow : wide,
-      height: bandH,
-      at: [x, y, zc],
-      align: [0, 0],
-      endGrain: !isTail,
-    });
+  } else {
+    // Dovetail pins: slim, widest at the cap face, slightly proud of the band.
+    for (const pin of dovetailSlots(D, t).pins) {
+      capFingers.push({
+        shape: 'taperedBox',
+        top: top ? [t + PIN_PROUD, pin.wOuter] : [t + PIN_PROUD, pin.wInner],
+        bottom: top ? [t + PIN_PROUD, pin.wInner] : [t + PIN_PROUD, pin.wOuter],
+        height: bandH + PIN_PROUD,
+        at: [x, pin.c, zc],
+        align: [0, 0],
+        endGrain: true,
+      });
+    }
   }
   if (lap > 0) {
     // The half-blind lap: cap material covering the joint from the cap face.
@@ -92,38 +122,44 @@ export function cornerFingerPrims(opts: {
   joinery: BoxJoinery;
 }): { tails: Primitive[]; pins: Primitive[] } {
   const { x, yCenter, bottomZ, boxH, sideT, joinery } = opts;
-  const n = Math.max(3, 2 * Math.round(boxH / (sideT * 3)) + 1); // odd: tails cap both ends
-  const fh = boxH / n;
-  const flare = joinery === 'dovetail' ? Math.min(fh * 0.2, sideT * 0.4) : 0;
+  const zMid = bottomZ + boxH / 2;
   const tails: Primitive[] = [];
   const pins: Primitive[] = [];
-  for (let k = 0; k < n; k++) {
-    const z = bottomZ + (k + 0.5) * fh;
-    const isTail = k % 2 === 0;
-    // End fingers stay square (half-pins) so the joint ends flush at the edges.
-    if (flare === 0 || k === 0 || k === n - 1) {
-      (isTail ? tails : pins).push({
+
+  // Solid corner column of side material; the end board's pins render a hair
+  // proud over it — no complementary-face math, so no voids and no z-fighting.
+  tails.push({
+    shape: 'box',
+    size: [sideT, sideT, boxH],
+    at: [x, yCenter, zMid],
+  });
+
+  if (joinery === 'box-joint') {
+    const n = Math.max(3, 2 * Math.round(boxH / (sideT * 3)) + 1);
+    const fh = boxH / n;
+    for (let k = 1; k < n; k += 2) {
+      pins.push({
         shape: 'box',
-        size: [sideT, sideT, fh],
-        at: [x, yCenter, z],
-        endGrain: !isTail,
+        size: [sideT + PIN_PROUD, sideT + PIN_PROUD, fh],
+        at: [x, yCenter, bottomZ + (k + 0.5) * fh],
+        endGrain: true,
       });
-      continue;
     }
-    const wide: [number, number] = [sideT, fh + 2 * flare];
-    const narrow: [number, number] = [sideT, fh - 2 * flare];
-    // Tails widen toward the outside of the joint; pins are their complement.
-    const outerEndIsTop = opts.outerSign > 0;
-    const grows = isTail === outerEndIsTop;
-    (isTail ? tails : pins).push({
+    return { tails, pins };
+  }
+
+  // Dovetail: slim pins at an even pitch, wide at the outer (end-grain) face.
+  const grows = opts.outerSign > 0; // outer face of the joint sits at +Y
+  for (const pin of dovetailSlots(boxH, sideT).pins) {
+    pins.push({
       shape: 'taperedBox',
-      top: grows ? wide : narrow,
-      bottom: grows ? narrow : wide,
-      height: sideT,
-      at: [x, yCenter, z],
+      top: grows ? [sideT + PIN_PROUD, pin.wOuter] : [sideT + PIN_PROUD, pin.wInner],
+      bottom: grows ? [sideT + PIN_PROUD, pin.wInner] : [sideT + PIN_PROUD, pin.wOuter],
+      height: sideT + PIN_PROUD,
+      at: [x, yCenter, zMid + pin.c],
       align: [0, 0],
       axis: 'y',
-      endGrain: !isTail,
+      endGrain: true,
     });
   }
   return { tails, pins };

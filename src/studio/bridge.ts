@@ -121,7 +121,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
         if (!geometry.getAttribute('color')) {
           const count = geometry.getAttribute('position').count;
           const shade =
-            (prim.shape === 'box' || prim.shape === 'taperedBox') && prim.endGrain ? 0.72 : 1;
+            (prim.shape === 'box' || prim.shape === 'taperedBox') && prim.endGrain ? 0.85 : 1;
           geometry.setAttribute(
             'color',
             new THREE.BufferAttribute(new Float32Array(count * 3).fill(shade), 3),
