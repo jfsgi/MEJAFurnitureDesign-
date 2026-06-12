@@ -104,6 +104,9 @@ export type Primitive =
        *  boards get blind sockets and a solid lap plate; tails boards
        *  shorten their tooth engagement to match (both ends). */
       lip?: number;
+      /** Tails boards: this end of the length axis stays square — no teeth
+       *  (a case side running past its only jointed corner to the floor). */
+      plainEnd?: 'positive' | 'negative';
       /** Pins boards: finger-pull scoop in the top edge. */
       scoop?: { width: number; depth: number };
     }

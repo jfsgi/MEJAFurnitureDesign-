@@ -42,13 +42,24 @@ export function jointedBoardGeometry(prim: JointedBoard): THREE.BufferGeometry {
 
   if (prim.role === 'tails') {
     // Native axes: x = thickness, y = height, z = length.
+    let frontDepth = engagement;
+    let backDepth = engagement;
+    if (prim.plainEnd) {
+      // Map the model-space plain end onto the native ±z ends: (z, x) keeps
+      // native +z on model +length; the (y, x) drawer orientation's rotation
+      // flips it (native +z lands on model −y).
+      const positiveIsNativeFront = prim.lengthAxis === 'z';
+      const plainIsFront = (prim.plainEnd === 'positive') === positiveIsNativeFront;
+      if (plainIsFront) frontDepth = 0;
+      else backDepth = 0;
+    }
     const geo = tailsBoardGeometry(
       prim.thickness * M,
       prim.height * M,
       prim.length * M,
       spec,
-      engagement,
-      engagement,
+      frontDepth,
+      backDepth,
     );
     if (!geo) return plainBoard(prim);
     geo.scale(1000, 1000, 1000);

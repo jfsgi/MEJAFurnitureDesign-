@@ -833,3 +833,65 @@ describe('bookcase repeat rule', () => {
     expect(wide.findings.some((f) => f.message.includes('sag'))).toBe(true);
   });
 });
+
+describe('coastal end table', () => {
+  const def = REGISTRY['coastal-end-table'];
+
+  it('sides dovetail into the top only — square at the floor', () => {
+    const base = defaultParams(def);
+    const t = base.thickness as number;
+    const H = base.height as number;
+    const W = base.width as number;
+    const model = def.generate(base);
+    const side = model.parts.find((p) => p.id === 'side-1')!;
+    const tails = side.primitives[0] as {
+      shape: string;
+      role?: string;
+      length?: number;
+      plainEnd?: string;
+      jointDepth?: number;
+    };
+    expect(tails.shape).toBe('jointedBoard');
+    expect(tails.role).toBe('tails');
+    expect(tails.plainEnd).toBe('negative'); // bottom end runs square to the floor
+    expect(tails.length).toBeCloseTo(H, 5);
+    expect(tails.jointDepth).toBeCloseTo(t, 5);
+    const top = model.parts.find((p) => p.id === 'top')!;
+    const pins = top.primitives[0] as { role?: string; length?: number };
+    expect(pins.role).toBe('pins');
+    expect(pins.length).toBeCloseTo(W, 5);
+  });
+
+  it('drawer bay over open shelves; bottom shelf rides the toe space', () => {
+    const base = defaultParams(def);
+    const t = base.thickness as number;
+    const H = base.height as number;
+    const toe = base.toeSpace as number;
+    const drawerH = base.drawerHeight as number;
+    const model = def.generate(base);
+    const bottom = model.parts.find((p) => p.id === 'bottom-shelf')!;
+    expect((bottom.primitives[0] as { at: number[] }).at[2]).toBeCloseTo(toe + t / 2, 5);
+    const drawerShelf = model.parts.find((p) => p.id === 'drawer-shelf')!;
+    expect((drawerShelf.primitives[0] as { at: number[] }).at[2]).toBeCloseTo(
+      H - t - drawerH - t / 2,
+      5,
+    );
+    // Two bays at defaults → one intermediate fixed shelf, dovetailed box behind the front.
+    expect(model.parts.find((p) => p.id === 'shelf-1')).toBeDefined();
+    expect(model.parts.find((p) => p.id === 'drawer-front')).toBeDefined();
+    const boxSide = model.parts.find((p) => p.id === 'drawer-side-1')!;
+    expect((boxSide.primitives[0] as { joint?: string }).joint).toBe('dovetail');
+  });
+
+  it('half-blind option laps the top face and shortens the sides one lip', () => {
+    const base = defaultParams(def);
+    const H = base.height as number;
+    const model = def.generate({ ...base, caseJoinery: 'half-blind-dovetail' });
+    const side = model.parts.find((p) => p.id === 'side-1')!;
+    const tails = side.primitives[0] as { length?: number; lip?: number };
+    expect(tails.length).toBeCloseTo(H - HALF_BLIND_LIP, 5);
+    expect(tails.lip).toBeCloseTo(HALF_BLIND_LIP, 5);
+    const top = model.parts.find((p) => p.id === 'top')!;
+    expect((top.primitives[0] as { lip?: number }).lip).toBeCloseTo(HALF_BLIND_LIP, 5);
+  });
+});

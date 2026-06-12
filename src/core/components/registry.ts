@@ -1,6 +1,7 @@
 import type { ComponentDef } from '../types';
 import { board, panel, roundLeg, shelf, straightLeg, taperedLeg } from './primitives';
 import { coffeeTable, consoleTable, diningTable, sideTable } from './table';
+import { coastalEndTable } from './coastalendtable';
 import { bookcase } from './bookcase';
 import { cabinet } from './cabinet';
 import { displayStand } from './displaystand';
@@ -18,6 +19,7 @@ const ALL: ComponentDef[] = [
   coffeeTable,
   consoleTable,
   sideTable,
+  coastalEndTable,
   bench,
   stool,
   bookcase,
@@ -43,7 +45,7 @@ export const REGISTRY: Record<string, ComponentDef> = Object.fromEntries(
 );
 
 export const CATEGORIES: { name: string; components: ComponentDef[] }[] = [
-  { name: 'Tables', components: [diningTable, coffeeTable, consoleTable, sideTable] },
+  { name: 'Tables', components: [diningTable, coffeeTable, consoleTable, sideTable, coastalEndTable] },
   { name: 'Seating', components: [bench, stool] },
   { name: 'Storage', components: [bookcase, cabinet, dresser, storageTower, wineCube, displayStand] },
   { name: 'Wall-mounted', components: [wallShelf, spiceRack] },
