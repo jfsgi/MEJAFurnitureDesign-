@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import type { ProjectDoc } from '../core/types';
 import { evaluateInstance } from '../core/evaluate';
+import { MATERIAL_BY_ID } from '../core/materials';
 import {
   archedBoardGeometry,
   longestAxis,
@@ -116,6 +117,12 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
         applyBoxUVs(geometry, ENGINE_TILE_MM, grain, offset[0], offset[1]);
         const mesh = new THREE.Mesh(geometry, material);
         mesh.name = `${inst.name} · ${part.name}`;
+        // Sheet-goods parts (a drawer's ply bottom, a ply back) keep their
+        // own stock when a whole-scene material is applied — the engine
+        // skips hinted meshes unless they're targeted by name.
+        if (MATERIAL_BY_ID[part.material]?.sheet) {
+          mesh.userData.materialHint = 'ply';
+        }
         mesh.position.set(...prim.at);
         mesh.rotation.copy(rotation);
         mesh.castShadow = true;
