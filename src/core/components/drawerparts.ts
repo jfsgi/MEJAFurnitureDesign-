@@ -11,6 +11,11 @@ const BOTTOM_RECESS = inch(0.25); // drawer bottom sits up in its groove
 const PULL_WIDTH_MAX = inch(4.5);
 const PULL_DEPTH_MAX = inch(1.125);
 
+/** Joint tips render this much proud (0.5 mm per face) so the end grain never
+ * sits coplanar with the mating board's face — the renderer's version of
+ * cutting proud and flushing. */
+export const JOINT_PROUD = 1;
+
 export type BoxJoinery = 'dovetail' | 'box-joint';
 
 export type CaseJoinery = 'half-blind-dovetail' | 'through-dovetail' | 'box-joint';
@@ -49,7 +54,7 @@ export function drawerBoxParts(opts: {
         {
           shape: 'jointedBoard',
           role: 'tails',
-          length: boxD,
+          length: boxD + JOINT_PROUD,
           height: boxH,
           thickness: sideT,
           at: [cx + sx * (boxW / 2 - sideT / 2), centerY, boxZ],
@@ -74,7 +79,7 @@ export function drawerBoxParts(opts: {
         {
           shape: 'jointedBoard',
           role: 'pins',
-          length: boxW,
+          length: boxW + JOINT_PROUD,
           height: boxH,
           thickness: sideT,
           at: [cx, centerY + sy * (boxD / 2 - sideT / 2), boxZ],

@@ -8,7 +8,7 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part, Primitive } from '../types';
 import { formatLength, inch } from '../units';
-import { drawerBoxParts } from './drawerparts';
+import { JOINT_PROUD, drawerBoxParts } from './drawerparts';
 import { slideFitWarning } from './drawerbox';
 
 /** Case boards with engine-rendered corner joinery (see drawerparts/jointBoards). */
@@ -31,7 +31,7 @@ export function caseBoardPrims(opts: {
         ? {
             shape: 'jointedBoard',
             role: 'tails',
-            length: H - 2 * lap,
+            length: halfBlind ? H - 2 * lap : H + JOINT_PROUD,
             height: D,
             thickness: t,
             at: [sx * (W / 2 - t / 2), 0, H / 2],
@@ -51,7 +51,7 @@ export function caseBoardPrims(opts: {
         {
           shape: 'jointedBoard',
           role: 'pins',
-          length: W,
+          length: W + JOINT_PROUD,
           height: D,
           thickness: bandH,
           at: [0, 0, top ? H - t + bandH / 2 : t - bandH / 2],

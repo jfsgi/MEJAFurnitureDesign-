@@ -3,6 +3,7 @@ import { REGISTRY } from './components/registry';
 import { buildCutList } from './cutlist';
 import { SHEET_L, SHEET_W, buildStockBreakdown } from './stock';
 import { defaultParams, modelBBox, partsAffectedBy } from './evaluate';
+import { JOINT_PROUD } from './components/drawerparts';
 import { inch } from './units';
 import type { Instance, ProjectDoc } from './types';
 
@@ -390,7 +391,7 @@ describe('drawer unit', () => {
     const tails = side.primitives[0] as { shape: string; role?: string; length?: number };
     expect(tails.shape).toBe('jointedBoard');
     expect(tails.role).toBe('tails');
-    expect(tails.length).toBeCloseTo(H, 5); // through: teeth reach the cap faces
+    expect(tails.length).toBeCloseTo(H + JOINT_PROUD, 5); // through: teeth land proud of the cap faces
     const top = through.parts.find((p) => p.id === 'top')!;
     expect((top.primitives[0] as { role?: string }).role).toBe('pins');
     expect(top.cut.length).toBeCloseTo((base.width as number) - 2 * t + 2 * t, 5);
