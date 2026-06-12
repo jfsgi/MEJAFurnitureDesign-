@@ -60,7 +60,8 @@ export const artBackShelf: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Eased shelf: small corner radii and a light roundover all around.
+    // Bullnosed shelf: a full half-radius wraps the edge all around, with
+    // small corner radii in plan.
     parts.push({
       id: 'shelf',
       name: 'Shelf',
@@ -71,7 +72,7 @@ export const artBackShelf: ComponentDef = {
           size: [L, D, st],
           at: [0, 0, mount - st / 2],
           radius: inch(0.5),
-          edge: inch(0.1875),
+          edge: st / 2,
         },
       ],
       cut: { length: L, width: D, thickness: st },

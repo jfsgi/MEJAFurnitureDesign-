@@ -227,7 +227,7 @@ export function roundedSlabGeometry(size: V3, radius: number, edge = 0): THREE.B
     bevelThickness: re,
     bevelSize: re,
     bevelOffset: 0,
-    bevelSegments: 5,
+    bevelSegments: 8,
     curveSegments: ARC_SEGMENTS,
   });
   geometry.translate(0, 0, -band / 2);
