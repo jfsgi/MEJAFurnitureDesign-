@@ -38,7 +38,10 @@ export function caseBoardPrims(opts: {
             lengthAxis: 'z',
             thicknessAxis: 'x',
             joint,
-            jointDepth: bandH,
+            // Full mating thickness keeps the tails/pins layouts identical;
+            // half-blind hides via the shortened tails and the cap lap, not a
+            // shallower joint.
+            jointDepth: t,
           }
         : { shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] },
     cap: (top) => {
@@ -56,7 +59,8 @@ export function caseBoardPrims(opts: {
           thicknessAxis: 'z',
           outerSign: top ? 1 : -1,
           joint,
-          jointDepth: bandH,
+          // Pins run the full side thickness so they show on the side faces.
+          jointDepth: t,
         },
       ];
       if (lap > 0) {
