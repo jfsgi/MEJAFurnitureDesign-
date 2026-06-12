@@ -26,7 +26,7 @@ export const entryBench: ComponentDef = {
     { kind: 'material', key: 'material', label: 'Material', default: 'maple', tier: 'basic' },
     { kind: 'boolean', key: 'shelfRails', label: 'Rails under the shelf', default: true, tier: 'advanced' },
     { kind: 'length', key: 'shelfHeight', label: 'Shelf height', default: inch(5), min: inch(2.5), max: inch(10), tier: 'advanced' },
-    { kind: 'length', key: 'seatThickness', label: 'Seat thickness', default: inch(1.5), min: inch(1), max: inch(2), tier: 'advanced' },
+    { kind: 'length', key: 'seatThickness', label: 'Seat thickness', default: inch(0.8125), min: inch(0.625), max: inch(2), tier: 'advanced' },
     { kind: 'length', key: 'legThickness', label: 'Leg thickness', default: inch(2.5), min: inch(1.5), max: inch(3.5), tier: 'advanced' },
     { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(1), min: inch(0.75), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'endOverhang', label: 'Seat end overhang', default: inch(1), min: 0, max: inch(3), tier: 'advanced' },
@@ -55,11 +55,24 @@ export const entryBench: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
+    // Seat edge to the scale drawing (shelftop.dwg): a quarter-round of
+    // radius = the full stock thickness springs from the square bottom
+    // arris and sweeps flush into the top face, all around the seat.
     parts.push({
       id: 'seat',
       name: 'Seat',
       material: mat,
-      primitives: [{ shape: 'box', size: [W, D, seatT], at: [0, 0, H - seatT / 2] }],
+      primitives: [
+        {
+          shape: 'roundedSlab',
+          size: [W, D, seatT],
+          at: [0, 0, H - seatT / 2],
+          radius: inch(0.75),
+          edge: seatT,
+          edgeMode: 'top',
+          corners: 'all',
+        },
+      ],
       cut: { length: W, width: D, thickness: seatT },
     });
 
