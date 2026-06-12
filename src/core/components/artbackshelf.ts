@@ -60,8 +60,8 @@ export const artBackShelf: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Bullnosed shelf: a full half-radius wraps the edge all around, the
-    // front corners radiused 1" in plan.
+    // Shelf: 1" front corner radii in plan; the top arris carries a
+    // half-stock corner radius and the bottom edge stays square.
     parts.push({
       id: 'shelf',
       name: 'Shelf',
@@ -73,13 +73,15 @@ export const artBackShelf: ComponentDef = {
           at: [0, 0, mount - st / 2],
           radius: inch(1),
           edge: st / 2,
+          edgeMode: 'top',
         },
       ],
       cut: { length: L, width: D, thickness: st },
     });
 
     // Pilaster stiles with a button base block at the foot — the button's
-    // face carries a 3/8" roundover on all four sides.
+    // face carries a 3/8" roundover on all four sides, meeting at square
+    // corners like router passes.
     for (const sx of [-1, 1]) {
       parts.push({
         id: `stile-${sx}`,
@@ -99,7 +101,7 @@ export const artBackShelf: ComponentDef = {
               frameY + BASE_BLOCK_STEP / 2,
               frameBottom + BASE_BLOCK_H / 2,
             ],
-            radius: inch(0.375),
+            radius: 0,
             edge: inch(0.375),
             axis: 'y',
             corners: 'all',

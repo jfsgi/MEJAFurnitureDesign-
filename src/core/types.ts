@@ -93,8 +93,11 @@ export type Primitive =
       at: [number, number, number];
       /** Corner radius in plan ('front' = the +Y corners; 'all' = every corner). */
       radius: number;
-      /** Roundover radius on the top and bottom edges (0 = square arris). */
+      /** Roundover radius on the slab edges (0 = square arris). */
       edge?: number;
+      /** 'both' rounds top and bottom arrises (default); 'top' rounds the
+       *  top only, leaving the bottom edge square. */
+      edgeMode?: 'both' | 'top';
       /** Thickness axis: 'z' lies flat (default); 'y' stands the slab on the
        *  wall like a button, face toward +Y. */
       axis?: 'z' | 'y';

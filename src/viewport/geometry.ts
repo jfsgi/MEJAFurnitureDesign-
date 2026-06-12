@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { GRAIN_MM_U, GRAIN_MM_V } from './woodTexture';
 
 type V3 = [number, number, number];
@@ -200,9 +201,12 @@ export function roundedSlabGeometry(
   radius: number,
   edge = 0,
   corners: 'front' | 'all' = 'front',
+  /** 'both' rounds top and bottom arrises; 'top' leaves the bottom square. */
+  edgeMode: 'both' | 'top' = 'both',
 ): THREE.BufferGeometry {
   const [w, d, t] = size;
-  const re = Math.max(0, Math.min(edge, t / 2 - 0.1, w / 4, d / 4));
+  const reMax = edgeMode === 'top' ? t - 0.2 : t / 2 - 0.1;
+  const re = Math.max(0, Math.min(edge, reMax, w / 4, d / 4));
   const outline = (ww: number, dd: number, r: number) => {
     const shape = new THREE.Shape();
     if (corners === 'all') {
@@ -237,6 +241,32 @@ export function roundedSlabGeometry(
     return geometry;
   }
   const r = Math.min(Math.max(radius - re, 0.5), (w - 2 * re) / 2 - 0.1, d - 2 * re - 0.1);
+  if (edgeMode === 'top') {
+    // Square body up to the roundover, then a beveled cap whose lower bevel
+    // hides inside the body — only the top arris rounds.
+    const rcFull = Math.min(radius, w / 2 - 0.1, d - 0.1);
+    const body = new THREE.ExtrudeGeometry(outline(w, d, rcFull), {
+      depth: t - re,
+      bevelEnabled: false,
+      curveSegments: ARC_SEGMENTS,
+    });
+    body.translate(0, 0, -t / 2);
+    const EPS = 0.01;
+    const cap = new THREE.ExtrudeGeometry(outline(w - 2 * re, d - 2 * re, r), {
+      depth: EPS,
+      bevelEnabled: true,
+      bevelThickness: re,
+      bevelSize: re,
+      bevelOffset: 0,
+      bevelSegments: 8,
+      curveSegments: ARC_SEGMENTS,
+    });
+    cap.translate(0, 0, t / 2 - re - EPS);
+    const merged = mergeGeometries([body, cap], false)!;
+    body.dispose();
+    cap.dispose();
+    return merged;
+  }
   const band = t - 2 * re;
   const geometry = new THREE.ExtrudeGeometry(outline(w - 2 * re, d - 2 * re, r), {
     depth: band,

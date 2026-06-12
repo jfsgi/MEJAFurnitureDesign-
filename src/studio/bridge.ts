@@ -99,6 +99,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.radius,
             prim.edge ?? 0,
             prim.corners ?? 'front',
+            prim.edgeMode ?? 'both',
           );
           if (vertical) geometry.rotateX(-Math.PI / 2);
           grain = vertical ? 'z' : 'x';

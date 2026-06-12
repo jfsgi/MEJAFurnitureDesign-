@@ -101,7 +101,13 @@ function PrimitiveMesh({
       const planSize: [number, number, number] = vertical
         ? [prim.size[0], prim.size[2], prim.size[1]]
         : prim.size;
-      const geo = roundedSlabGeometry(planSize, prim.radius, prim.edge ?? 0, prim.corners ?? 'front');
+      const geo = roundedSlabGeometry(
+        planSize,
+        prim.radius,
+        prim.edge ?? 0,
+        prim.corners ?? 'front',
+        prim.edgeMode ?? 'both',
+      );
       if (vertical) geo.rotateX(-Math.PI / 2);
       applyBoxUVs(geo, GRAIN_MM_U, vertical ? 'z' : 'x', offset[0], offset[1]);
       return geo;
