@@ -40,6 +40,9 @@ export function StudioView() {
   const [materialsList, setMaterialsList] = useState<MaterialInfo[]>([]);
   const [parts, setParts] = useState<string[]>([]);
   const [targetPart, setTargetPart] = useState('*');
+  const [panelStock, setPanelStock] = useState('birchply');
+  const [ssao, setSsao] = useState(true);
+  const [photoFinish, setPhotoFinish] = useState(true);
   const [resetTick, setResetTick] = useState(0);
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function StudioView() {
     if (!engine) return;
     engine.setTextureResolution(textureSize);
     engine.showObject(buildStudioGroup(doc, engine.materials), { frame: !framedRef.current });
+    engine.setPanelMaterial(panelStock);
     framedRef.current = true;
     const names = engine.listParts();
     setParts(names);
@@ -74,6 +78,9 @@ export function StudioView() {
     engineRef.current?.setLighting(lighting);
   }, [lighting]);
   useEffect(() => {
+    engineRef.current?.setPanelMaterial(panelStock);
+  }, [panelStock]);
+  useEffect(() => {
     engineRef.current?.setBackground(background);
   }, [background]);
 
@@ -82,7 +89,7 @@ export function StudioView() {
     if (!engine || rendering) return;
     setRendering(true);
     try {
-      const blob = await brandSnapshot(await engine.renderSnapshot());
+      const blob = await brandSnapshot(await engine.renderSnapshot({ ssao, photoFinish }));
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `${doc.name.replace(/[^\w.-]+/g, '-')}-4k.png`;
@@ -190,7 +197,35 @@ export function StudioView() {
             Reset to design materials
           </button>
 
+          <h4 className="panel-heading">Panel stock</h4>
+          <select
+            className="input"
+            value={panelStock}
+            onChange={(e) => setPanelStock(e.target.value)}
+            aria-label="Sheet-goods stock (drawer bottoms, back panels)"
+          >
+            {materialsList
+              .filter((m) => m.category === 'wood' || m.category === 'scanned')
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+          </select>
+
           <div className="studio-render">
+            <label className="studio-toggle">
+              <input type="checkbox" checked={ssao} onChange={(e) => setSsao(e.target.checked)} />
+              Contact shading (SSAO)
+            </label>
+            <label className="studio-toggle">
+              <input
+                type="checkbox"
+                checked={photoFinish}
+                onChange={(e) => setPhotoFinish(e.target.checked)}
+              />
+              Photo finish (vignette + grain)
+            </label>
             <button className="btn btn--primary" onClick={render4K} disabled={rendering}>
               <DownloadIcon /> {rendering ? 'Rendering…' : 'Render 4K PNG'}
             </button>
