@@ -76,6 +76,7 @@ export const entryBench: ComponentDef = {
       cut: { length: W, width: D, thickness: seatT },
     });
 
+    // Posts carry a 3/8" radius along each vertical corner; ends stay square.
     for (const sx of [-1, 1]) {
       for (const sy of [-1, 1]) {
         parts.push({
@@ -83,7 +84,14 @@ export const entryBench: ComponentDef = {
           name: 'Leg',
           material: mat,
           primitives: [
-            { shape: 'box', size: [legT, legT, legH], at: [sx * legX, sy * legY, legH / 2] },
+            {
+              shape: 'roundedSlab',
+              size: [legT, legT, legH],
+              at: [sx * legX, sy * legY, legH / 2],
+              radius: inch(0.375),
+              corners: 'all',
+              grain: 'z',
+            },
           ],
           cut: { length: legH, width: legT, thickness: legT },
         });

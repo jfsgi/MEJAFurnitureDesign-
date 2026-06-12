@@ -145,7 +145,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.edgeMode ?? 'both',
           );
           if (vertical) geometry.rotateX(-Math.PI / 2);
-          grain = vertical ? 'z' : 'x';
+          grain = prim.grain ?? (vertical ? 'z' : 'x');
         } else {
           geometry = new THREE.CylinderGeometry(
             prim.radiusTop,

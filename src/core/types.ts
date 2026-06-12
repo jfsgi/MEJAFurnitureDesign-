@@ -103,6 +103,8 @@ export type Primitive =
       axis?: 'z' | 'y';
       /** Which outline corners round (default 'front'). */
       corners?: 'front' | 'all';
+      /** Grain override — vertical for posts with radiused corners. */
+      grain?: 'x' | 'y' | 'z';
     }
   | {
       shape: 'jointedBoard';

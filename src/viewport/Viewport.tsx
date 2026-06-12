@@ -123,7 +123,8 @@ function PrimitiveMesh({
         prim.edgeMode ?? 'both',
       );
       if (vertical) geo.rotateX(-Math.PI / 2);
-      applyBoxUVs(geo, GRAIN_MM_U, vertical ? 'z' : 'x', offset[0], offset[1]);
+      const grain = prim.grain ?? (vertical ? 'z' : 'x');
+      applyBoxUVs(geo, GRAIN_MM_U, grain, offset[0], offset[1]);
       return geo;
     }
     if (prim.shape === 'box' && mat.grain) {
