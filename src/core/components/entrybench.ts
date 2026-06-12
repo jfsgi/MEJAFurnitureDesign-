@@ -11,7 +11,7 @@ const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
 
 const RAIL_HEIGHT = inch(2.25);
-const APRON_T = inch(1);
+
 const SAG_SPAN = inch(54);
 
 export const entryBench: ComponentDef = {
@@ -28,6 +28,7 @@ export const entryBench: ComponentDef = {
     { kind: 'length', key: 'shelfHeight', label: 'Shelf height', default: inch(5), min: inch(2.5), max: inch(10), tier: 'advanced' },
     { kind: 'length', key: 'seatThickness', label: 'Seat thickness', default: inch(0.8125), min: inch(0.625), max: inch(2), tier: 'advanced' },
     { kind: 'length', key: 'legThickness', label: 'Leg thickness', default: inch(2.5), min: inch(1.5), max: inch(3.5), tier: 'advanced' },
+    { kind: 'length', key: 'apronThickness', label: 'Apron thickness', default: inch(0.75), min: inch(0.5), max: inch(1.25), tier: 'advanced' },
     { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(0.8125), min: inch(0.625), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'endOverhang', label: 'Seat end overhang', default: inch(1), min: 0, max: inch(3), tier: 'advanced' },
     { kind: 'length', key: 'frontOverhang', label: 'Seat front overhang', default: inch(0.75), min: 0, max: inch(2), tier: 'advanced' },
@@ -38,6 +39,7 @@ export const entryBench: ComponentDef = {
     const H = num(p, 'height');
     const seatT = num(p, 'seatThickness');
     const legT = num(p, 'legThickness');
+    const apronT = num(p, 'apronThickness');
     const shelfT = num(p, 'shelfThickness');
     const shelfH = num(p, 'shelfHeight');
     const ovEnd = num(p, 'endOverhang');
@@ -142,11 +144,11 @@ export const entryBench: ComponentDef = {
         primitives: [
           {
             shape: 'box',
-            size: [span, APRON_T, apronH],
-            at: [0, sy * (envD / 2 - SB - APRON_T / 2), H - seatT - apronH / 2],
+            size: [span, apronT, apronH],
+            at: [0, sy * (envD / 2 - SB - apronT / 2), H - seatT - apronH / 2],
           },
         ],
-        cut: { length: span, width: apronH, thickness: APRON_T },
+        cut: { length: span, width: apronH, thickness: apronT },
       });
     }
     for (const sx of [-1, 1]) {
@@ -157,11 +159,11 @@ export const entryBench: ComponentDef = {
         primitives: [
           {
             shape: 'box',
-            size: [APRON_T, envD - 2 * legT, apronH],
-            at: [sx * (envW / 2 - SB - APRON_T / 2), 0, H - seatT - apronH / 2],
+            size: [apronT, envD - 2 * legT, apronH],
+            at: [sx * (envW / 2 - SB - apronT / 2), 0, H - seatT - apronH / 2],
           },
         ],
-        cut: { length: envD - 2 * legT, width: apronH, thickness: APRON_T },
+        cut: { length: envD - 2 * legT, width: apronH, thickness: apronT },
       });
     }
     const railH = Math.min(RAIL_HEIGHT, shelfH - shelfT);
@@ -173,11 +175,11 @@ export const entryBench: ComponentDef = {
         primitives: [
           {
             shape: 'box',
-            size: [span, APRON_T, railH],
-            at: [0, sy * (envD / 2 - SB - APRON_T / 2), shelfH - shelfT - railH / 2],
+            size: [span, apronT, railH],
+            at: [0, sy * (envD / 2 - SB - apronT / 2), shelfH - shelfT - railH / 2],
           },
         ],
-        cut: { length: span, width: railH, thickness: APRON_T },
+        cut: { length: span, width: railH, thickness: apronT },
       });
     }
 
