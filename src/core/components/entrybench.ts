@@ -122,6 +122,21 @@ export const entryBench: ComponentDef = {
         cut: { length: span, width: apronH, thickness: APRON_T },
       });
     }
+    for (const sx of [-1, 1]) {
+      parts.push({
+        id: `apron-end-${sx}`,
+        name: 'End apron',
+        material: mat,
+        primitives: [
+          {
+            shape: 'box',
+            size: [APRON_T, envD - 2 * legT, apronH],
+            at: [sx * (envW / 2 - APRON_T / 2), 0, H - seatT - apronH / 2],
+          },
+        ],
+        cut: { length: envD - 2 * legT, width: apronH, thickness: APRON_T },
+      });
+    }
     const railH = Math.min(RAIL_HEIGHT, shelfH - shelfT);
     for (const sy of [-1, 1]) {
       parts.push({

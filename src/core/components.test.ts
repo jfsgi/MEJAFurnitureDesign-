@@ -944,6 +944,7 @@ describe('entryway bench', () => {
     expect(names.filter((n) => n === 'Leg')).toHaveLength(4);
     expect(names.filter((n) => n === 'Seat')).toHaveLength(1);
     expect(names.filter((n) => n === 'Apron')).toHaveLength(2); // under the seat, front and back
+    expect(names.filter((n) => n === 'End apron')).toHaveLength(2); // closing the frame at each end
     expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2); // under the shelf's front and back edges
     expect(names.filter((n) => n === 'Shelf end rail')).toHaveLength(2);
     const shelf = model.parts.find((p) => p.id === 'shelf')!;
