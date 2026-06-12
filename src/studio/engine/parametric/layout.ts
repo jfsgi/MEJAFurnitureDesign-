@@ -14,6 +14,7 @@ import type {
   DrawerBoxSpec,
   DrawerFrontSpec,
   DrawerUnitSpec,
+  EndTableSpec,
   EdgeProfile,
   FrontStyle,
   FurnitureSpec,
@@ -23,6 +24,9 @@ import type {
 import { validateSpec } from './spec.js';
 
 export type PartShape = 'box' | 'cylinder' | 'taperedLeg';
+
+/** Half-blind drawer-box fronts: tails stop 1/16" shy of the show face. */
+const BOX_LIP = 1.5875;
 
 type EdgeProfileName = Exclude<EdgeProfile, 'square'>;
 
@@ -45,6 +49,11 @@ export interface Part {
   /** Axis the wood grain runs along, for the cut list. */
   grainAxis: 'x' | 'y' | 'z';
   /**
+   * Sheet-goods parts (drawer bottoms, back panels) default to the panel
+   * material instead of the piece's primary wood.
+   */
+  materialHint?: 'ply';
+  /**
    * Renders interlocking corner joinery on the board ends (the cut list is
    * unaffected — joinery lives within the board's nominal dimensions).
    * Tails boards show tail end-grain on the mating face; pins boards carry
@@ -58,6 +67,8 @@ export interface Part {
     pinsOuterSign?: 1 | -1;
     /** Tails boards: half-blind front — tails stop this short of the show face. */
     frontLipMm?: number;
+    /** Tails boards: half-blind back — same lap at the −z end. */
+    backLipMm?: number;
     /** Pins boards: blind sockets with a solid lap this thick at the show face. */
     lipMm?: number;
     /**
@@ -71,6 +82,8 @@ export interface Part {
     frontBevelMm?: number;
     /** Case tails sides: world-x sign of the panel's inner face. */
     bevelInnerSign?: 1 | -1;
+    /** Case tails sides: teeth at the top end only (bottom end square). */
+    singleEnd?: boolean;
   };
   /**
    * 45° chamfer between the front (+z) face and the listed side faces —
@@ -149,6 +162,8 @@ export function buildLayout(spec: FurnitureSpec): FurnitureLayout {
       return frontPanelLayout(spec);
     case 'drawerunit':
       return drawerUnitLayout(spec);
+    case 'endtable':
+      return endTableLayout(spec);
   }
 }
 
@@ -270,6 +285,7 @@ function bookshelfLayout(spec: BookshelfSpec): FurnitureLayout {
   if (spec.backPanel) {
     parts.push({
       name: 'Back panel',
+      materialHint: 'ply',
       shape: 'box',
       sizeMm: [w, h, backT],
       positionMm: [0, h / 2, -d / 2 + backT / 2],
@@ -338,6 +354,7 @@ function cabinetLayout(spec: CabinetSpec): FurnitureLayout {
   });
   parts.push({
     name: 'Back panel',
+    materialHint: 'ply',
     shape: 'box',
     sizeMm: [w, caseH, backT],
     positionMm: [0, legH + caseH / 2, -d / 2 + backT / 2],
@@ -411,14 +428,14 @@ function drawerBoxLayout(spec: DrawerBoxSpec): FurnitureLayout {
     parts.push({
       name: 'Drawer side',
       shape: 'box',
-      sizeMm: [t, h, halfblind ? d - lip : d],
-      positionMm: [sx * (w / 2 - t / 2), h / 2, halfblind ? -lip / 2 : 0],
+      sizeMm: [t, h, halfblind ? d - 2 * lip : d],
+      positionMm: [sx * (w / 2 - t / 2), h / 2, 0],
       role: 'structure',
       grainAxis: 'z',
       joinery: through
         ? { type: spec.joinery as 'dovetail' | 'boxjoint', role: 'tails', matingThicknessMm: t }
         : halfblind
-          ? { type: 'dovetail', role: 'tails', matingThicknessMm: t, frontLipMm: lip }
+          ? { type: 'dovetail', role: 'tails', matingThicknessMm: t, frontLipMm: lip, backLipMm: lip }
           : undefined,
     });
   }
@@ -445,8 +462,8 @@ function drawerBoxLayout(spec: DrawerBoxSpec): FurnitureLayout {
               role: 'pins',
               matingThicknessMm: t,
               pinsOuterSign: sz as 1 | -1,
-              // Blind sockets on the front only; the back stays through.
-              lipMm: sz > 0 ? lip : undefined,
+              // Blind sockets front and back — no joint breaks a show face.
+              lipMm: lip,
             }
           : undefined,
       scoop: sz > 0 ? scoop : undefined,
@@ -455,6 +472,7 @@ function drawerBoxLayout(spec: DrawerBoxSpec): FurnitureLayout {
   // Bottom rides in a groove ~12mm above the lower edge.
   parts.push({
     name: 'Drawer bottom',
+    materialHint: 'ply',
     shape: 'box',
     sizeMm: [w - 2 * t + 12, spec.bottomThicknessMm, d - 2 * t + 12],
     positionMm: [0, 12 + spec.bottomThicknessMm / 2, 0],
@@ -621,6 +639,150 @@ function frontPanelLayout(spec: CabinetDoorSpec | DrawerFrontSpec): FurnitureLay
   return { spec, parts, overallMm: [spec.widthMm, spec.heightMm, spec.thicknessMm] };
 }
 
+/**
+ * Coastal end table: dovetailed case (tails on the floor-running sides,
+ * pins on the top), one inset drawer on side-mount slides, two open
+ * shelves below, open back with a rear rail under the top.
+ */
+function endTableLayout(spec: EndTableSpec): FurnitureLayout {
+  const parts: Part[] = [];
+  const { widthMm: w, depthMm: d, heightMm: h, stockThicknessMm: t } = spec;
+  const reveal = 2;
+  const frontT = 19;
+  const slideClearance = 13;
+  // The sides run full height to the floor; their top ends carry the tails
+  // that interleave with the top panel's pins.
+  const bayTop = h - t;
+
+  for (const sx of [1, -1]) {
+    parts.push({
+      name: 'Side panel',
+      shape: 'box',
+      sizeMm: [t, h, d],
+      positionMm: [sx * (w / 2 - t / 2), h / 2, 0],
+      role: 'structure',
+      grainAxis: 'y',
+      joinery: {
+        type: 'dovetail',
+        role: 'tails',
+        matingThicknessMm: t,
+        orient: 'case',
+        singleEnd: true,
+      },
+    });
+  }
+  parts.push({
+    name: 'Top',
+    shape: 'box',
+    sizeMm: [w, t, d],
+    positionMm: [0, h - t / 2, 0],
+    role: 'structure',
+    grainAxis: 'x',
+    joinery: {
+      type: 'dovetail',
+      role: 'pins',
+      matingThicknessMm: t,
+      pinsOuterSign: 1,
+      orient: 'case',
+    },
+  });
+
+  const innerW = w - 2 * t;
+  const bay = spec.drawerHeightMm + 2 * reveal;
+  // The bottom shelf rides just off the floor; the middle shelf splits the
+  // open space between it and the drawer bay. Both set back a hair from
+  // the front edges.
+  const shelfDepth = d - 10;
+  const shelf1Top = bayTop - bay;
+  const middleY = (spec.bottomShelfLiftMm + t + shelf1Top) / 2;
+  for (const [name, yCenter] of [
+    ['Middle shelf', middleY],
+    ['Bottom shelf', spec.bottomShelfLiftMm + t / 2],
+  ] as Array<[string, number]>) {
+    parts.push({
+      name,
+      shape: 'box',
+      sizeMm: [innerW, t, shelfDepth],
+      positionMm: [0, yCenter, -5],
+      role: 'structure',
+      grainAxis: 'x',
+    });
+  }
+  // Rear rail under the top, flush with the back edges.
+  parts.push({
+    name: 'Rear rail',
+    shape: 'box',
+    sizeMm: [innerW, 60, t],
+    positionMm: [0, bayTop - 30, -(d / 2 - t / 2)],
+    role: 'structure',
+    grainAxis: 'x',
+  });
+
+  const open = Math.max(0, spec.openMm ?? 0);
+  // Inset slab front, flush with the case front.
+  parts.push({
+    name: 'Drawer front',
+    shape: 'box',
+    sizeMm: [innerW - 2 * reveal, spec.drawerHeightMm, frontT],
+    positionMm: [0, shelf1Top + reveal + spec.drawerHeightMm / 2, d / 2 - frontT / 2 + open],
+    role: 'panel',
+    grainAxis: 'x',
+  });
+
+  // Through-dovetailed box on side-mount slides.
+  const boxT = spec.boxStockThicknessMm;
+  const boxW = innerW - 2 * slideClearance;
+  const boxD = Math.max(150, Math.floor((d - 60) / 50) * 50);
+  const boxH = Math.max(60, bay - 25);
+  const boxY0 = shelf1Top + 10;
+  const boxZ = d / 2 - frontT - boxD / 2 - 5 + open;
+  for (const sx of [1, -1]) {
+    parts.push({
+      name: 'Drawer side',
+      shape: 'box',
+      sizeMm: [boxT, boxH, boxD - 2 * BOX_LIP],
+      positionMm: [sx * (boxW / 2 - boxT / 2), boxY0 + boxH / 2, boxZ],
+      role: 'structure',
+      grainAxis: 'z',
+      joinery: {
+        type: 'dovetail',
+        role: 'tails',
+        matingThicknessMm: boxT,
+        frontLipMm: BOX_LIP,
+        backLipMm: BOX_LIP,
+      },
+    });
+  }
+  for (const sz of [1, -1]) {
+    parts.push({
+      name: sz > 0 ? 'Drawer box front' : 'Drawer box back',
+      shape: 'box',
+      sizeMm: [boxW, boxH, boxT],
+      positionMm: [0, boxY0 + boxH / 2, boxZ + sz * (boxD / 2 - boxT / 2)],
+      role: 'structure',
+      grainAxis: 'x',
+      joinery: {
+        type: 'dovetail',
+        role: 'pins',
+        matingThicknessMm: boxT,
+        pinsOuterSign: sz as 1 | -1,
+        lipMm: BOX_LIP,
+      },
+    });
+  }
+  parts.push({
+    name: 'Drawer bottom',
+    materialHint: 'ply',
+    shape: 'box',
+    sizeMm: [boxW - 2 * boxT + 12, 6, boxD - 2 * boxT + 12],
+    positionMm: [0, boxY0 + 12 + 3, boxZ],
+    role: 'panel',
+    grainAxis: 'x',
+  });
+
+  return { spec, parts, overallMm: [w, h, d] };
+}
+
 function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
   const parts: Part[] = [];
   const { widthMm: w, heightMm: h, depthMm: d, stockThicknessMm: t } = spec;
@@ -634,7 +796,9 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
   const caseDepth = inset ? d : d - frontT;
   const caseFrontZ = d / 2; // carcass front face (after any overlay offset)
   const caseOffsetZ = inset ? 0 : -frontT / 2;
-  const innerDepth = caseDepth - backT;
+  // The ply back sits in rabbets, inset 1/4" from the back edges.
+  const backInset = 6.35;
+  const innerDepth = caseDepth - backT - backInset;
 
   // The carcass is dovetailed together: tails on the sides, pins cut on
   // the full-width top and bottom panels. Half-blind keeps the laps on the
@@ -683,11 +847,14 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
       },
     });
   }
+  // Inset 1/4" from the back edges, captured in rabbets — from behind you
+  // see the case edges framing the recessed ply.
   parts.push({
     name: 'Back panel',
+    materialHint: 'ply',
     shape: 'box',
-    sizeMm: [w, h, backT],
-    positionMm: [0, h / 2, -d / 2 + backT / 2],
+    sizeMm: [w - 2 * t + 20, h - 2 * t + 20, backT],
+    positionMm: [0, h / 2, caseOffsetZ - caseDepth / 2 + backInset + backT / 2],
     role: 'panel',
     grainAxis: 'y',
   });
@@ -762,12 +929,14 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
         ? Math.min(spec.openAmountMm ?? boxD * 0.6, boxD - 60)
         : 0;
 
-      if (railH > 0 && i > 0 && c === 0) {
+      // One rail per column, butting into the dividers — rails never cross
+      // a divider (coplanar faces would fight, and it isn't how it's built).
+      if (railH > 0 && i > 0) {
         parts.push({
           name: 'Divider rail',
           shape: 'box',
-          sizeMm: [innerW, railH, frontT],
-          positionMm: [0, openingBottom - railH / 2, caseFrontZ - frontT / 2],
+          sizeMm: [colW, railH, frontT],
+          positionMm: [colCenter, openingBottom - railH / 2, caseFrontZ - frontT / 2],
           role: 'structure',
           grainAxis: 'x',
           frontBevel: bevel ? { bevelMm: bevel, sides: ['y+', 'y-'] } : undefined,
@@ -804,11 +973,17 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
         parts.push({
           name: 'Drawer side',
           shape: 'box',
-          sizeMm: [boxT, boxH, boxD],
+          sizeMm: [boxT, boxH, boxD - 2 * BOX_LIP],
           positionMm: [colCenter + sx * (boxW / 2 - boxT / 2), boxY0 + boxH / 2, boxZ],
           role: 'structure',
           grainAxis: 'z',
-          joinery: { type: 'dovetail', role: 'tails', matingThicknessMm: boxT },
+          joinery: {
+            type: 'dovetail',
+            role: 'tails',
+            matingThicknessMm: boxT,
+            frontLipMm: BOX_LIP,
+            backLipMm: BOX_LIP,
+          },
         });
       }
       for (const sz of [1, -1]) {
@@ -824,11 +999,13 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
             role: 'pins',
             matingThicknessMm: boxT,
             pinsOuterSign: sz as 1 | -1,
+            lipMm: BOX_LIP,
           },
         });
       }
       parts.push({
         name: 'Drawer bottom',
+        materialHint: 'ply',
         shape: 'box',
         sizeMm: [boxW - 2 * boxT + 12, 6, boxD - 2 * boxT + 12],
         positionMm: [colCenter, boxY0 + 12 + 3, boxZ],

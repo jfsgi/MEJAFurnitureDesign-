@@ -4,9 +4,9 @@ import type { ProjectDoc } from '../core/types';
 import { ENGINE_MATERIAL_MAP, buildStudioGroup, engineMaterialFor } from './bridge';
 import type { MaterialLibrary } from './engine/materials/MaterialLibrary';
 
-// The engine material ids available in the vendored library (v0.5.9 + paint-black).
+// The engine material ids available in the vendored library (v0.12.5 + paint-black).
 const ENGINE_IDS = new Set([
-  'oak', 'walnut', 'cherry', 'maple', 'redoak', 'mahogany', 'cedar',
+  'birchply', 'oak', 'walnut', 'cherry', 'maple', 'redoak', 'mahogany', 'cedar',
   'paint-white', 'paint-forest', 'paint-black', 'steel', 'brass', 'linen',
 ]);
 

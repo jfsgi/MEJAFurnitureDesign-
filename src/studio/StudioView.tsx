@@ -15,6 +15,7 @@ import { brandSnapshot } from './branding';
 import { DownloadIcon } from '../ui/icons';
 
 const BACKGROUNDS = [
+  { value: 'studio', label: 'Studio' },
   { value: '#22252a', label: 'Charcoal' },
   { value: '#e9e5de', label: 'Linen' },
   { value: 'transparent', label: 'None' },
@@ -33,7 +34,7 @@ export function StudioView() {
   const engineRef = useRef<FurnitureEngine | null>(null);
   const framedRef = useRef(false);
   const [lighting, setLighting] = useState<LightingPresetId>('studio');
-  const [background, setBackground] = useState<string>('#22252a');
+  const [background, setBackground] = useState<string>('studio');
   const [textureSize, setTextureSize] = useState(2048);
   const [rendering, setRendering] = useState(false);
   const [materialsList, setMaterialsList] = useState<MaterialInfo[]>([]);

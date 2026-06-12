@@ -200,13 +200,21 @@ export function generateWoodMaps(size: number, params: WoodParams): PbrMaps {
       let ringVisibility = 1;
       let knotDark = 0;
       if (cathedral) {
-        // Flat-sawn figure: ring contours are nested parabolic arches along
-        // the board. Quadratic-in-u + linear-in-v phase gives the arches;
-        // the v coefficient is kept on a 1/2 grid so the texture still tiles.
+        // Flat-sawn figure with true ring geometry: the face grazes a stack
+        // of nested rings, so the phase is the radial distance from the
+        // pith line. Lines run fine and parallel along the board, drifting
+        // as the cut depth oscillates, and open into elliptical cathedral
+        // tips wherever the surface is tangent to a ring (s ≈ 0). The sine
+        // depth term keeps the texture tiling along the board.
         const axis = (0.3 + h1 * 0.4) * plankW;
         const du = (uIn - axis) / plankW;
-        const archesAlongV = Math.max(1, Math.round(ringsPerPlank * 0.1 + h2 * 2)) * 0.5;
-        phase = du * du * ringsPerPlank * 0.5 + v * archesAlongV + h1 * 13 + wander;
+        const clusters = 1 + Math.round(h2); // arch zones per tile
+        const s =
+          (h1 * 2 - 1) * 1.5 +
+          1.8 * Math.sin((v / PERIOD) * Math.PI * 2 * clusters + h2 * 9) +
+          wander * 0.4;
+        // The 0.85/2.2 ratio elongates arch tips ~6x along the board.
+        phase = Math.hypot(du * ringsPerPlank * 0.85, s * 2.2) + h1 * 13;
         // Arches fade in and out along the board: large calm zones between
         // figured zones, like real flat-sawn stock.
         ringVisibility =
@@ -235,9 +243,9 @@ export function generateWoodMaps(size: number, params: WoodParams): PbrMaps {
         ringVisibility;
 
       // Fine streaks elongated along the grain.
-      const fine = fbm2D(u * 32, v * 2, 256, 16, seed + 7 + plank * 31, 5);
+      const fine = fbm2D(u * 56, v * 3, 448, 24, seed + 7 + plank * 31, 5);
       // Sparse darker hairline filaments.
-      const fil = valueNoise2D(u * 96, v * 8, 768, 64, seed + 19 + plank * 13);
+      const fil = valueNoise2D(u * 160, v * 12, 1280, 96, seed + 19 + plank * 13);
       const hair = Math.max(0, fil - 0.45) * 1.6;
       // Pore speckle.
       const pore = valueNoise2D(u * 48, v * 4, 384, 32, seed + 23) * 0.5 + 0.5;

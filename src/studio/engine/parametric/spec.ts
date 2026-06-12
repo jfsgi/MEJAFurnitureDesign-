@@ -197,6 +197,29 @@ export interface DrawerUnitSpec {
   openAmountMm?: number;
 }
 
+/**
+ * Coastal end table: a dovetailed case (tails on the sides, pins on the
+ * top) whose sides run to the floor, one inset drawer on side-mount
+ * slides over two open shelves.
+ */
+export interface EndTableSpec {
+  kind: 'endtable';
+  name?: string;
+  widthMm: number;
+  depthMm: number;
+  heightMm: number;
+  /** Case and shelf stock. */
+  stockThicknessMm: number;
+  /** Drawer front height (the bay sizes itself around it). */
+  drawerHeightMm: number;
+  /** Drawer box stock. */
+  boxStockThicknessMm: number;
+  /** Bottom shelf sits this far off the floor. */
+  bottomShelfLiftMm: number;
+  /** Preview: pull the drawer open this far (0 = closed). */
+  openMm?: number;
+}
+
 export type FurnitureSpec =
   | TableSpec
   | BookshelfSpec
@@ -204,7 +227,8 @@ export type FurnitureSpec =
   | DrawerBoxSpec
   | CabinetDoorSpec
   | DrawerFrontSpec
-  | DrawerUnitSpec;
+  | DrawerUnitSpec
+  | EndTableSpec;
 export type FurnitureKind = FurnitureSpec['kind'];
 
 export function defaultTableSpec(): TableSpec {
@@ -258,7 +282,7 @@ export function defaultDrawerBoxSpec(): DrawerBoxSpec {
     heightMm: 150,
     stockThicknessMm: 13,
     bottomThicknessMm: 6,
-    joinery: 'dovetail',
+    joinery: 'halfblind',
   };
 }
 
@@ -309,6 +333,21 @@ export function defaultDrawerUnitSpec(): DrawerUnitSpec {
   };
 }
 
+export function defaultEndTableSpec(): EndTableSpec {
+  return {
+    kind: 'endtable',
+    name: 'Coastal End Table',
+    widthMm: 500,
+    depthMm: 400,
+    heightMm: 560,
+    stockThicknessMm: 18,
+    drawerHeightMm: 130,
+    boxStockThicknessMm: 13,
+    bottomShelfLiftMm: 40,
+    openMm: 0,
+  };
+}
+
 export function defaultSpec(kind: FurnitureKind): FurnitureSpec {
   switch (kind) {
     case 'table':
@@ -325,6 +364,8 @@ export function defaultSpec(kind: FurnitureKind): FurnitureSpec {
       return defaultDrawerFrontSpec();
     case 'drawerunit':
       return defaultDrawerUnitSpec();
+    case 'endtable':
+      return defaultEndTableSpec();
   }
 }
 
@@ -466,6 +507,24 @@ export function validateSpec(spec: FurnitureSpec): void {
         if (!Number.isInteger(openCol) || openCol < 1 || openCol > cols) {
           throw new Error('drawerunit: openColumn must be between 1 and columnCount');
         }
+      }
+      break;
+    }
+    case 'endtable': {
+      positive(spec.widthMm, 'widthMm');
+      positive(spec.depthMm, 'depthMm');
+      positive(spec.heightMm, 'heightMm');
+      positive(spec.stockThicknessMm, 'stockThicknessMm');
+      positive(spec.drawerHeightMm, 'drawerHeightMm');
+      positive(spec.boxStockThicknessMm, 'boxStockThicknessMm');
+      if (spec.drawerHeightMm > spec.heightMm * 0.5) {
+        throw new Error('endtable: drawerHeightMm too tall for the case');
+      }
+      if (spec.widthMm <= 2 * spec.stockThicknessMm + 2 * 13 + 50) {
+        throw new Error('endtable: widthMm too small for slides and a drawer box');
+      }
+      if (spec.heightMm <= spec.drawerHeightMm + spec.bottomShelfLiftMm + 3 * spec.stockThicknessMm + 120) {
+        throw new Error('endtable: not enough height for the drawer bay and shelves');
       }
       break;
     }

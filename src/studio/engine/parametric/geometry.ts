@@ -34,6 +34,15 @@ const GLASS_MATERIAL = new THREE.MeshPhysicalMaterial({
  * mesh named after the part (so materials can target part names), grouped
  * under a single THREE.Group sitting on the floor at the origin.
  */
+/**
+ * Texture-u offsets that keep a narrow part's grain inside one simulated
+ * plank for every wood preset (plank counts 6–12 share boundaries on a
+ * 1/120 grid; these centers clear them all by ≥ 4/120). A single board's
+ * grain must never step across a glue line mid-face.
+ */
+const PLANK_SAFE_OFFSETS = [5 / 120, 55 / 120, 65 / 120, 115 / 120];
+const PLANK_FIT_M = 0.165;
+
 export function buildGroup(layout: FurnitureLayout, material: THREE.Material): THREE.Group {
   const group = new THREE.Group();
   group.name = layout.spec.name ?? layout.spec.kind;
@@ -41,8 +50,15 @@ export function buildGroup(layout: FurnitureLayout, material: THREE.Material): T
   for (const part of layout.parts) {
     const geometry = partGeometry(part);
     // Unique per-part UV offset (golden-ratio sequence) so identical parts —
-    // four legs, two doors — don't sample the same patch of grain.
-    const offsetU = (partIndex * 0.618033988749) % 1;
+    // four legs, two doors — don't sample the same patch of grain. Narrow
+    // parts (single boards) snap to a plank-safe offset across the grain.
+    const sizes = part.sizeMm.map((v) => v * MM_TO_M);
+    const grainIndex = part.grainAxis === 'x' ? 0 : part.grainAxis === 'y' ? 1 : 2;
+    const acrossMax = Math.max(...sizes.filter((_, i) => i !== grainIndex));
+    const offsetU =
+      acrossMax <= PLANK_FIT_M
+        ? PLANK_SAFE_OFFSETS[partIndex % PLANK_SAFE_OFFSETS.length]
+        : (partIndex * 0.618033988749) % 1;
     const offsetV = (partIndex * 0.754877666247) % 1;
     applyBoxUVs(geometry, TEXTURE_TILE_M, part.grainAxis, offsetU, offsetV, recessAO(part));
     partIndex += 1;
@@ -51,6 +67,7 @@ export function buildGroup(layout: FurnitureLayout, material: THREE.Material): T
       mesh.castShadow = false;
       mesh.userData.isGlass = true;
     }
+    if (part.materialHint) mesh.userData.materialHint = part.materialHint;
     mesh.name = part.name;
     mesh.position.set(
       part.positionMm[0] * MM_TO_M,
@@ -283,7 +300,7 @@ function partGeometry(part: Part): THREE.BufferGeometry {
               // Builder extrusion sign of the inner face: world x = −extrude.
               (-(part.joinery.bevelInnerSign ?? 1)) as 1 | -1,
             )
-          : tailsBoardGeometry(w, d, h, joint, lapped, lapped);
+          : tailsBoardGeometry(w, d, h, joint, lapped, part.joinery.singleEnd ? 0 : lapped);
         if (jointed) {
           jointed.rotateX(-Math.PI / 2);
           return jointed;
@@ -313,6 +330,7 @@ function partGeometry(part: Part): THREE.BufferGeometry {
             d,
             joint,
             part.joinery.frontLipMm ? joint.depth - part.joinery.frontLipMm * MM_TO_M : undefined,
+            part.joinery.backLipMm ? joint.depth - part.joinery.backLipMm * MM_TO_M : undefined,
           )
         : pinsBoardGeometry(
             w,

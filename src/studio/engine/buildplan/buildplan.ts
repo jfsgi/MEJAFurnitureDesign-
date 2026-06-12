@@ -230,6 +230,12 @@ function hardwareFor(layout: FurnitureLayout): HardwareItem[] {
       items.push({ item: 'Wood glue (250ml)', quantity: 1 });
       break;
     }
+    case 'endtable': {
+      items.push({ item: 'Full-extension side-mount slides (pair)', quantity: 1 });
+      items.push({ item: '4 × 30mm screws (front adjustment)', quantity: 4 });
+      items.push({ item: 'Wood glue (250ml)', quantity: 1 });
+      break;
+    }
   }
   return items;
 }
@@ -287,6 +293,11 @@ function toolsFor(layout: FurnitureLayout): string[] {
       tools.push('35mm Forstner bit (hinge cups)');
     }
   }
+  if (spec.kind === 'endtable') {
+    tools.push('Dovetail jig with router (case and drawer box)');
+    tools.push('Dado stack or router (shelf dados)');
+    tools.push('Drawer-slide mounting jig');
+  }
   if (spec.kind === 'drawerunit') {
     tools.push('Drawer-slide mounting jig');
     tools.push('Dovetail jig with router (carcass and drawer boxes)');
@@ -332,6 +343,8 @@ function overviewFor(layout: FurnitureLayout): string {
         : `A ${size} slab drawer front with horizontal grain.`;
     case 'drawerunit':
       return `A ${size} bank of ${layout.spec.drawerCount} drawers on full-extension slides with ${layout.spec.frontStyle} overlay fronts. Build order: carcass, slides, boxes, then fronts aligned last with adjustment screws.`;
+    case 'endtable':
+      return `A ${size} coastal end table: a dovetailed case (tails on the floor-running sides, pins on the top), one inset drawer on side-mount slides, and two open shelves. Build order: case dovetails, shelf dados, glue-up, then the drawer.`;
   }
 }
 
@@ -511,6 +524,26 @@ function stepsFor(layout: FurnitureLayout): BuildStep[] {
       });
       break;
     }
+    case 'endtable': {
+      steps.push(
+        {
+          title: 'Dovetail the case',
+          detail:
+            'Cut the tails on the sides\u2019 top ends and the pins on the top panel \u2014 the pattern runs front to back. Dry-fit before moving on.',
+        },
+        {
+          title: 'Dado the shelves and glue up',
+          detail:
+            'Cut stopped dados in the sides for the middle and bottom shelves, then glue the case square \u2014 check the diagonals while the rear rail goes in under the top.',
+        },
+        {
+          title: 'Build and hang the drawer',
+          detail:
+            'Through-dovetail the drawer box, groove for the bottom, then mount the side slides level. Fit the inset front with an even 2mm reveal and fix it from inside.',
+        },
+      );
+      break;
+    }
     case 'drawerunit': {
       steps.push(
         {
@@ -582,6 +615,7 @@ function estimateHours(layout: FurnitureLayout): { min: number; max: number } {
     door: 3,
     drawerfront: 2,
     drawerunit: 10,
+    endtable: 7,
   };
   const base = baseByKind[layout.spec.kind] ?? 6;
   const min = base + Math.round(partCount * 0.5);

@@ -27,7 +27,7 @@ export const ENGINE_MATERIAL_MAP: Record<string, string> = {
   cherry: 'cherry',
   ash: 'redoak',
   cedar: 'cedar',
-  'baltic-birch': 'maple',
+  'baltic-birch': 'birchply',
   'painted-white': 'paint-white',
   'painted-black': 'paint-black',
   'steel-black': 'steel',

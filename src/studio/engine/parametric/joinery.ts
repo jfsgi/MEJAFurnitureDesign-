@@ -138,15 +138,19 @@ export function tailsBoardGeometry(
   points.push([ziFront, height / 2]);
   // Top edge.
   points.push([-ziBack, height / 2]);
-  // Back toothed end, top to bottom (mirror of the front end).
-  for (const c of [...tailCenters].reverse()) {
-    const cy = yBottom + c;
-    points.push(
-      [-ziBack, cy + tailWide / 2 - flare],
-      [-zo, cy + tailWide / 2],
-      [-zo, cy - tailWide / 2],
-      [-ziBack, cy - tailWide / 2 + flare],
-    );
+  // Back toothed end, top to bottom (mirror of the front end). A zero
+  // backDepth leaves that end square (a case side that only joins at one
+  // end, like an end table's floor-running sides).
+  if (zo - ziBack > 1e-9) {
+    for (const c of [...tailCenters].reverse()) {
+      const cy = yBottom + c;
+      points.push(
+        [-ziBack, cy + tailWide / 2 - flare],
+        [-zo, cy + tailWide / 2],
+        [-zo, cy - tailWide / 2],
+        [-ziBack, cy - tailWide / 2 + flare],
+      );
+    }
   }
 
   const shape = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
@@ -301,27 +305,125 @@ export function pinsBoardGeometry(
   for (const [g0, g1, atBottom, atTop] of gaps) {
     const f0 = atBottom ? 0 : flare;
     const f1 = atTop ? 0 : flare;
+    // The opening bevel is cut before assembly and the side panel's bevel
+    // plane continues through the front pin, so the two bevels meet on a
+    // 45° miter at the opening corner. The front pin is built as an exact
+    // two-segment sweep: its cross-section grows linearly from the miter
+    // back to the full chamfered pentagon.
+    if (atBottom && frontBevel > 0) {
+      const b = Math.min(frontBevel, (g1 - g0) * 0.95);
+      const tipX = -zTip;
+      const innX = -zInner;
+      const dir = Math.sign(tipX - innX);
+      // Cross-section at sweep distance e from the opening corner.
+      const section = (e: number): Array<[number, number]> => {
+        const c = g0 + Math.max(0, b - e);
+        return [
+          [tipX, c],
+          [tipX, g1],
+          [innX, g1 + f1],
+          [innX, g0 + b],
+          [innX + dir * Math.min(e, b), c],
+        ];
+      };
+      for (const endSign of [1, -1] as const) {
+        const X = (e: number) => endSign * (length / 2 - spec.depth + e);
+        const stations = [0, b, spec.depth];
+        const positions: number[] = [];
+        const tri = (
+          a: [number, number, number],
+          bb: [number, number, number],
+          cc: [number, number, number],
+        ) => positions.push(...a, ...bb, ...cc);
+        for (let s = 0; s < stations.length - 1; s++) {
+          const p0 = section(stations[s]);
+          const p1 = section(stations[s + 1]);
+          const x0 = X(stations[s]);
+          const x1 = X(stations[s + 1]);
+          for (let i = 0; i < 5; i++) {
+            const j = (i + 1) % 5;
+            const a: [number, number, number] = [x0, p0[i][1], -p0[i][0]];
+            const bb: [number, number, number] = [x0, p0[j][1], -p0[j][0]];
+            const cc: [number, number, number] = [x1, p1[j][1], -p1[j][0]];
+            const dd: [number, number, number] = [x1, p1[i][1], -p1[i][0]];
+            tri(a, bb, cc);
+            tri(a, cc, dd);
+          }
+        }
+        // End caps (fan).
+        for (const [e, flip] of [
+          [0, false],
+          [spec.depth, true],
+        ] as Array<[number, boolean]>) {
+          const p = section(e);
+          const x = X(e);
+          for (let i = 1; i < 4; i++) {
+            const a: [number, number, number] = [x, p[0][1], -p[0][0]];
+            const bb: [number, number, number] = [x, p[i][1], -p[i][0]];
+            const cc: [number, number, number] = [x, p[i + 1][1], -p[i + 1][0]];
+            if (flip) tri(a, cc, bb);
+            else tri(a, bb, cc);
+          }
+        }
+        // Orient every face outward from the solid's centroid, then flat-shade.
+        let cx = 0;
+        let cy = 0;
+        let cz = 0;
+        for (let i = 0; i < positions.length; i += 3) {
+          cx += positions[i];
+          cy += positions[i + 1];
+          cz += positions[i + 2];
+        }
+        const nVerts = positions.length / 3;
+        cx /= nVerts;
+        cy /= nVerts;
+        cz /= nVerts;
+        const va = new THREE.Vector3();
+        const vb = new THREE.Vector3();
+        const vc = new THREE.Vector3();
+        const ab = new THREE.Vector3();
+        const ac = new THREE.Vector3();
+        const n = new THREE.Vector3();
+        const out = new THREE.Vector3();
+        for (let i = 0; i < positions.length; i += 9) {
+          va.fromArray(positions, i);
+          vb.fromArray(positions, i + 3);
+          vc.fromArray(positions, i + 6);
+          ab.subVectors(vb, va);
+          ac.subVectors(vc, va);
+          n.crossVectors(ab, ac);
+          out.set(
+            (va.x + vb.x + vc.x) / 3 - cx,
+            (va.y + vb.y + vc.y) / 3 - cy,
+            (va.z + vb.z + vc.z) / 3 - cz,
+          );
+          if (n.dot(out) < 0) {
+            for (let k = 0; k < 3; k++) {
+              const tmp = positions[i + 3 + k];
+              positions[i + 3 + k] = positions[i + 6 + k];
+              positions[i + 6 + k] = tmp;
+            }
+          }
+        }
+        const pin = new THREE.BufferGeometry();
+        pin.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+        pin.computeVertexNormals();
+        pin.setAttribute(
+          'uv',
+          new THREE.BufferAttribute(new Float32Array((positions.length / 3) * 2), 2),
+        );
+        pieces.push(pin);
+      }
+      continue;
+    }
     // rotateY(π/2) maps shape (sx, sy, extrude) → world (extrude, sy, −sx),
     // so shape X carries the NEGATED z coordinate.
-    // The opening bevel is cut before assembly, so it runs through the
-    // joint: the front gap's prism loses its inner-front corner too,
-    // keeping the chamfer continuous around the assembled opening.
-    const bevelDir = Math.sign(zInner - zTip);
-    const shape =
-      atBottom && frontBevel > 0
-        ? new THREE.Shape([
-            new THREE.Vector2(-zTip, g0),
-            new THREE.Vector2(-zTip, g1),
-            new THREE.Vector2(-zInner, g1 + f1),
-            new THREE.Vector2(-zInner, g0 + frontBevel),
-            new THREE.Vector2(-zInner + bevelDir * frontBevel, g0),
-          ])
-        : new THREE.Shape([
-            new THREE.Vector2(-zTip, g0),
-            new THREE.Vector2(-zTip, g1),
-            new THREE.Vector2(-zInner, g1 + f1),
-            new THREE.Vector2(-zInner, g0 - f0),
-          ]);
+    const shape = new THREE.Shape([
+      new THREE.Vector2(-zTip, g0),
+      new THREE.Vector2(-zTip, g1),
+      new THREE.Vector2(-zInner, g1 + f1),
+      new THREE.Vector2(-zInner, g0 - f0),
+    ]);
     const prism = new THREE.ExtrudeGeometry(shape, { depth: spec.depth, bevelEnabled: false });
     prism.rotateY(Math.PI / 2);
     // The cross-section is uniform along the board, so both ends use the

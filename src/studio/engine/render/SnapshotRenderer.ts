@@ -1,4 +1,8 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export interface SnapshotOptions {
   /** Output width in pixels. Defaults to 3840 (4K UHD). */
@@ -13,6 +17,14 @@ export interface SnapshotOptions {
   supersample?: number;
   /** Render with a transparent background (PNG alpha). */
   transparent?: boolean;
+  /**
+   * Screen-space ambient occlusion: soft contact shading wherever parts
+   * meet — the single biggest photographic cue. Defaults on (opaque
+   * backgrounds only; the AO pass has no alpha).
+   */
+  ssao?: boolean;
+  /** Photographic finish: subtle vignette and fine grain. Defaults on. */
+  photoFinish?: boolean;
   /** 'image/png' (default) or 'image/jpeg'. */
   mimeType?: string;
   quality?: number;
@@ -33,6 +45,40 @@ export interface SnapshotContext {
 }
 
 const MAX_DIMENSION = 16384;
+
+/**
+ * Camera-response touches that read as photography instead of CG: a gentle
+ * radial vignette and fine luminance grain (≈ high-ISO sensor noise).
+ */
+function applyPhotoFinish(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  const vignette = ctx.createRadialGradient(
+    width / 2,
+    height / 2,
+    Math.min(width, height) * 0.45,
+    width / 2,
+    height / 2,
+    Math.hypot(width, height) * 0.62,
+  );
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.14)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, width, height);
+
+  const image = ctx.getImageData(0, 0, width, height);
+  const data = image.data;
+  let seed = 1234567;
+  const rand = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296 - 0.5;
+  };
+  for (let i = 0; i < data.length; i += 4) {
+    const n = rand() * 5;
+    data[i] += n;
+    data[i + 1] += n;
+    data[i + 2] += n;
+  }
+  ctx.putImageData(image, 0, 0);
+}
 
 /**
  * Renders a high-quality still of the scene at the requested resolution
@@ -86,13 +132,33 @@ export async function renderSnapshot(
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
 
-    renderer.render(scene, camera);
+    const useSsao = (options.ssao ?? true) && !options.transparent;
+    if (useSsao) {
+      const composer = new EffectComposer(renderer);
+      composer.setSize(renderWidth, renderHeight);
+      composer.addPass(new RenderPass(scene, camera));
+      const ssao = new SSAOPass(scene, camera, renderWidth, renderHeight);
+      // Furniture-scale contact shading: tight radius, gentle strength.
+      ssao.kernelRadius = 0.06;
+      ssao.minDistance = 0.0004;
+      ssao.maxDistance = 0.04;
+      composer.addPass(ssao);
+      composer.addPass(new OutputPass());
+      composer.render();
+      composer.dispose();
+    } else {
+      renderer.render(scene, camera);
+    }
 
     const output = document.createElement('canvas');
     output.width = width;
     output.height = height;
     const ctx = output.getContext('2d')!;
     ctx.drawImage(canvas, 0, 0, renderWidth, renderHeight, 0, 0, width, height);
+
+    if ((options.photoFinish ?? true) && !options.transparent) {
+      applyPhotoFinish(ctx, width, height);
+    }
 
     return await new Promise<Blob>((resolve, reject) => {
       output.toBlob(

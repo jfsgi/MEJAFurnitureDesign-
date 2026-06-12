@@ -37,18 +37,21 @@ export function createLightRig(preset: LightingPresetId): THREE.Group {
     // Offset sampling along the surface normal: kills the stair-stepped
     // shadow edges where rails shadow shallow recesses.
     key.shadow.normalBias = 0.01;
-    key.shadow.radius = 6;
+    key.shadow.radius = 10;
     group.add(key);
     return key;
   };
 
   switch (preset) {
     case 'studio': {
-      addKey(0xffffff, 2.1, new THREE.Vector3(2.5, 3.2, 2.2));
-      const fill = new THREE.DirectionalLight(0xdfe8ff, 0.7);
+      // Gentler key-to-fill ratio than a classic CG three-point: the
+      // environment carries more of the fill, like a softbox studio, and
+      // the key is slightly warm like real photo strobes through fabric.
+      addKey(0xfff3e2, 1.8, new THREE.Vector3(2.5, 3.2, 2.2));
+      const fill = new THREE.DirectionalLight(0xdfe8ff, 0.55);
       fill.position.set(-2.8, 1.6, 1.4);
       group.add(fill);
-      const rim = new THREE.DirectionalLight(0xffffff, 1.1);
+      const rim = new THREE.DirectionalLight(0xffffff, 0.9);
       rim.position.set(-1, 2.4, -2.6);
       group.add(rim);
       break;
