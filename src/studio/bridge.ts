@@ -4,8 +4,8 @@
 // then the root group converts to the engine's world (Y-up, meters).
 
 import * as THREE from 'three';
-import type { ProjectDoc } from '../core/types';
-import { evaluateInstance } from '../core/evaluate';
+import type { Primitive, ProjectDoc } from '../core/types';
+import { evaluateInstance, partBBox } from '../core/evaluate';
 import { MATERIAL_BY_ID } from '../core/materials';
 import {
   archedBoardGeometry,
@@ -42,6 +42,33 @@ export function engineMaterialFor(designMaterialId: string): string {
 /** Engine texture tile in model millimeters (2.4 m of wood per repeat). */
 const ENGINE_TILE_MM = 2400;
 
+/**
+ * The engine's single-board rule: parts narrower than this across the grain
+ * are one board — their across-grain texture offset snaps to a plank-safe
+ * position so the simulated glue lines never cross a face mid-board.
+ * Mirrors buildGroup in the engine's parametric/geometry.ts.
+ */
+const PLANK_SAFE_OFFSETS = [5 / 120, 55 / 120, 65 / 120, 115 / 120];
+const PLANK_FIT_MM = 165;
+
+/** Model-space grain axis of a primitive (for the across-grain extent). */
+function modelGrainAxis(prim: Primitive): 'x' | 'y' | 'z' {
+  switch (prim.shape) {
+    case 'box':
+      return prim.grain ?? AXIS[longestAxis(prim.size)];
+    case 'jointedBoard':
+      return prim.lengthAxis;
+    case 'taperedBox':
+      return prim.axis ?? 'z';
+    case 'archedBoard':
+      return prim.arch === 'bottom-y' ? 'y' : 'x';
+    case 'roundedSlab':
+      return prim.axis === 'y' ? 'z' : 'x';
+    default:
+      return 'z'; // cylinders stand vertical in model space
+  }
+}
+
 /** Builds the whole document as one engine-ready group (Y-up, meters). */
 export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): THREE.Group {
   const root = new THREE.Group();
@@ -64,6 +91,21 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
       // board, per-face end-grain shading baked into vertex colors, and a
       // stable per-part offset so neighboring boards vary.
       const offset = grainOffset(`${inst.id}/${part.id}`);
+      // Narrow parts are single boards: snap the across-grain offset to a
+      // plank-safe slot (seed-picked) so no glue line crosses the face.
+      let offsetU = offset[0];
+      const box = partBBox(part);
+      if (box && part.primitives.length > 0) {
+        const gi = { x: 0, y: 1, z: 2 }[modelGrainAxis(part.primitives[0])];
+        const ext = [0, 1, 2].map((i) => box.max[i] - box.min[i]);
+        const acrossMax = Math.max(...ext.filter((_, i) => i !== gi));
+        if (acrossMax <= PLANK_FIT_MM) {
+          offsetU =
+            PLANK_SAFE_OFFSETS[
+              Math.floor(offset[0] * PLANK_SAFE_OFFSETS.length) % PLANK_SAFE_OFFSETS.length
+            ];
+        }
+      }
       for (const prim of part.primitives) {
         let geometry: THREE.BufferGeometry;
         let grain: 'x' | 'y' | 'z' = 'x';
@@ -114,7 +156,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
           rotation.x = Math.PI / 2;
           grain = 'y'; // along the cylinder axis pre-rotation
         }
-        applyBoxUVs(geometry, ENGINE_TILE_MM, grain, offset[0], offset[1]);
+        applyBoxUVs(geometry, ENGINE_TILE_MM, grain, offsetU, offset[1]);
         const mesh = new THREE.Mesh(geometry, material);
         mesh.name = `${inst.name} · ${part.name}`;
         // Sheet-goods parts (a drawer's ply bottom, a ply back) keep their
