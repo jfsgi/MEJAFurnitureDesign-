@@ -85,6 +85,25 @@ export type Primitive =
       at: [number, number, number]; // center; axis along Z
     }
   | {
+      shape: 'jointedBoard';
+      /** Tails carry the toothed ends (sides); pins carry the complements. */
+      role: 'tails' | 'pins';
+      length: number;
+      /** Dimension along the joint pattern. */
+      height: number;
+      thickness: number;
+      at: [number, number, number];
+      lengthAxis: 'x' | 'y' | 'z';
+      thicknessAxis: 'x' | 'y' | 'z';
+      joint: 'dovetail' | 'box-joint';
+      /** Joint depth = mating board thickness. */
+      jointDepth: number;
+      /** Pins boards: which side of the thickness axis faces out. */
+      outerSign?: 1 | -1;
+      /** Pins boards: finger-pull scoop in the top edge. */
+      scoop?: { width: number; depth: number };
+    }
+  | {
       shape: 'archedBoard';
       size: [number, number, number];
       at: [number, number, number];

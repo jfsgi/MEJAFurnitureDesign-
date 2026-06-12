@@ -4,7 +4,6 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { cornerFingerPrims } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -60,67 +59,58 @@ export const drawerBox: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Sides vacate the corner columns for the rendered joint fingers.
-    const sideParts: Record<number, Part> = {};
+    // Engine joinery end to end: tails boards for the sides, pins boards for
+    // the front and back (the front optionally scooped for the pull).
+    const jointType = str(p, 'joinery') === 'dovetail' ? ('dovetail' as const) : ('box-joint' as const);
     for (const sx of [-1, 1]) {
-      const part: Part = {
+      parts.push({
         id: `side-${sx}`,
         name: `Side (${joinery})`,
         material: mat,
         primitives: [
-          { shape: 'box', size: [sideT, D - 2 * sideT, H], at: [sx * (W / 2 - sideT / 2), 0, H / 2] },
+          {
+            shape: 'jointedBoard',
+            role: 'tails',
+            length: D,
+            height: H,
+            thickness: sideT,
+            at: [sx * (W / 2 - sideT / 2), 0, H / 2],
+            lengthAxis: 'y',
+            thicknessAxis: 'x',
+            joint: jointType,
+            jointDepth: sideT,
+          },
         ],
         cut: { length: D, width: H, thickness: sideT },
-      };
-      sideParts[sx] = part;
-      parts.push(part);
+      });
     }
-    const endParts: Record<number, Part> = {};
-    for (const sy of [-1, 1]) {
+    for (const sy of [-1, 1] as const) {
       const isFront = sy > 0;
-      const y = sy * (D / 2 - sideT / 2);
-      const part: Part = {
+      const scooped = isFront && (p['pull'] as boolean);
+      parts.push({
         id: isFront ? 'front' : 'back',
         name: isFront ? `Front (${joinery})` : `Back (${joinery})`,
         material: mat,
-        primitives: [],
-        cut: { length: endW, width: H, thickness: sideT },
-      };
-      if (isFront && (p['pull'] as boolean)) {
-        // Smooth shaper-cutter scoop from the top edge; the cut entry stays the
-        // full board — the pull is machined out of it.
-        const pullW = Math.min(inch(4.5), endW * 0.4);
-        const pullD = Math.min(inch(1.125), H * 0.4);
-        part.primitives.push({
-          shape: 'archedBoard',
-          size: [endW, sideT, H],
-          at: [0, y, H / 2],
-          arch: 'scoop',
-          rise: pullD,
-          shoulder: (endW - pullW) / 2,
-        });
-      } else {
-        part.primitives.push({ shape: 'box', size: [endW, sideT, H], at: [0, y, H / 2] });
-      }
-      endParts[sy] = part;
-      parts.push(part);
-    }
-
-    // Visible corner joints, matching the joinery choice.
-    for (const sx of [-1, 1]) {
-      for (const sy of [-1, 1] as const) {
-        const { tails, pins } = cornerFingerPrims({
-          x: sx * (W / 2 - sideT / 2),
-          outerSign: sy,
-          yCenter: sy * (D / 2 - sideT / 2),
-          bottomZ: 0,
-          boxH: H,
-          sideT,
-          joinery: str(p, 'joinery') === 'dovetail' ? 'dovetail' : 'box-joint',
-        });
-        sideParts[sx].primitives.push(...tails);
-        endParts[sy].primitives.push(...pins);
-      }
+        primitives: [
+          {
+            shape: 'jointedBoard',
+            role: 'pins',
+            length: W,
+            height: H,
+            thickness: sideT,
+            at: [0, sy * (D / 2 - sideT / 2), H / 2],
+            lengthAxis: 'x',
+            thicknessAxis: 'y',
+            outerSign: sy,
+            joint: jointType,
+            jointDepth: sideT,
+            scoop: scooped
+              ? { width: Math.min(inch(4.5), endW * 0.4), depth: Math.min(inch(1.125), H * 0.4) }
+              : undefined,
+          },
+        ],
+        cut: { length: W, width: H, thickness: sideT },
+      });
     }
 
     parts.push({

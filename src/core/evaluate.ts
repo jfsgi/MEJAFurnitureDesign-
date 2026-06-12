@@ -131,6 +131,15 @@ function primCorners(prim: Primitive): [number, number, number][] {
     for (const x of wx)
       for (const y of wy) for (const z of wz) corners.push([cx + x, cy + y, cz + z]);
     return corners;
+  } else if (prim.shape === 'jointedBoard') {
+    const size = { x: 0, y: 0, z: 0 };
+    size[prim.lengthAxis] = prim.length;
+    size[prim.thicknessAxis] = prim.thickness;
+    const rest = (['x', 'y', 'z'] as const).find(
+      (a) => a !== prim.lengthAxis && a !== prim.thicknessAxis,
+    )!;
+    size[rest] = prim.height;
+    [hx, hy, hz] = [size.x / 2, size.y / 2, size.z / 2];
   } else if (prim.shape === 'archedBoard') {
     // Stock extents; a front bulge reaches past +Y by its rise, an angled end
     // trim past the +length face by its skew.

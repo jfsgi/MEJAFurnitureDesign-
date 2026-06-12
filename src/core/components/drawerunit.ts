@@ -6,10 +6,67 @@
 // (1/16" typical); stacked fronts are spaced by that same reveal. The back panel
 // insets 1/4" from the rear of the box.
 
-import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
+import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part, Primitive } from '../types';
 import { formatLength, inch } from '../units';
-import { caseCornerFingers, drawerBoxParts, type CaseJoinery } from './drawerparts';
+import { drawerBoxParts } from './drawerparts';
 import { slideFitWarning } from './drawerbox';
+
+/** Case boards with engine-rendered corner joinery (see drawerparts/jointBoards). */
+export function caseBoardPrims(opts: {
+  W: number;
+  D: number;
+  H: number;
+  t: number;
+  joinery: string;
+}): { side: (sx: number) => Primitive; cap: (top: boolean) => Primitive[] } {
+  const { W, D, H, t, joinery } = opts;
+  const jointed = joinery !== 'butt';
+  const joint = joinery === 'box-joint' ? ('box-joint' as const) : ('dovetail' as const);
+  const halfBlind = joinery === 'half-blind-dovetail';
+  const lap = halfBlind ? t / 3 : 0;
+  const bandH = t - lap;
+  return {
+    side: (sx) =>
+      jointed
+        ? {
+            shape: 'jointedBoard',
+            role: 'tails',
+            length: H - 2 * lap,
+            height: D,
+            thickness: t,
+            at: [sx * (W / 2 - t / 2), 0, H / 2],
+            lengthAxis: 'z',
+            thicknessAxis: 'x',
+            joint,
+            jointDepth: bandH,
+          }
+        : { shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] },
+    cap: (top) => {
+      const z = top ? H - t / 2 : t / 2;
+      if (!jointed) return [{ shape: 'box', size: [W - 2 * t, D, t], at: [0, 0, z] }];
+      const prims: Primitive[] = [
+        {
+          shape: 'jointedBoard',
+          role: 'pins',
+          length: W,
+          height: D,
+          thickness: bandH,
+          at: [0, 0, top ? H - t + bandH / 2 : t - bandH / 2],
+          lengthAxis: 'x',
+          thicknessAxis: 'z',
+          outerSign: top ? 1 : -1,
+          joint,
+          jointDepth: bandH,
+        },
+      ];
+      if (lap > 0) {
+        // Half-blind: the cap's lap covers the joint from the cap face.
+        prims.push({ shape: 'box', size: [W, D, lap], at: [0, 0, top ? H - lap / 2 : lap / 2] });
+      }
+      return prims;
+    },
+  };
+}
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -93,57 +150,31 @@ export const drawerUnit: ComponentDef = {
         : visibleJoint
           ? innerW + 2 * t
           : innerW;
-    // Visible joints: the sides span between the caps and the corner fingers fill
-    // the edge bands; hidden joints keep full-height sides with clean faces.
-    const sideParts: Record<number, Part> = {};
+    void visibleJoint;
+    const caseBoards = caseBoardPrims({ W, D, H, t, joinery: caseJoinery });
     for (const sx of [-1, 1]) {
-      const part: Part = {
+      parts.push({
         id: `side-${sx}`,
         name: `Side${jointTag}`,
         material: mat,
-        primitives: [
-          visibleJoint
-            ? { shape: 'box', size: [t, D, H - 2 * t], at: [sx * (W / 2 - t / 2), 0, H / 2] }
-            : { shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] },
-        ],
+        primitives: [caseBoards.side(sx)],
         cut: { length: H, width: D, thickness: t },
-      };
-      sideParts[sx] = part;
-      parts.push(part);
+      });
     }
-    const bottomPart: Part = {
+    parts.push({
       id: 'bottom',
       name: `Bottom${jointTag}`,
       material: mat,
-      primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, t / 2] }],
+      primitives: caseBoards.cap(false),
       cut: { length: capLen, width: D, thickness: t },
-    };
-    parts.push(bottomPart);
-    const topPart: Part = {
+    });
+    parts.push({
       id: 'top',
       name: `Top${jointTag}`,
       material: mat,
-      primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, H - t / 2] }],
+      primitives: caseBoards.cap(true),
       cut: { length: capLen, width: D, thickness: t },
-    };
-    parts.push(topPart);
-    if (visibleJoint) {
-      for (const sx of [-1, 1] as const) {
-        for (const zEdge of ['top', 'bottom'] as const) {
-          const { sideFingers, capFingers } = caseCornerFingers({
-            zEdge,
-            sx,
-            W,
-            D,
-            H,
-            t,
-            style: caseJoinery as CaseJoinery,
-          });
-          sideParts[sx].primitives.push(...sideFingers);
-          (zEdge === 'top' ? topPart : bottomPart).primitives.push(...capFingers);
-        }
-      }
-    }
+    });
     // Back panel, inset from the rear of the box per the shop standard.
     parts.push({
       id: 'back',

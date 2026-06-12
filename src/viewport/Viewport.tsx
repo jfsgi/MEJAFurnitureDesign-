@@ -15,7 +15,9 @@ import { docBBox, evaluateInstance, instanceBBox, modelBBox, type BBox } from '.
 import { inch, snapMM } from '../core/units';
 import { useStore } from '../core/store';
 import { archedBoardGeometry, grainBoxGeometry, longestAxis, taperedBoxGeometry } from './geometry';
-import { getWoodTexture, grainOffset } from './woodTexture';
+import { GRAIN_MM_U, getWoodTexture, grainOffset } from './woodTexture';
+import { jointedBoardGeometry } from './jointBoards';
+import { applyBoxUVs } from '../studio/engine/materials/uv';
 import { viewport, type ViewName } from './viewportApi';
 import { FrameIcon, FrameSelectionIcon, MinusIcon, PlusIcon, ZoomWindowIcon } from '../ui/icons';
 
@@ -47,13 +49,21 @@ function PrimitiveMesh({
   seed: string;
   partId: string;
 }) {
-  const grainTex = mat.grain ? getWoodTexture(mat.id, prim.shape === 'cylinder') : null;
+  // Cylinders and engine-jointed boards carry grain along V — rotated texture.
+  const rotatedGrain = prim.shape === 'cylinder' || prim.shape === 'jointedBoard';
+  const grainTex = mat.grain ? getWoodTexture(mat.id, rotatedGrain) : null;
 
   const geo = useMemo(() => {
     // The offset is per part and UVs are computed in part space (uvOrigin), so the
     // grain runs solid across every board of a part instead of cutting at
     // primitive seams (a leg's shoulder and taper read as one piece of wood).
     const offset = grainOffset(seed);
+    if (prim.shape === 'jointedBoard') {
+      // Engine joinery geometry, with the engine's box UVs (grain along V).
+      const geo = jointedBoardGeometry(prim);
+      applyBoxUVs(geo, GRAIN_MM_U, prim.lengthAxis, offset[0], offset[1]);
+      return geo;
+    }
     if (prim.shape === 'taperedBox') {
       return taperedBoxGeometry(
         prim.top,

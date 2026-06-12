@@ -6,15 +6,13 @@
 import * as THREE from 'three';
 import type { ProjectDoc } from '../core/types';
 import { evaluateInstance } from '../core/evaluate';
-import {
-  archedBoardGeometry,
-  grainBoxGeometry,
-  longestAxis,
-  taperedBoxGeometry,
-} from '../viewport/geometry';
-import { GRAIN_MM_U, GRAIN_MM_V, grainOffset } from '../viewport/woodTexture';
+import { archedBoardGeometry, longestAxis, taperedBoxGeometry } from '../viewport/geometry';
+import { jointedBoardGeometry } from '../viewport/jointBoards';
+import { grainOffset } from '../viewport/woodTexture';
 import { applyBoxUVs } from './engine/materials/uv';
 import type { MaterialLibrary } from './engine/materials/MaterialLibrary';
+
+const AXIS = ['x', 'y', 'z'] as const;
 
 /** Atelier3D material id → 4K engine material id. */
 export const ENGINE_MATERIAL_MAP: Record<string, string> = {
@@ -38,23 +36,6 @@ export function engineMaterialFor(designMaterialId: string): string {
 /** Engine texture tile in model millimeters (2.4 m of wood per repeat). */
 const ENGINE_TILE_MM = 2400;
 
-/**
- * Converts the design builders' grain UVs (grain along U at 1200 mm, 300 mm
- * across) into the engine's convention: grain along V, square tile, so a board
- * samples one plank of the texture lengthwise instead of marching across the
- * panel's plank joints (the "spliced" look), with figure running the board.
- */
-function toEngineUVs(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
-  const uv = geometry.getAttribute('uv');
-  for (let i = 0; i < uv.count; i++) {
-    const along = uv.getX(i) * GRAIN_MM_U; // back to millimeters along the grain
-    const across = uv.getY(i) * GRAIN_MM_V;
-    uv.setXY(i, across / ENGINE_TILE_MM, along / ENGINE_TILE_MM);
-  }
-  uv.needsUpdate = true;
-  return geometry;
-}
-
 /** Builds the whole document as one engine-ready group (Y-up, meters). */
 export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): THREE.Group {
   const root = new THREE.Group();
@@ -72,16 +53,22 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
 
     for (const part of model.parts) {
       const material = materials.get(engineMaterialFor(part.material));
-      // Same grain system as the design viewport: anisotropic UVs aligned to each
-      // board's grain, a stable random offset per part, and part-space origins so
-      // grain runs solid across a part's boards instead of cutting at seams.
+      // The engine's own pipeline end to end: its joinery geometry where parts
+      // are jointed, and its box UV projection everywhere — grain along each
+      // board, per-face end-grain shading baked into vertex colors, and a
+      // stable per-part offset so neighboring boards vary.
       const offset = grainOffset(`${inst.id}/${part.id}`);
       for (const prim of part.primitives) {
         let geometry: THREE.BufferGeometry;
+        let grain: 'x' | 'y' | 'z' = 'x';
         const rotation = new THREE.Euler();
         if (prim.shape === 'box') {
-          geometry = grainBoxGeometry(prim.size, longestAxis(prim.size), offset, prim.at);
+          geometry = new THREE.BoxGeometry(...prim.size);
+          grain = AXIS[longestAxis(prim.size)];
           rotation.set(prim.tiltX ?? 0, prim.tilt ?? 0, 0);
+        } else if (prim.shape === 'jointedBoard') {
+          geometry = jointedBoardGeometry(prim);
+          grain = prim.lengthAxis;
         } else if (prim.shape === 'taperedBox') {
           geometry = taperedBoxGeometry(
             prim.top,
@@ -89,10 +76,8 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.height,
             prim.align,
             prim.shift ?? [0, 0],
-            offset,
-            prim.at,
-            prim.axis ?? 'z',
           );
+          grain = prim.axis ?? 'z';
         } else if (prim.shape === 'archedBoard') {
           geometry = archedBoardGeometry(
             prim.size,
@@ -100,8 +85,8 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.rise,
             prim.shoulder ?? 0,
             prim.endSkew ?? 0,
-            offset,
           );
+          grain = prim.arch === 'bottom-y' ? 'y' : 'x';
         } else {
           geometry = new THREE.CylinderGeometry(
             prim.radiusTop,
@@ -110,23 +95,9 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             48,
           );
           rotation.x = Math.PI / 2;
-          // Grain along the cylinder axis (pre-rotation Y).
-          applyBoxUVs(geometry, GRAIN_MM_U, 'y', offset[0], offset[1]);
+          grain = 'y'; // along the cylinder axis pre-rotation
         }
-        if (prim.shape !== 'cylinder') toEngineUVs(geometry);
-        // Engine materials run with vertexColors (applyBoxUVs bakes AO there);
-        // our grain-mapped geometries must carry a white color attribute or
-        // they render black. Joint fingers of the mating board shade darker,
-        // the way end grain reads against face grain.
-        if (!geometry.getAttribute('color')) {
-          const count = geometry.getAttribute('position').count;
-          const shade =
-            (prim.shape === 'box' || prim.shape === 'taperedBox') && prim.endGrain ? 0.85 : 1;
-          geometry.setAttribute(
-            'color',
-            new THREE.BufferAttribute(new Float32Array(count * 3).fill(shade), 3),
-          );
-        }
+        applyBoxUVs(geometry, ENGINE_TILE_MM, grain, offset[0], offset[1]);
         const mesh = new THREE.Mesh(geometry, material);
         mesh.name = `${inst.name} · ${part.name}`;
         mesh.position.set(...prim.at);

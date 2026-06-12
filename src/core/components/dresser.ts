@@ -4,7 +4,8 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { caseCornerFingers, drawerBoxParts, type CaseJoinery } from './drawerparts';
+import { drawerBoxParts } from './drawerparts';
+import { caseBoardPrims } from './drawerunit';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -77,55 +78,31 @@ export const dresser: ComponentDef = {
         : jointed
           ? innerW + 2 * t
           : innerW;
-    const sideParts: Record<number, Part> = {};
+    void jointed;
+    const caseBoards = caseBoardPrims({ W, D, H, t, joinery: caseJoinery });
     for (const sx of [-1, 1]) {
-      const part: Part = {
+      parts.push({
         id: `side-${sx}`,
         name: `Side${jointTag}`,
         material: mat,
-        primitives: [
-          jointed
-            ? { shape: 'box', size: [t, D, H - 2 * t], at: [sx * (W / 2 - t / 2), 0, H / 2] }
-            : { shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] },
-        ],
+        primitives: [caseBoards.side(sx)],
         cut: { length: H, width: D, thickness: t },
-      };
-      sideParts[sx] = part;
-      parts.push(part);
+      });
     }
-    const bottomPart: Part = {
+    parts.push({
       id: 'bottom',
       name: `Bottom${jointTag}`,
       material: mat,
-      primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, t / 2] }],
+      primitives: caseBoards.cap(false),
       cut: { length: capLen, width: D, thickness: t },
-    };
-    parts.push(bottomPart);
-    const topPart: Part = {
+    });
+    parts.push({
       id: 'top',
       name: `Top${jointTag}`,
       material: mat,
-      primitives: [{ shape: 'box', size: [innerW, D, t], at: [0, 0, H - t / 2] }],
+      primitives: caseBoards.cap(true),
       cut: { length: capLen, width: D, thickness: t },
-    };
-    parts.push(topPart);
-    if (jointed) {
-      for (const sx of [-1, 1] as const) {
-        for (const zEdge of ['top', 'bottom'] as const) {
-          const { sideFingers, capFingers } = caseCornerFingers({
-            zEdge,
-            sx,
-            W,
-            D,
-            H,
-            t,
-            style: caseJoinery as CaseJoinery,
-          });
-          sideParts[sx].primitives.push(...sideFingers);
-          (zEdge === 'top' ? topPart : bottomPart).primitives.push(...capFingers);
-        }
-      }
-    }
+    });
     parts.push({
       id: 'back',
       name: 'Back panel',
