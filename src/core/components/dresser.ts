@@ -73,11 +73,9 @@ export const dresser: ComponentDef = {
         : caseJoinery === 'box-joint'
           ? ' (box joint)'
           : '';
-    const capLen = halfBlindCase
-      ? innerW + 2 * (t - HALF_BLIND_LIP)
-      : jointed
-        ? innerW + 2 * t
-        : innerW;
+    // Jointed caps run the full case width (half-blind laps reach the outer
+    // faces); butt caps fit between the sides.
+    const capLen = jointed ? W : innerW;
     const sideLen = halfBlindCase ? H - 2 * HALF_BLIND_LIP : H;
     const caseBoards = caseBoardPrims({ W, D, H, t, joinery: caseJoinery });
     for (const sx of [-1, 1]) {

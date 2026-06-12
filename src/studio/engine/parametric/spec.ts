@@ -135,6 +135,8 @@ export interface DrawerFrontSpec {
   edgeProfile?: EdgeProfile;
   outerEdgeProfile?: EdgeProfile;
   frameJoint?: FrameJoint;
+  /** Finger-pull channel routed along the top edge (slab fronts) — handle-less. */
+  fingerPull?: boolean;
 }
 
 /** A bank of drawers: carcass, drawer boxes on slides, overlay fronts. */
@@ -145,6 +147,17 @@ export interface DrawerUnitSpec {
   heightMm: number;
   depthMm: number;
   drawerCount: number;
+  /**
+   * Side-by-side drawer banks separated by full-height column dividers.
+   */
+  columnCount?: number;
+  /**
+   * Column divider treatment (inset fronts): 'setback' (default) drops the
+   * divider back a front thickness and the fronts extend across it, gapped
+   * one reveal; 'flush' keeps the divider face flush with the front edge,
+   * fronts inset within each column with full reveals.
+   */
+  columnDivider?: 'setback' | 'flush';
   /** Carcass stock. */
   stockThicknessMm: number;
   /** Drawer box stock. */
@@ -158,6 +171,30 @@ export interface DrawerUnitSpec {
   /** Overlay fronts (default) or inset fronts flush in the openings. */
   frontMount?: FrontMount;
   frameJoint?: FrameJoint;
+  /** Finger-pull channel routed along each front's top edge (slab fronts). */
+  fingerPull?: boolean;
+  /**
+   * Carcass corners: through dovetails (default) or half-blind — laps on
+   * the top and bottom faces, the side pattern stopping 1/16" short.
+   */
+  caseJoinery?: 'dovetail' | 'halfblind';
+  /**
+   * 45° bevel on the inside front edges of the case opening and around
+   * each front's face (inset slab fronts). The fronts set back by the
+   * bevel depth. 0 or undefined = square edges.
+   */
+  insideBevelMm?: number;
+  /**
+   * Horizontal divider rails between drawer openings (inset fronts).
+   * Off by default — drawers separate by reveals only.
+   */
+  dividerRails?: boolean;
+  /** Pull a drawer open: row from the bottom (1-based), 0/undefined = closed. */
+  openDrawer?: number;
+  /** Column of the open drawer (1-based, default 1). */
+  openColumn?: number;
+  /** How far the open drawer extends (default 60% of the box depth). */
+  openAmountMm?: number;
 }
 
 export type FurnitureSpec =
@@ -260,6 +297,12 @@ export function defaultDrawerUnitSpec(): DrawerUnitSpec {
     heightMm: 750,
     depthMm: 500,
     drawerCount: 3,
+    columnCount: 1,
+    insideBevelMm: 0,
+    dividerRails: false,
+    openDrawer: 0,
+    openColumn: 1,
+    openAmountMm: 300,
     stockThicknessMm: 18,
     boxStockThicknessMm: 13,
     frontStyle: 'shaker',
@@ -364,6 +407,9 @@ export function validateSpec(spec: FurnitureSpec): void {
         if (2 * spec.railStileWidthMm + 50 > spec.widthMm || 2 * spec.railStileWidthMm + 50 > spec.heightMm) {
           throw new Error(`${spec.kind}: railStileWidthMm too wide — no room for the center panel`);
         }
+        if (spec.kind === 'drawerfront' && spec.fingerPull) {
+          throw new Error(`${spec.kind}: fingerPull is routed into slab fronts — set style to "slab"`);
+        }
         if (spec.style === 'raised') {
           const raiseWidth = spec.raiseWidthMm ?? 38;
           const opening = Math.min(
@@ -392,6 +438,34 @@ export function validateSpec(spec: FurnitureSpec): void {
       }
       if (spec.widthMm <= 2 * spec.stockThicknessMm + 2 * 13 + 50) {
         throw new Error('drawerunit: widthMm too small for slides and drawer boxes');
+      }
+      if (spec.fingerPull && spec.frontStyle !== 'slab') {
+        throw new Error('drawerunit: fingerPull is routed into slab fronts — set frontStyle to "slab"');
+      }
+      const cols = spec.columnCount ?? 1;
+      if (!Number.isInteger(cols) || cols < 1 || cols > 4) {
+        throw new Error('drawerunit: columnCount must be an integer between 1 and 4');
+      }
+      const colWidth = (spec.widthMm - 2 * spec.stockThicknessMm - (cols - 1) * spec.stockThicknessMm) / cols;
+      if (colWidth <= 2 * 13 + 50) {
+        throw new Error('drawerunit: too many columns for the width — drawer boxes need room for slides');
+      }
+      if (spec.insideBevelMm) {
+        if (spec.insideBevelMm < 0 || spec.insideBevelMm > 8) {
+          throw new Error('drawerunit: insideBevelMm must be between 0 and 8');
+        }
+        if (spec.frontMount !== 'inset') {
+          throw new Error('drawerunit: insideBevelMm is an inset-front detail — set frontMount to "inset"');
+        }
+      }
+      if (spec.openDrawer) {
+        if (!Number.isInteger(spec.openDrawer) || spec.openDrawer < 0 || spec.openDrawer > spec.drawerCount) {
+          throw new Error('drawerunit: openDrawer must be a row number between 0 (closed) and drawerCount');
+        }
+        const openCol = spec.openColumn ?? 1;
+        if (!Number.isInteger(openCol) || openCol < 1 || openCol > cols) {
+          throw new Error('drawerunit: openColumn must be between 1 and columnCount');
+        }
       }
       break;
     }

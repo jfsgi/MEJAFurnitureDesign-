@@ -1,9 +1,15 @@
 import * as THREE from 'three';
 import { applyBoxUVs } from '../materials/uv.js';
 import type { FurnitureLayout, Part } from './layout.js';
-import { pinsBoardGeometry, scoopedBoardGeometry, tailsBoardGeometry } from './joinery.js';
+import {
+  caseSideTailsGeometry,
+  pinsBoardGeometry,
+  scoopedBoardGeometry,
+  tailsBoardGeometry,
+} from './joinery.js';
 import { profiledBoardGeometry } from './profiledBoard.js';
 import { raisedPanelGeometry } from './raisedPanel.js';
+import { fingerPullFrontGeometry } from './fingerPull.js';
 
 const MM_TO_M = 0.001;
 
@@ -93,15 +99,21 @@ function edgeProfiledGeometry(
   sz: number,
   edge: NonNullable<Part['edgeProfile']>,
 ): THREE.BufferGeometry | null {
+  // Catalog-scale cuts: Freeborn pattern and door-edge cutters detail a
+  // band ~7/16" wide. Matching the inner band to the 10mm groove depth
+  // also keeps a coped rail's visible body exactly at its cut length.
   const depth = Math.min(0.005, sz * 0.35);
-  const outerWidth = 0.008;
-  const innerWidth = 0.006;
+  const outerWidth = 0.011;
+  const innerWidth = 0.01;
 
   if (edge.axis === 'slab') {
     if (!edge.outer) return null;
+    // An exact 45° bevel uses its own band width and depth.
+    const bw = edge.bevelMm ? edge.bevelMm * MM_TO_M : outerWidth;
+    const bd = edge.bevelMm ? Math.min(edge.bevelMm * MM_TO_M, sz * 0.45) : depth;
     return profiledBoardGeometry(sx, sy, sz, {
-      depth,
-      outer: { profile: edge.outer, width: outerWidth, uMin: true, uMax: true, vMin: true, vMax: true },
+      depth: bd,
+      outer: { profile: edge.outer, width: bw, uMin: true, uMax: true, vMin: true, vMax: true },
     });
   }
 
@@ -143,7 +155,9 @@ function edgeProfiledGeometry(
     outer: edge.outer
       ? {
           profile: edge.outer,
-          width: outerWidth,
+          // Exact 45° opening bevels override the standard band size.
+          width: edge.bevelMm ? edge.bevelMm * MM_TO_M : outerWidth,
+          depth: edge.bevelMm ? Math.min(edge.bevelMm * MM_TO_M, sz * 0.45) : undefined,
           // Door-edge detail wraps the board ends on stiles so it runs
           // continuously around the assembled door.
           uMin: alongY,
@@ -157,8 +171,81 @@ function edgeProfiledGeometry(
   return geometry;
 }
 
+/**
+ * Plain box with 45° chamfers between the front (+z) face and the listed
+ * side faces — beveled opening edges on rails and dividers. All listed
+ * sides must share an axis (x± or y±).
+ */
+function chamferedFrontPrism(
+  w: number,
+  h: number,
+  d: number,
+  bevel: number,
+  sides: Array<'x+' | 'x-' | 'y+' | 'y-'>,
+): THREE.BufferGeometry {
+  const alongY = sides[0].startsWith('x');
+  if (alongY) {
+    // Cross-section in (x, z), extruded along y.
+    const pts: THREE.Vector2[] = [new THREE.Vector2(-w / 2, -d / 2), new THREE.Vector2(w / 2, -d / 2)];
+    if (sides.includes('x+')) {
+      pts.push(new THREE.Vector2(w / 2, d / 2 - bevel), new THREE.Vector2(w / 2 - bevel, d / 2));
+    } else {
+      pts.push(new THREE.Vector2(w / 2, d / 2));
+    }
+    if (sides.includes('x-')) {
+      pts.push(new THREE.Vector2(-w / 2 + bevel, d / 2), new THREE.Vector2(-w / 2, d / 2 - bevel));
+    } else {
+      pts.push(new THREE.Vector2(-w / 2, d / 2));
+    }
+    const geometry = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+      depth: h,
+      bevelEnabled: false,
+    });
+    geometry.translate(0, 0, -h / 2);
+    geometry.rotateX(Math.PI / 2);
+    return geometry;
+  }
+  // Cross-section in (−z, y), extruded along x (the pins-prism convention).
+  const pts: THREE.Vector2[] = [new THREE.Vector2(d / 2, -h / 2), new THREE.Vector2(d / 2, h / 2)];
+  if (sides.includes('y+')) {
+    pts.push(new THREE.Vector2(-d / 2 + bevel, h / 2), new THREE.Vector2(-d / 2, h / 2 - bevel));
+  } else {
+    pts.push(new THREE.Vector2(-d / 2, h / 2));
+  }
+  if (sides.includes('y-')) {
+    pts.push(new THREE.Vector2(-d / 2, -h / 2 + bevel), new THREE.Vector2(-d / 2 + bevel, -h / 2));
+  } else {
+    pts.push(new THREE.Vector2(-d / 2, -h / 2));
+  }
+  const geometry = new THREE.ExtrudeGeometry(new THREE.Shape(pts), {
+    depth: w,
+    bevelEnabled: false,
+  });
+  geometry.rotateY(Math.PI / 2);
+  geometry.translate(-w / 2, 0, 0);
+  return geometry;
+}
+
 function partGeometry(part: Part): THREE.BufferGeometry {
   const [w, h, d] = part.sizeMm.map((v) => v * MM_TO_M) as [number, number, number];
+  if (part.fingerPullTop && part.shape === 'box') {
+    return fingerPullFrontGeometry(
+      w,
+      h,
+      d,
+      part.edgeProfile?.outer,
+      part.edgeProfile?.bevelMm ? part.edgeProfile.bevelMm * MM_TO_M : undefined,
+    );
+  }
+  if (part.frontBevel && part.shape === 'box') {
+    return chamferedFrontPrism(
+      w,
+      h,
+      d,
+      part.frontBevel.bevelMm * MM_TO_M,
+      part.frontBevel.sides,
+    );
+  }
   if (part.raisedPanel && part.shape === 'box') {
     return raisedPanelGeometry(
       w,
@@ -174,10 +261,68 @@ function partGeometry(part: Part): THREE.BufferGeometry {
     : undefined;
   if (part.joinery && part.shape === 'box') {
     const joint = { type: part.joinery.type, depth: part.joinery.matingThicknessMm * MM_TO_M };
+    if (part.joinery.orient === 'case') {
+      // Carcass framing: a side panel toothed at its top/bottom ends
+      // (tails run along y), or a top/bottom panel with pins at its ends
+      // (along x). Pattern runs along the depth. Built in the drawer-box
+      // frame, then rotated about x so the box's z-pattern lands on world
+      // z and the board length lands on its world axis.
+      const caseBevel = (part.joinery.frontBevelMm ?? 0) * MM_TO_M;
+      if (part.joinery.role === 'tails') {
+        // Half-blind case corners lap at BOTH ends of the side.
+        const lapped = part.joinery.frontLipMm
+          ? joint.depth - part.joinery.frontLipMm * MM_TO_M
+          : undefined;
+        const jointed = caseBevel
+          ? caseSideTailsGeometry(
+              w,
+              d,
+              h,
+              joint,
+              caseBevel,
+              // Builder extrusion sign of the inner face: world x = −extrude.
+              (-(part.joinery.bevelInnerSign ?? 1)) as 1 | -1,
+            )
+          : tailsBoardGeometry(w, d, h, joint, lapped, lapped);
+        if (jointed) {
+          jointed.rotateX(-Math.PI / 2);
+          return jointed;
+        }
+      } else {
+        const jointed = pinsBoardGeometry(
+          w,
+          d,
+          h,
+          joint,
+          part.joinery.pinsOuterSign ?? 1,
+          undefined,
+          (part.joinery.lipMm ?? 0) * MM_TO_M,
+          caseBevel,
+        );
+        if (jointed) {
+          jointed.rotateX(-Math.PI / 2);
+          return jointed;
+        }
+      }
+    }
     const jointed =
       part.joinery.role === 'tails'
-        ? tailsBoardGeometry(w, h, d, joint)
-        : pinsBoardGeometry(w, h, d, joint, part.joinery.pinsOuterSign ?? 1, scoop);
+        ? tailsBoardGeometry(
+            w,
+            h,
+            d,
+            joint,
+            part.joinery.frontLipMm ? joint.depth - part.joinery.frontLipMm * MM_TO_M : undefined,
+          )
+        : pinsBoardGeometry(
+            w,
+            h,
+            d,
+            joint,
+            part.joinery.pinsOuterSign ?? 1,
+            scoop,
+            (part.joinery.lipMm ?? 0) * MM_TO_M,
+          );
     if (jointed) return jointed;
   }
   if (scoop && part.shape === 'box') {

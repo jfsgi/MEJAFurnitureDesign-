@@ -1,7 +1,7 @@
 # Vendored: @4kgraphics/engine
 
-Source: `jfsgi/4kGraphics` `packages/engine/src` at `6354102` (v0.5.9,
-"shop-true raise cross-sections with quirk shoulders and beads").
+Source: `jfsgi/4kGraphics` `packages/engine/src` at `13601b9` (v0.9.3,
+"opening bevel stays on the case and connects at the corners").
 
 The engine is not published to a registry, so its source is vendored here for
 the Studio workspace. Local modifications, all marked "Atelier3D extension":

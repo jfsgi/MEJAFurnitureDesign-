@@ -91,6 +91,8 @@ function buildCutList(layout: FurnitureLayout): CutListItem[] {
         thicknessIn: formatInches(dims[2]),
         notes: part.role === 'glass'
           ? 'Glass — order tempered from supplier'
+          : part.fingerPullTop
+            ? `Finger-pull channel routed along the top edge (Freeborn 57-024 style)${part.edgeProfile?.outer ? `; ${part.edgeProfile.outer} door-edge detail, sides and bottom` : ''}`
           : part.scoop
             ? `Finger scoop ${Math.round(part.scoop.widthMm)} × ${Math.round(part.scoop.depthMm)}mm in top edge`
             : part.raisedPanel
@@ -218,13 +220,12 @@ function hardwareFor(layout: FurnitureLayout): HardwareItem[] {
           spec.slideType === 'undermount'
             ? 'Undermount soft-close slides (pair per drawer)'
             : 'Full-extension side-mount slides (pair per drawer)',
-        quantity: spec.drawerCount,
+        quantity: spec.drawerCount * (spec.columnCount ?? 1),
       });
-      items.push({ item: '8mm × 40mm dowels or confirmat screws (carcass)', quantity: 16 });
       items.push({ item: '16mm panel nails or staples (back panel)', quantity: 24 });
-      items.push({ item: '4 × 30mm screws (front adjustment, 4 per drawer)', quantity: spec.drawerCount * 4 });
+      items.push({ item: '4 × 30mm screws (front adjustment, 4 per drawer)', quantity: spec.drawerCount * (spec.columnCount ?? 1) * 4 });
       if (spec.frontStyle !== 'slab') {
-        items.push({ item: 'Panel spacers (space balls)', quantity: spec.drawerCount * 8 });
+        items.push({ item: 'Panel spacers (space balls)', quantity: spec.drawerCount * (spec.columnCount ?? 1) * 8 });
       }
       items.push({ item: 'Wood glue (250ml)', quantity: 1 });
       break;
@@ -288,7 +289,7 @@ function toolsFor(layout: FurnitureLayout): string[] {
   }
   if (spec.kind === 'drawerunit') {
     tools.push('Drawer-slide mounting jig');
-    tools.push('Dovetail or box-joint jig (drawer boxes)');
+    tools.push('Dovetail jig with router (carcass and drawer boxes)');
     if (spec.frontStyle !== 'slab') {
       tools.push('Router table with rail-and-stile bits (fronts)');
     }
@@ -416,7 +417,7 @@ function stepsFor(layout: FurnitureLayout): BuildStep[] {
             j === 'dovetail'
               ? 'Rout through dovetails on all four corners with the jig; test-fit a corner in scrap first and dial in the bit depth until the joint closes hand-tight.'
               : j === 'halfblind'
-                ? 'Rout half-blind dovetails with the jig — tails in the sides, sockets stopped 6mm shy of the front face so the show face stays clean. Test-fit in scrap first.'
+                ? 'Rout half-blind dovetails with the jig — tails in the sides, blind sockets stopped 1/16" shy of the front face so the show face stays clean. The back corners are through-dovetailed. Test-fit in scrap first.'
                 : j === 'boxjoint'
                   ? 'Cut box joints on all four corners at the table saw with the jig. The fit should need light mallet taps — too tight will split when glue swells the fingers.'
                   : 'Cut a dado in each side to receive the front and back, sized for a snug push fit.',
@@ -515,11 +516,13 @@ function stepsFor(layout: FurnitureLayout): BuildStep[] {
         {
           title: 'Assemble the carcass',
           detail:
-            'Join the top and bottom panels between the sides with glue and dowels, square against the back panel, and fasten the back.',
+            spec.caseJoinery === 'halfblind'
+              ? 'Dovetail the carcass together — tails on the sides, half-blind pins on the full-width top and bottom with 1/16" laps so the top and bottom faces stay clean. Glue up square against the back panel, then fasten the back.'
+              : 'Dovetail the carcass together — tails on the sides, through pins on the full-width top and bottom. Glue up square against the back panel, then fasten the back.',
         },
         {
           title: 'Mount the slides',
-          detail: `Lay out ${spec.drawerCount} slide positions with the jig and screw the cabinet members to the sides — identical heights left and right, or the drawers will rack.`,
+          detail: `Lay out ${spec.drawerCount * (spec.columnCount ?? 1)} slide positions with the jig and screw the cabinet members to the sides — identical heights left and right, or the drawers will rack.`,
         },
         {
           title: 'Build the drawer boxes',

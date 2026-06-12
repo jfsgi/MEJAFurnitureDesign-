@@ -47,7 +47,7 @@ interface RaiseSegment {
 const PROFILES: Record<RaiseProfileId, (W: number) => RaiseSegment[]> = {
   bevel: (W) => {
     const step = Math.min(0.0009, W * 0.06);
-    const reveal = Math.min(0.0022, W * 0.1);
+    const reveal = Math.min(0.0025, W * 0.11);
     return [
       { a: W - step - reveal, h: 0.74, shape: 'line' },
       { a: W - step, h: 0.74, shape: 'line' },
@@ -79,8 +79,8 @@ const PROFILES: Record<RaiseProfileId, (W: number) => RaiseSegment[]> = {
   stepcove: (W) => {
     const step = Math.min(0.0009, W * 0.06);
     const approach = Math.min(0.003, W * 0.16);
-    const riser = Math.min(0.0008, W * 0.05);
-    const ledge = Math.min(0.002, W * 0.1);
+    const riser = Math.min(0.0011, W * 0.06);
+    const ledge = Math.min(0.0024, W * 0.11);
     return [
       { a: approach, h: 0.1, shape: 'line' },
       { a: approach + riser, h: 0.34, shape: 'line' },
@@ -90,8 +90,8 @@ const PROFILES: Record<RaiseProfileId, (W: number) => RaiseSegment[]> = {
     ];
   },
   bevelstep: (W) => {
-    const step = Math.min(0.0014, W * 0.08);
-    const reveal = Math.min(0.0034, W * 0.14);
+    const step = Math.min(0.0016, W * 0.09);
+    const reveal = Math.min(0.0038, W * 0.15);
     return [
       { a: W - step - reveal, h: 0.58, shape: 'line' },
       { a: W - step, h: 0.58, shape: 'line' },
@@ -99,8 +99,8 @@ const PROFILES: Record<RaiseProfileId, (W: number) => RaiseSegment[]> = {
     ];
   },
   covebead: (W) => {
-    const bead = Math.min(0.0036, W * 0.2);
-    const quirk = Math.min(0.0012, W * 0.06);
+    const bead = Math.min(0.0044, W * 0.22);
+    const quirk = Math.min(0.0014, W * 0.07);
     return [
       { a: W - bead - quirk, h: 0.58, shape: 'concave' },
       { a: W - bead / 2 - quirk, h: 0.96, shape: 'convex' },
@@ -109,8 +109,8 @@ const PROFILES: Record<RaiseProfileId, (W: number) => RaiseSegment[]> = {
     ];
   },
   ogeebead: (W) => {
-    const bead = Math.min(0.0036, W * 0.2);
-    const quirk = Math.min(0.0012, W * 0.06);
+    const bead = Math.min(0.0044, W * 0.22);
+    const quirk = Math.min(0.0014, W * 0.07);
     const body = W - bead - quirk;
     return [
       { a: body * 0.48, h: 0.34, shape: 'concave' },

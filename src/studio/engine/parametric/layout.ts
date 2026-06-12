@@ -54,9 +54,29 @@ export interface Part {
     type: 'dovetail' | 'boxjoint';
     role: 'tails' | 'pins';
     matingThicknessMm: number;
-    /** For pins boards: which z face is the outside of the box. */
+    /** For pins boards: which face is the outside of the box (z, or x for 'case'). */
     pinsOuterSign?: 1 | -1;
+    /** Tails boards: half-blind front — tails stop this short of the show face. */
+    frontLipMm?: number;
+    /** Pins boards: blind sockets with a solid lap this thick at the show face. */
+    lipMm?: number;
+    /**
+     * Joint frame. Default is the drawer-box frame (tails boards run along
+     * z, pins boards along x). 'case' is carcass framing: tails boards run
+     * along y (a side panel toothed at its top/bottom ends), pins boards
+     * along x (a top/bottom panel with pins at its ends), pattern along z.
+     */
+    orient?: 'case';
+    /** Case panels: stopped 45° opening bevel on the inner front arris. */
+    frontBevelMm?: number;
+    /** Case tails sides: world-x sign of the panel's inner face. */
+    bevelInnerSign?: 1 | -1;
   };
+  /**
+   * 45° chamfer between the front (+z) face and the listed side faces —
+   * the beveled opening edges on plain frame members.
+   */
+  frontBevel?: { bevelMm: number; sides: Array<'x+' | 'x-' | 'y+' | 'y-'> };
   /**
    * Renders a raised-panel profile on the front face: a flat tongue at the
    * edges (hidden in the frame grooves), a profiled raise, and a proud flat
@@ -70,6 +90,11 @@ export interface Part {
   };
   /** Finger-scoop cutout on a board's top edge (drawer-box fronts). */
   scoop?: { widthMm: number; depthMm: number };
+  /**
+   * Finger-pull channel routed along the board's top edge (handle-less
+   * slab fronts). The cut list keeps the part's nominal dimensions.
+   */
+  fingerPullTop?: boolean;
   /**
    * Panel sitting recessed inside a frame: bakes contact shading (ambient
    * occlusion) that darkens toward the frame on all four sides.
@@ -85,6 +110,8 @@ export interface Part {
   edgeProfile?: {
     inner?: EdgeProfileName;
     outer?: EdgeProfileName;
+    /** Slab fronts: exact 45° bevel — band width and depth both this size. */
+    bevelMm?: number;
     /** Which local side faces the opening: 'x+' | 'x-' | 'y+' | 'y-'. */
     innerSide?: 'x+' | 'x-' | 'y+' | 'y-';
     axis: 'x' | 'y' | 'slab';
@@ -372,9 +399,10 @@ function drawerBoxLayout(spec: DrawerBoxSpec): FurnitureLayout {
   const { widthMm: w, depthMm: d, heightMm: h, stockThicknessMm: t } = spec;
   const halfblind = spec.joinery === 'halfblind';
   const through = spec.joinery === 'dovetail' || spec.joinery === 'boxjoint';
-  // Half-blind tails stop 6mm short of the front face (clean show face);
-  // the joint reads from above and inside.
-  const lip = 6;
+  // Half-blind tails stop 1/16" short of the front face (clean show face);
+  // from the side, the joint pattern ends at the lap line. The back corners
+  // stay through-dovetailed, as jigs cut them.
+  const lip = 1.5875;
   const scoop = spec.scoop
     ? { widthMm: Math.min(120, w * 0.35), depthMm: Math.min(32, h * 0.4) }
     : undefined;
@@ -390,7 +418,7 @@ function drawerBoxLayout(spec: DrawerBoxSpec): FurnitureLayout {
       joinery: through
         ? { type: spec.joinery as 'dovetail' | 'boxjoint', role: 'tails', matingThicknessMm: t }
         : halfblind
-          ? { type: 'dovetail', role: 'tails', matingThicknessMm: t - lip }
+          ? { type: 'dovetail', role: 'tails', matingThicknessMm: t, frontLipMm: lip }
           : undefined,
     });
   }
@@ -411,7 +439,16 @@ function drawerBoxLayout(spec: DrawerBoxSpec): FurnitureLayout {
             matingThicknessMm: t,
             pinsOuterSign: sz as 1 | -1,
           }
-        : undefined,
+        : halfblind
+          ? {
+              type: 'dovetail',
+              role: 'pins',
+              matingThicknessMm: t,
+              pinsOuterSign: sz as 1 | -1,
+              // Blind sockets on the front only; the back stays through.
+              lipMm: sz > 0 ? lip : undefined,
+            }
+          : undefined,
       scoop: sz > 0 ? scoop : undefined,
     });
   }
@@ -448,6 +485,7 @@ function pushFrontParts(
     outerEdgeProfile?: EdgeProfile;
     frameJoint?: 'cope' | 'miter';
     glassPanel?: boolean;
+    fingerPull?: boolean;
     centerXMm: number;
     bottomYMm: number;
     centerZMm: number;
@@ -474,6 +512,7 @@ function pushFrontParts(
       positionMm: [cx, y0 + h / 2, cz],
       role: 'panel',
       grainAxis: options.slabGrain,
+      fingerPullTop: options.fingerPull || undefined,
       edgeProfile: outer ? { outer, axis: 'slab' } : undefined,
     });
     return;
@@ -571,6 +610,7 @@ function frontPanelLayout(spec: CabinetDoorSpec | DrawerFrontSpec): FurnitureLay
     outerEdgeProfile: spec.outerEdgeProfile,
     frameJoint: spec.frameJoint,
     glassPanel: spec.kind === 'door' ? spec.glassPanel : undefined,
+    fingerPull: spec.kind === 'drawerfront' ? spec.fingerPull : undefined,
     centerXMm: 0,
     bottomYMm: 0,
     centerZMm: 0,
@@ -596,26 +636,51 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
   const caseOffsetZ = inset ? 0 : -frontT / 2;
   const innerDepth = caseDepth - backT;
 
+  // The carcass is dovetailed together: tails on the sides, pins cut on
+  // the full-width top and bottom panels. Half-blind keeps the laps on the
+  // top and bottom faces; the side pattern stops 1/16" short of them.
+  const caseHb = spec.caseJoinery === 'halfblind';
+  const caseLip = 1.5875;
+  // Optional 45° opening bevel, stopped at the joints; inset fronts set
+  // back by the same amount so the bevel frames each front.
+  const bevel = inset ? (spec.insideBevelMm ?? 0) : 0;
   for (const sx of [1, -1]) {
     parts.push({
       name: 'Side panel',
       shape: 'box',
-      sizeMm: [t, h, caseDepth],
+      sizeMm: [t, caseHb ? h - 2 * caseLip : h, caseDepth],
       positionMm: [sx * (w / 2 - t / 2), h / 2, caseOffsetZ],
       role: 'structure',
       grainAxis: 'y',
+      joinery: {
+        type: 'dovetail',
+        role: 'tails',
+        matingThicknessMm: t,
+        frontLipMm: caseHb ? caseLip : undefined,
+        frontBevelMm: bevel || undefined,
+        bevelInnerSign: (-sx) as 1 | -1,
+        orient: 'case',
+      },
     });
   }
   const innerW = w - 2 * t;
-  const caseZ = caseOffsetZ + backT / 2;
   for (const top of [0, 1]) {
     parts.push({
       name: top ? 'Top panel' : 'Bottom panel',
       shape: 'box',
-      sizeMm: [innerW, t, innerDepth],
-      positionMm: [0, top ? h - t / 2 : t / 2, caseZ],
+      sizeMm: [w, t, caseDepth],
+      positionMm: [0, top ? h - t / 2 : t / 2, caseOffsetZ],
       role: 'structure',
       grainAxis: 'x',
+      joinery: {
+        type: 'dovetail',
+        role: 'pins',
+        matingThicknessMm: t,
+        pinsOuterSign: top ? 1 : -1,
+        lipMm: caseHb ? caseLip : undefined,
+        frontBevelMm: bevel || undefined,
+        orient: 'case',
+      },
     });
   }
   parts.push({
@@ -630,84 +695,147 @@ function drawerUnitLayout(spec: DrawerUnitSpec): FurnitureLayout {
   const n = spec.drawerCount;
   const undermount = spec.slideType === 'undermount';
   const boxT = spec.boxStockThicknessMm;
-  const boxW = w - 2 * t - 2 * (undermount ? 5 : slideClearance);
   const boxD = Math.min(innerDepth - 25, Math.floor((innerDepth - 25) / 50) * 50);
   const boxLift = undermount ? 16 : 10;
 
-  // Inset banks show divider rails between the openings; overlay fronts
-  // cover the carcass so none are needed.
-  const railH = 20;
+  // Columns: interior split by full-height partitions. Set back (default),
+  // the column divider sits behind the fronts by the front thickness and
+  // the fronts extend across it, meeting over its centerline with a
+  // reveal-wide gap; flush, the divider face shows and fronts inset within
+  // each column with full reveals.
+  const cols = Math.max(1, spec.columnCount ?? 1);
+  const setback = (spec.columnDivider ?? 'setback') === 'setback';
+  const colW = (innerW - (cols - 1) * t) / cols;
+  for (let c = 1; c < cols; c++) {
+    const px = -w / 2 + t + c * (colW + t) - t / 2;
+    parts.push({
+      name: 'Column divider',
+      shape: 'box',
+      sizeMm: [t, h - 2 * t, inset && setback ? caseDepth - frontT : caseDepth],
+      positionMm: [px, h / 2, caseOffsetZ - (inset && setback ? frontT / 2 : 0)],
+      role: 'structure',
+      grainAxis: 'y',
+      frontBevel:
+        bevel && !setback ? { bevelMm: bevel, sides: ['x+', 'x-'] } : undefined,
+    });
+  }
+
+  const boxW = colW - 2 * (undermount ? 5 : slideClearance);
+
+  // Divider rails between openings are an option (inset only); without
+  // them the drawers separate by reveals alone. Overlay fronts cover the
+  // carcass so they never need rails.
+  const railH = inset && spec.dividerRails ? 20 : 0;
   const interiorH = h - 2 * t;
   const openingH = inset ? (interiorH - (n - 1) * railH) / n : (h - 4 - 3 * (n - 1)) / n;
-  const frontW = inset ? innerW - 2 * reveal : w - 4;
+  const overlayW = (w - 4 - 3 * (cols - 1)) / cols;
   const frontH = inset ? openingH - 2 * reveal : openingH;
-  const frontZ = inset ? d / 2 - frontT / 2 : d / 2 - frontT / 2;
+  // Beveled openings set the fronts back by the bevel depth.
+  const frontZ = d / 2 - frontT / 2 - bevel;
 
-  for (let i = 0; i < n; i++) {
-    const openingBottom = inset ? t + i * (openingH + railH) : 2 + i * (openingH + 3);
-    const y0 = openingBottom + (inset ? reveal : 0);
+  for (let c = 0; c < cols; c++) {
+    const colLeft = -w / 2 + t + c * (colW + t);
+    const colRight = colLeft + colW;
+    const colCenter = (colLeft + colRight) / 2;
+    // Set back: inset fronts run from the outer side (full reveal) to the
+    // divider centerline (half the reveal each, so adjacent fronts gap one
+    // reveal). Flush: full reveals against the visible divider faces.
+    const fLeft = inset
+      ? c === 0 || !setback
+        ? colLeft + reveal
+        : colLeft - t / 2 + reveal / 2
+      : 0;
+    const fRight = inset
+      ? c === cols - 1 || !setback
+        ? colRight - reveal
+        : colRight + t / 2 - reveal / 2
+      : 0;
+    const frontW = inset ? fRight - fLeft : overlayW;
+    const frontCX = inset ? (fLeft + fRight) / 2 : -w / 2 + 2 + overlayW / 2 + c * (overlayW + 3);
 
-    if (inset && i > 0) {
+    for (let i = 0; i < n; i++) {
+      const openingBottom = inset ? t + i * (openingH + railH) : 2 + i * (openingH + 3);
+      const y0 = openingBottom + (inset ? reveal : 0);
+      // Pulled-open drawer: the front and its box slide forward together.
+      const isOpen = spec.openDrawer === i + 1 && (spec.openColumn ?? 1) === c + 1;
+      const pull = isOpen
+        ? Math.min(spec.openAmountMm ?? boxD * 0.6, boxD - 60)
+        : 0;
+
+      if (railH > 0 && i > 0 && c === 0) {
+        parts.push({
+          name: 'Divider rail',
+          shape: 'box',
+          sizeMm: [innerW, railH, frontT],
+          positionMm: [0, openingBottom - railH / 2, caseFrontZ - frontT / 2],
+          role: 'structure',
+          grainAxis: 'x',
+          frontBevel: bevel ? { bevelMm: bevel, sides: ['y+', 'y-'] } : undefined,
+        });
+      }
+
+      pushFrontParts(parts, {
+        style: spec.frontStyle,
+        widthMm: frontW,
+        heightMm: frontH,
+        thicknessMm: frontT,
+        railStileWidthMm: 50,
+        // Raised fronts use full frame stock (¾"): with the ¼" tongue
+        // centered, the raise gets its true catalog depth.
+        panelThicknessMm: spec.frontStyle === 'raised' ? frontT : 6,
+        raiseProfile: spec.raiseProfile,
+        raiseWidthMm: 32,
+        edgeProfile: spec.edgeProfile,
+        outerEdgeProfile: spec.outerEdgeProfile,
+        frameJoint: spec.frameJoint,
+        fingerPull: spec.fingerPull,
+        centerXMm: frontCX,
+        bottomYMm: y0,
+        centerZMm: frontZ + pull,
+        namePrefix: 'Drawer front',
+        slabGrain: 'x',
+      });
+
+      const boxY0 = openingBottom + boxLift;
+      const boxH = Math.max(60, openingH - (undermount ? 38 : 30));
+      const boxZ = d / 2 - bevel - frontT - boxD / 2 - 5 + pull;
+      // Boxes are through-dovetailed like the standalone drawer boxes.
+      for (const sx of [1, -1]) {
+        parts.push({
+          name: 'Drawer side',
+          shape: 'box',
+          sizeMm: [boxT, boxH, boxD],
+          positionMm: [colCenter + sx * (boxW / 2 - boxT / 2), boxY0 + boxH / 2, boxZ],
+          role: 'structure',
+          grainAxis: 'z',
+          joinery: { type: 'dovetail', role: 'tails', matingThicknessMm: boxT },
+        });
+      }
+      for (const sz of [1, -1]) {
+        parts.push({
+          name: sz > 0 ? 'Drawer box front' : 'Drawer box back',
+          shape: 'box',
+          sizeMm: [boxW, boxH, boxT],
+          positionMm: [colCenter, boxY0 + boxH / 2, boxZ + sz * (boxD / 2 - boxT / 2)],
+          role: 'structure',
+          grainAxis: 'x',
+          joinery: {
+            type: 'dovetail',
+            role: 'pins',
+            matingThicknessMm: boxT,
+            pinsOuterSign: sz as 1 | -1,
+          },
+        });
+      }
       parts.push({
-        name: 'Divider rail',
+        name: 'Drawer bottom',
         shape: 'box',
-        sizeMm: [innerW, railH, frontT],
-        positionMm: [0, openingBottom - railH / 2, caseFrontZ - frontT / 2],
-        role: 'structure',
+        sizeMm: [boxW - 2 * boxT + 12, 6, boxD - 2 * boxT + 12],
+        positionMm: [colCenter, boxY0 + 12 + 3, boxZ],
+        role: 'panel',
         grainAxis: 'x',
       });
     }
-
-    pushFrontParts(parts, {
-      style: spec.frontStyle,
-      widthMm: frontW,
-      heightMm: frontH,
-      thicknessMm: frontT,
-      railStileWidthMm: 50,
-      panelThicknessMm: spec.frontStyle === 'raised' ? 16 : 6,
-      raiseProfile: spec.raiseProfile,
-      raiseWidthMm: 32,
-      edgeProfile: spec.edgeProfile,
-      outerEdgeProfile: spec.outerEdgeProfile,
-      frameJoint: spec.frameJoint,
-      centerXMm: 0,
-      bottomYMm: y0,
-      centerZMm: frontZ,
-      namePrefix: 'Drawer front',
-      slabGrain: 'x',
-    });
-
-    const boxY0 = openingBottom + boxLift;
-    const boxH = Math.max(60, openingH - (undermount ? 38 : 30));
-    const boxZ = d / 2 - frontT - boxD / 2 - 5;
-    for (const sx of [1, -1]) {
-      parts.push({
-        name: 'Drawer side',
-        shape: 'box',
-        sizeMm: [boxT, boxH, boxD],
-        positionMm: [sx * (boxW / 2 - boxT / 2), boxY0 + boxH / 2, boxZ],
-        role: 'structure',
-        grainAxis: 'z',
-      });
-    }
-    for (const sz of [1, -1]) {
-      parts.push({
-        name: sz > 0 ? 'Drawer box front' : 'Drawer box back',
-        shape: 'box',
-        sizeMm: [boxW - 2 * boxT, boxH, boxT],
-        positionMm: [0, boxY0 + boxH / 2, boxZ + sz * (boxD / 2 - boxT / 2)],
-        role: 'structure',
-        grainAxis: 'x',
-      });
-    }
-    parts.push({
-      name: 'Drawer bottom',
-      shape: 'box',
-      sizeMm: [boxW - 2 * boxT + 12, 6, boxD - 2 * boxT + 12],
-      positionMm: [0, boxY0 + 12 + 3, boxZ],
-      role: 'panel',
-      grainAxis: 'x',
-    });
   }
 
   return { spec, parts, overallMm: [w, h, d] };

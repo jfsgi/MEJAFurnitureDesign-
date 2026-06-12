@@ -100,6 +100,10 @@ export type Primitive =
       jointDepth: number;
       /** Pins boards: which side of the thickness axis faces out. */
       outerSign?: 1 | -1;
+      /** Half-blind: the joint stops this short of the show face. Pins
+       *  boards get blind sockets and a solid lap plate; tails boards
+       *  shorten their tooth engagement to match (both ends). */
+      lip?: number;
       /** Pins boards: finger-pull scoop in the top edge. */
       scoop?: { width: number; depth: number };
     }

@@ -36,9 +36,20 @@ export function jointedBoardGeometry(prim: JointedBoard): THREE.BufferGeometry {
     depth: prim.jointDepth * M,
   };
 
+  // Half-blind: tails shorten their engagement to the socket bottoms; pins
+  // boards carry blind sockets and the solid lap plate on the show face.
+  const engagement = prim.lip ? spec.depth - prim.lip * M : undefined;
+
   if (prim.role === 'tails') {
     // Native axes: x = thickness, y = height, z = length.
-    const geo = tailsBoardGeometry(prim.thickness * M, prim.height * M, prim.length * M, spec);
+    const geo = tailsBoardGeometry(
+      prim.thickness * M,
+      prim.height * M,
+      prim.length * M,
+      spec,
+      engagement,
+      engagement,
+    );
     if (!geo) return plainBoard(prim);
     geo.scale(1000, 1000, 1000);
     if (prim.lengthAxis === 'z' && prim.thicknessAxis === 'x') {
@@ -65,6 +76,7 @@ export function jointedBoardGeometry(prim: JointedBoard): THREE.BufferGeometry {
     spec,
     engineSign,
     prim.scoop ? { width: prim.scoop.width * M, depth: prim.scoop.depth * M } : undefined,
+    (prim.lip ?? 0) * M,
   );
   if (!geo) return plainBoard(prim);
   geo.scale(1000, 1000, 1000);

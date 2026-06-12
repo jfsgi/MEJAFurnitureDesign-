@@ -381,7 +381,7 @@ describe('drawer unit', () => {
     expect(fronts[0].primitives[0].at[1]).toBeGreaterThan((base.depth as number) / 2 - 0.001);
   });
 
-  it('case joints mirror the engine layout; half-blind buries tails in a solid cap', () => {
+  it('case joints mirror the engine layout; half-blind keeps the lap on the cap', () => {
     const base = defaultParams(def);
     const t = base.thickness as number;
     const H = base.height as number;
@@ -407,20 +407,28 @@ describe('drawer unit', () => {
       (boxJoint.parts.find((p) => p.id === 'top')!.primitives[0] as { joint?: string }).joint,
     ).toBe('box-joint');
 
-    // Half-blind: shortened tails bury into a plain solid cap (engine style);
-    // the cap show face stays clean and carries no pins board.
+    // Half-blind: blind sockets in the caps with the lap on the show face;
+    // the sides keep the full joint layout, engagement stopped a lip short.
     const halfBlind = def.generate(base);
     const hbSide = halfBlind.parts.find((p) => p.id === 'side-1')!;
-    const hbTails = hbSide.primitives[0] as { length?: number; jointDepth?: number };
+    const hbTails = hbSide.primitives[0] as { length?: number; jointDepth?: number; lip?: number };
     expect(hbTails.length).toBeCloseTo(H - 2 * HALF_BLIND_LIP, 5);
-    expect(hbTails.jointDepth).toBeCloseTo(t - HALF_BLIND_LIP, 5);
+    expect(hbTails.jointDepth).toBeCloseTo(t, 5); // full mating depth — layouts must match
+    expect(hbTails.lip).toBeCloseTo(HALF_BLIND_LIP, 5);
     const hbTop = halfBlind.parts.find((p) => p.id === 'top')!;
     expect(hbTop.primitives).toHaveLength(1);
-    const cap = hbTop.primitives[0] as { shape: string; size: [number, number, number] };
-    expect(cap.shape).toBe('box');
-    expect(cap.size[2]).toBeCloseTo(t, 5);
-    expect(cap.size[0]).toBeLessThan(W); // end grain a hair shy of the side faces
-    expect(cap.size[0]).toBeGreaterThan(W - 1);
+    const cap = hbTop.primitives[0] as {
+      shape: string;
+      role?: string;
+      length?: number;
+      thickness?: number;
+      lip?: number;
+    };
+    expect(cap.shape).toBe('jointedBoard');
+    expect(cap.role).toBe('pins');
+    expect(cap.length).toBeCloseTo(W, 5);
+    expect(cap.thickness).toBeCloseTo(t, 5);
+    expect(cap.lip).toBeCloseTo(HALF_BLIND_LIP, 5);
   });
 
   it('half-blind dovetailed case: labeled parts, top/bottom stock runs into the sockets', () => {
@@ -430,8 +438,8 @@ describe('drawer unit', () => {
     const innerW = (params.width as number) - 2 * t;
     const top = model.parts.find((p) => p.id === 'top')!;
     expect(top.name).toBe('Top (half-blind DT)');
-    // Sockets stop a lip short of the show face on each end.
-    expect(top.cut.length).toBeCloseTo(innerW + 2 * (t - HALF_BLIND_LIP), 5);
+    // The cap runs the full case width — its laps reach the outer faces.
+    expect(top.cut.length).toBeCloseTo(innerW + 2 * t, 5);
     const side = model.parts.find((p) => p.id === 'side-1')!;
     expect(side.name).toBe('Side (half-blind DT)');
     // Tails stop a lip shy of each cap face.
