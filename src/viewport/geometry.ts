@@ -257,28 +257,55 @@ export function roundedSlabGeometry(
   }
   const r = Math.min(Math.max(radius - re, 0.5), (w - 2 * re) / 2 - 0.1, d - 2 * re - 0.1);
   if (edgeMode === 'top') {
-    // Square body up to the roundover, then a beveled cap whose lower bevel
-    // hides inside the body — only the top arris rounds.
+    // Half bullnose, built explicitly: a square body carries the bottom
+    // arris, and a quarter-round band sweeps from the full outline at the
+    // body's top straight up and inward, landing flush in the inset top
+    // face — one arc, no under-curl. (The extrude-bevel trick can't do
+    // this: its mirror half pokes out once the radius nears the
+    // thickness.)
+    const reT = Math.min(re, t - 0.6); // keep a hair of square wall below
     const rcFull = Math.min(radius, w / 2 - 0.1, d - 0.1);
+    const rIns = Math.max(rcFull - reT, 0.5);
     const body = new THREE.ExtrudeGeometry(outline(w, d, rcFull), {
-      depth: t - re,
+      depth: t - reT,
       bevelEnabled: false,
       curveSegments: ARC_SEGMENTS,
     });
     body.translate(0, 0, -t / 2);
-    const EPS = 0.01;
-    const cap = new THREE.ExtrudeGeometry(outline(w - 2 * re, d - 2 * re, r), {
-      depth: EPS,
-      bevelEnabled: true,
-      bevelThickness: re,
-      bevelSize: re,
-      bevelOffset: 0,
-      bevelSegments: 8,
-      curveSegments: ARC_SEGMENTS,
-    });
-    cap.translate(0, 0, t / 2 - re - EPS);
-    const merged = mergeGeometries([body, cap], false)!;
+    // Quarter-round band: rings between the inset top outline and the full
+    // outline, offset re·sinθ outward and re·(1−cosθ) down from the top.
+    const RING_DIVS = 12;
+    const STEPS = 10;
+    const rings: THREE.Vector2[][] = [];
+    const zs: number[] = [];
+    for (let k = 0; k <= STEPS; k++) {
+      const th = (k / STEPS) * (Math.PI / 2);
+      const s = reT * Math.sin(th);
+      rings.push(outline(w - 2 * reT + 2 * s, d - 2 * reT + 2 * s, rIns + s).getPoints(RING_DIVS));
+      zs.push(t / 2 - reT * (1 - Math.cos(th)));
+    }
+    const pos: number[] = [];
+    for (let k = 0; k < STEPS; k++) {
+      const upper = rings[k];
+      const lower = rings[k + 1];
+      const n = Math.min(upper.length, lower.length);
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        // CCW outline, lower ring wider: wind for outward-facing normals.
+        pos.push(lower[i].x, lower[i].y, zs[k + 1], lower[j].x, lower[j].y, zs[k + 1], upper[j].x, upper[j].y, zs[k]);
+        pos.push(lower[i].x, lower[i].y, zs[k + 1], upper[j].x, upper[j].y, zs[k], upper[i].x, upper[i].y, zs[k]);
+      }
+    }
+    const bandGeo = new THREE.BufferGeometry();
+    bandGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    bandGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+    bandGeo.computeVertexNormals();
+    const cap = new THREE.ShapeGeometry(outline(w - 2 * reT, d - 2 * reT, rIns), RING_DIVS)
+      .toNonIndexed();
+    cap.translate(0, 0, t / 2);
+    const merged = mergeGeometries([body, bandGeo, cap], false)!;
     body.dispose();
+    bandGeo.dispose();
     cap.dispose();
     return merged;
   }
