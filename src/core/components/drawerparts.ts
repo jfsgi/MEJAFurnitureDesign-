@@ -11,9 +11,10 @@ const BOTTOM_RECESS = inch(0.25); // drawer bottom sits up in its groove
 const PULL_WIDTH_MAX = inch(4.5);
 const PULL_DEPTH_MAX = inch(1.125);
 
-/** Half-blind sockets stop this short of the mating board's show face — the
- * engine's lip: tails bury into a plain solid cap instead of meeting pins. */
-export const HALF_BLIND_LIP = 6;
+/** Half-blind sockets stop this short of the mating board's show face: the
+ * pins run to within 1/16" of the case's top and bottom faces, MEJA's
+ * standard. Tails bury into a plain solid cap instead of meeting pins. */
+export const HALF_BLIND_LIP = inch(0.0625);
 
 export type BoxJoinery = 'dovetail' | 'box-joint';
 
