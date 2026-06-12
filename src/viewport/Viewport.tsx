@@ -87,7 +87,10 @@ function PrimitiveMesh({
       );
     }
     if (prim.shape === 'box' && mat.grain) {
-      return grainBoxGeometry(prim.size, longestAxis(prim.size), offset, prim.at);
+      const axis = prim.grain
+        ? ({ x: 0, y: 1, z: 2 } as const)[prim.grain]
+        : longestAxis(prim.size);
+      return grainBoxGeometry(prim.size, axis, offset, prim.at);
     }
     return null;
   }, [prim, mat.grain, seed]);

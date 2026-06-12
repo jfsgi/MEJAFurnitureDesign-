@@ -64,7 +64,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
         const rotation = new THREE.Euler();
         if (prim.shape === 'box') {
           geometry = new THREE.BoxGeometry(...prim.size);
-          grain = AXIS[longestAxis(prim.size)];
+          grain = prim.grain ?? AXIS[longestAxis(prim.size)];
           rotation.set(prim.tiltX ?? 0, prim.tilt ?? 0, 0);
         } else if (prim.shape === 'jointedBoard') {
           geometry = jointedBoardGeometry(prim);

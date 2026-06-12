@@ -11,6 +11,7 @@ import { wineCube } from './winecube';
 import { drawerBox } from './drawerbox';
 import { drawerUnit } from './drawerunit';
 import { bench, stool } from './seating';
+import { entryBench } from './entrybench';
 import { wallShelf } from './wallshelf';
 import { spiceRack } from './spicerack';
 
@@ -22,6 +23,7 @@ const ALL: ComponentDef[] = [
   coastalEndTable,
   bench,
   stool,
+  entryBench,
   bookcase,
   cabinet,
   dresser,
@@ -46,7 +48,7 @@ export const REGISTRY: Record<string, ComponentDef> = Object.fromEntries(
 
 export const CATEGORIES: { name: string; components: ComponentDef[] }[] = [
   { name: 'Tables', components: [diningTable, coffeeTable, consoleTable, sideTable, coastalEndTable] },
-  { name: 'Seating', components: [bench, stool] },
+  { name: 'Seating', components: [bench, stool, entryBench] },
   { name: 'Storage', components: [bookcase, cabinet, dresser, storageTower, wineCube, displayStand] },
   { name: 'Wall-mounted', components: [wallShelf, spiceRack] },
   { name: 'Drawers', components: [drawerBox, drawerUnit] },

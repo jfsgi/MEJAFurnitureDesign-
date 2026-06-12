@@ -62,6 +62,9 @@ export type Primitive =
       tiltX?: number;
       /** Renders shaded like end grain (joint fingers of the mating board). */
       endGrain?: boolean;
+      /** Grain direction override — pieces of a larger board (a notched
+       *  shelf's corner tongues) whose longest axis crosses the grain. */
+      grain?: 'x' | 'y' | 'z';
     }
   | {
       shape: 'taperedBox';

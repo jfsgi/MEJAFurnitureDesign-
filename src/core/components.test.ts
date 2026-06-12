@@ -895,3 +895,41 @@ describe('coastal end table', () => {
     expect((top.primitives[0] as { lip?: number }).lip).toBeCloseTo(HALF_BLIND_LIP, 5);
   });
 });
+
+describe('entryway bench', () => {
+  const def = REGISTRY['entry-bench'];
+
+  it('builds the seat on four posts with a notched boot shelf and end rails', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Leg')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Seat')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2);
+    const shelf = model.parts.find((p) => p.id === 'shelf')!;
+    expect(shelf.primitives).toHaveLength(3); // center board + a tongue between each leg pair
+    // The tongues keep the slab's grain running along the bench.
+    for (const prim of shelf.primitives) {
+      expect((prim as { grain?: string }).grain).toBe('x');
+    }
+  });
+
+  it('shelf edges run flush with the leg envelope under the seat overhang', () => {
+    const base = defaultParams(def);
+    const model = def.generate(base);
+    const W = base.width as number;
+    const ovEnd = base.endOverhang as number;
+    const shelf = model.parts.find((p) => p.id === 'shelf')!;
+    const xs = shelf.primitives.map(
+      (pr) => (pr as { at: number[]; size: number[] }).at[0] + (pr as { size: number[] }).size[0] / 2,
+    );
+    expect(Math.max(...xs)).toBeCloseTo(W / 2 - ovEnd, 5); // flush with the legs' outer faces
+    expect(shelf.cut.length).toBeCloseTo(W - 2 * ovEnd, 5);
+  });
+
+  it('stands on the floor with the seat at the requested height', () => {
+    const base = defaultParams(def);
+    const box = modelBBox(def.generate(base))!;
+    expect(box.min[2]).toBeCloseTo(0, 5);
+    expect(box.max[2]).toBeCloseTo(base.height as number, 5);
+  });
+});
