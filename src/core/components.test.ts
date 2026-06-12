@@ -3,7 +3,7 @@ import { REGISTRY } from './components/registry';
 import { buildCutList } from './cutlist';
 import { SHEET_L, SHEET_W, buildStockBreakdown } from './stock';
 import { defaultParams, modelBBox, partsAffectedBy } from './evaluate';
-import { JOINT_PROUD } from './components/drawerparts';
+import { HALF_BLIND_LIP } from './components/drawerparts';
 import { inch } from './units';
 import type { Instance, ProjectDoc } from './types';
 
@@ -381,36 +381,46 @@ describe('drawer unit', () => {
     expect(fronts[0].primitives[0].at[1]).toBeGreaterThan((base.depth as number) / 2 - 0.001);
   });
 
-  it('case joints are engine boards; half-blind hides under the cap lap', () => {
+  it('case joints mirror the engine layout; half-blind buries tails in a solid cap', () => {
     const base = defaultParams(def);
     const t = base.thickness as number;
     const H = base.height as number;
+    const W = base.width as number;
     const through = def.generate({ ...base, caseJoinery: 'through-dovetail' });
     const side = through.parts.find((p) => p.id === 'side-1')!;
     expect(side.name).toBe('Side (dovetail)');
-    const tails = side.primitives[0] as { shape: string; role?: string; length?: number };
+    const tails = side.primitives[0] as { shape: string; role?: string; length?: number; jointDepth?: number };
     expect(tails.shape).toBe('jointedBoard');
     expect(tails.role).toBe('tails');
-    expect(tails.length).toBeCloseTo(H + JOINT_PROUD, 5); // through: teeth land proud of the cap faces
+    expect(tails.length).toBeCloseTo(H, 5); // nominal: tails and pins tile the joint exactly
+    expect(tails.jointDepth).toBeCloseTo(t, 5);
     const top = through.parts.find((p) => p.id === 'top')!;
-    expect((top.primitives[0] as { role?: string }).role).toBe('pins');
-    expect(top.cut.length).toBeCloseTo((base.width as number) - 2 * t + 2 * t, 5);
+    const pins = top.primitives[0] as { role?: string; length?: number; thickness?: number };
+    expect(pins.role).toBe('pins');
+    expect(pins.length).toBeCloseTo(W, 5);
+    expect(pins.thickness).toBeCloseTo(t, 5); // full cap thickness, no band
+    expect(top.primitives).toHaveLength(1);
+    expect(top.cut.length).toBeCloseTo(W - 2 * t + 2 * t, 5);
 
     const boxJoint = def.generate({ ...base, caseJoinery: 'box-joint' });
     expect(
       (boxJoint.parts.find((p) => p.id === 'top')!.primitives[0] as { joint?: string }).joint,
     ).toBe('box-joint');
 
-    // Half-blind: tails stop a lap short of the cap faces, which stay clean.
+    // Half-blind: shortened tails bury into a plain solid cap (engine style);
+    // the cap show face stays clean and carries no pins board.
     const halfBlind = def.generate(base);
     const hbSide = halfBlind.parts.find((p) => p.id === 'side-1')!;
-    const hbTails = hbSide.primitives[0] as { length?: number };
-    expect(hbTails.length).toBeCloseTo(H - (2 * t) / 3, 5);
+    const hbTails = hbSide.primitives[0] as { length?: number; jointDepth?: number };
+    expect(hbTails.length).toBeCloseTo(H - 2 * HALF_BLIND_LIP, 5);
+    expect(hbTails.jointDepth).toBeCloseTo(t - HALF_BLIND_LIP, 5);
     const hbTop = halfBlind.parts.find((p) => p.id === 'top')!;
-    const lap = hbTop.primitives.find(
-      (pr) => pr.shape === 'box' && Math.abs(pr.size[2] - t / 3) < 1e-6,
-    );
-    expect(lap).toBeDefined(); // full-width lap covering the joint from above
+    expect(hbTop.primitives).toHaveLength(1);
+    const cap = hbTop.primitives[0] as { shape: string; size: [number, number, number] };
+    expect(cap.shape).toBe('box');
+    expect(cap.size[2]).toBeCloseTo(t, 5);
+    expect(cap.size[0]).toBeLessThan(W); // end grain a hair shy of the side faces
+    expect(cap.size[0]).toBeGreaterThan(W - 1);
   });
 
   it('half-blind dovetailed case: labeled parts, top/bottom stock runs into the sockets', () => {
@@ -420,10 +430,12 @@ describe('drawer unit', () => {
     const innerW = (params.width as number) - 2 * t;
     const top = model.parts.find((p) => p.id === 'top')!;
     expect(top.name).toBe('Top (half-blind DT)');
-    expect(top.cut.length).toBeCloseTo(innerW + t, 5); // half the side thickness per end
+    // Sockets stop a lip short of the show face on each end.
+    expect(top.cut.length).toBeCloseTo(innerW + 2 * (t - HALF_BLIND_LIP), 5);
     const side = model.parts.find((p) => p.id === 'side-1')!;
     expect(side.name).toBe('Side (half-blind DT)');
-    expect(side.cut.length).toBeCloseTo(params.height as number, 5); // tails over full height
+    // Tails stop a lip shy of each cap face.
+    expect(side.cut.length).toBeCloseTo((params.height as number) - 2 * HALF_BLIND_LIP, 5);
     const butt = def.generate({ ...params, caseJoinery: 'butt' });
     expect(butt.parts.find((p) => p.id === 'top')!.cut.length).toBeCloseTo(innerW, 5);
     expect(butt.parts.find((p) => p.id === 'top')!.name).toBe('Top');

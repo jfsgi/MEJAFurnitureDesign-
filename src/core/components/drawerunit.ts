@@ -8,10 +8,21 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part, Primitive } from '../types';
 import { formatLength, inch } from '../units';
-import { JOINT_PROUD, drawerBoxParts } from './drawerparts';
+import { HALF_BLIND_LIP, drawerBoxParts } from './drawerparts';
 import { slideFitWarning } from './drawerbox';
 
-/** Case boards with engine-rendered corner joinery (see drawerparts/jointBoards). */
+/** The half-blind cap's end grain sits a paint-thickness shy of the side
+ * faces, so the buried tails read as a flush-filled joint with a hairline
+ * instead of two coplanar surfaces fighting. */
+const CAP_SHY = 0.3;
+
+/**
+ * Case boards mirroring the engine's native drawer-box layout, rotated
+ * upright: through joints are nominal, exactly complementary tails/pins
+ * boards (sockets and pins tile the joint plane — nothing overlaps);
+ * half-blind is the engine's construction — tails stop a lip short of the
+ * show face and bury into a plain solid cap, no pins board at all.
+ */
 export function caseBoardPrims(opts: {
   W: number;
   D: number;
@@ -23,51 +34,43 @@ export function caseBoardPrims(opts: {
   const jointed = joinery !== 'butt';
   const joint = joinery === 'box-joint' ? ('box-joint' as const) : ('dovetail' as const);
   const halfBlind = joinery === 'half-blind-dovetail';
-  const lap = halfBlind ? t / 3 : 0;
-  const bandH = t - lap;
   return {
     side: (sx) =>
       jointed
         ? {
             shape: 'jointedBoard',
             role: 'tails',
-            length: halfBlind ? H - 2 * lap : H + JOINT_PROUD,
+            length: halfBlind ? H - 2 * HALF_BLIND_LIP : H,
             height: D,
             thickness: t,
             at: [sx * (W / 2 - t / 2), 0, H / 2],
             lengthAxis: 'z',
             thicknessAxis: 'x',
             joint,
-            // Full mating thickness keeps the tails/pins layouts identical;
-            // half-blind hides via the shortened tails and the cap lap, not a
-            // shallower joint.
-            jointDepth: t,
+            jointDepth: halfBlind ? t - HALF_BLIND_LIP : t,
           }
         : { shape: 'box', size: [t, D, H], at: [sx * (W / 2 - t / 2), 0, H / 2] },
     cap: (top) => {
       const z = top ? H - t / 2 : t / 2;
       if (!jointed) return [{ shape: 'box', size: [W - 2 * t, D, t], at: [0, 0, z] }];
-      const prims: Primitive[] = [
+      if (halfBlind) {
+        return [{ shape: 'box', size: [W - 2 * CAP_SHY, D, t], at: [0, 0, z] }];
+      }
+      return [
         {
           shape: 'jointedBoard',
           role: 'pins',
-          length: W + JOINT_PROUD,
+          length: W,
           height: D,
-          thickness: bandH,
-          at: [0, 0, top ? H - t + bandH / 2 : t - bandH / 2],
+          thickness: t,
+          at: [0, 0, z],
           lengthAxis: 'x',
           thicknessAxis: 'z',
           outerSign: top ? 1 : -1,
           joint,
-          // Pins run the full side thickness so they show on the side faces.
           jointDepth: t,
         },
       ];
-      if (lap > 0) {
-        // Half-blind: the cap's lap covers the joint from the cap face.
-        prims.push({ shape: 'box', size: [W, D, lap], at: [0, 0, top ? H - lap / 2 : lap / 2] });
-      }
-      return prims;
     },
   };
 }
@@ -135,26 +138,25 @@ export const drawerUnit: ComponentDef = {
     const findings: Finding[] = [];
 
     // Case joinery. All jointed styles render corner fingers: half-blind shows
-    // tails on the side faces under the cap's lap strip (the cap face stays
-    // clean); through dovetails and box joints pierce the cap face too. Cut
-    // lengths book the stock the joint consumes.
+    // tails on the side faces only, stopped a lip short of the clean cap face;
+    // through dovetails and box joints pierce the cap face too. Cut lengths
+    // book the stock the joint consumes.
     const caseJoinery = str(p, 'caseJoinery');
+    const halfBlindCase = caseJoinery === 'half-blind-dovetail';
     const visibleJoint = caseJoinery !== 'butt';
-    const jointTag =
-      caseJoinery === 'half-blind-dovetail'
-        ? ' (half-blind DT)'
-        : caseJoinery === 'through-dovetail'
-          ? ' (dovetail)'
-          : caseJoinery === 'box-joint'
-            ? ' (box joint)'
-            : '';
-    const capLen =
-      caseJoinery === 'half-blind-dovetail'
-        ? innerW + t
-        : visibleJoint
-          ? innerW + 2 * t
-          : innerW;
-    void visibleJoint;
+    const jointTag = halfBlindCase
+      ? ' (half-blind DT)'
+      : caseJoinery === 'through-dovetail'
+        ? ' (dovetail)'
+        : caseJoinery === 'box-joint'
+          ? ' (box joint)'
+          : '';
+    const capLen = halfBlindCase
+      ? innerW + 2 * (t - HALF_BLIND_LIP)
+      : visibleJoint
+        ? innerW + 2 * t
+        : innerW;
+    const sideLen = halfBlindCase ? H - 2 * HALF_BLIND_LIP : H;
     const caseBoards = caseBoardPrims({ W, D, H, t, joinery: caseJoinery });
     for (const sx of [-1, 1]) {
       parts.push({
@@ -162,7 +164,7 @@ export const drawerUnit: ComponentDef = {
         name: `Side${jointTag}`,
         material: mat,
         primitives: [caseBoards.side(sx)],
-        cut: { length: H, width: D, thickness: t },
+        cut: { length: sideLen, width: D, thickness: t },
       });
     }
     parts.push({

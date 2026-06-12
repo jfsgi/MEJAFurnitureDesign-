@@ -4,7 +4,6 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { JOINT_PROUD } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -72,7 +71,7 @@ export const drawerBox: ComponentDef = {
           {
             shape: 'jointedBoard',
             role: 'tails',
-            length: D + JOINT_PROUD,
+            length: D,
             height: H,
             thickness: sideT,
             at: [sx * (W / 2 - sideT / 2), 0, H / 2],
@@ -96,7 +95,7 @@ export const drawerBox: ComponentDef = {
           {
             shape: 'jointedBoard',
             role: 'pins',
-            length: W + JOINT_PROUD,
+            length: W,
             height: H,
             thickness: sideT,
             at: [0, sy * (D / 2 - sideT / 2), H / 2],

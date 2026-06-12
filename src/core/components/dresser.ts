@@ -4,7 +4,7 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { drawerBoxParts } from './drawerparts';
+import { HALF_BLIND_LIP, drawerBoxParts } from './drawerparts';
 import { caseBoardPrims } from './drawerunit';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
@@ -60,25 +60,25 @@ export const dresser: ComponentDef = {
     const findings: Finding[] = [];
 
     // Case joinery: sides join the top and bottom with rendered corner fingers
-    // (half-blind shows on the side faces under the cap's lap; through styles
-    // pierce the cap face). Cut lengths book the stock the joint consumes.
+    // (half-blind shows on the side faces only, stopped a lip short of the
+    // clean cap face; through styles pierce the cap face). Cut lengths book
+    // the stock the joint consumes.
     const caseJoinery = str(p, 'caseJoinery');
+    const halfBlindCase = caseJoinery === 'half-blind-dovetail';
     const jointed = caseJoinery !== 'butt';
-    const jointTag =
-      caseJoinery === 'half-blind-dovetail'
-        ? ' (half-blind DT)'
-        : caseJoinery === 'through-dovetail'
-          ? ' (dovetail)'
-          : caseJoinery === 'box-joint'
-            ? ' (box joint)'
-            : '';
-    const capLen =
-      caseJoinery === 'half-blind-dovetail'
-        ? innerW + t
-        : jointed
-          ? innerW + 2 * t
-          : innerW;
-    void jointed;
+    const jointTag = halfBlindCase
+      ? ' (half-blind DT)'
+      : caseJoinery === 'through-dovetail'
+        ? ' (dovetail)'
+        : caseJoinery === 'box-joint'
+          ? ' (box joint)'
+          : '';
+    const capLen = halfBlindCase
+      ? innerW + 2 * (t - HALF_BLIND_LIP)
+      : jointed
+        ? innerW + 2 * t
+        : innerW;
+    const sideLen = halfBlindCase ? H - 2 * HALF_BLIND_LIP : H;
     const caseBoards = caseBoardPrims({ W, D, H, t, joinery: caseJoinery });
     for (const sx of [-1, 1]) {
       parts.push({
@@ -86,7 +86,7 @@ export const dresser: ComponentDef = {
         name: `Side${jointTag}`,
         material: mat,
         primitives: [caseBoards.side(sx)],
-        cut: { length: H, width: D, thickness: t },
+        cut: { length: sideLen, width: D, thickness: t },
       });
     }
     parts.push({
