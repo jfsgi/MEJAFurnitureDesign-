@@ -8,6 +8,10 @@ import { inch } from '../units';
 
 const BOTTOM_RECESS = inch(0.25); // drawer bottom sits up in its groove
 
+/** The bottom's groove depth, per side — the panel cuts this much over the
+ * inside dimension in both directions. */
+export const BOTTOM_GROOVE = inch(0.25);
+
 const PULL_WIDTH_MAX = inch(4.5);
 const PULL_DEPTH_MAX = inch(1.125);
 
@@ -99,6 +103,10 @@ export function drawerBoxParts(opts: {
       cut: { length: boxW, width: boxH, thickness: sideT },
     });
   }
+  // The bottom rides in a 1/4"-deep groove all around — cut 1/2" over the
+  // inside dimensions, its edges buried in the boards.
+  const bottomW = endW + 2 * BOTTOM_GROOVE;
+  const bottomD = boxD - 2 * sideT + 2 * BOTTOM_GROOVE;
   parts.push({
     id: `${idPrefix}-bottom`,
     name: 'Drawer bottom',
@@ -106,11 +114,11 @@ export function drawerBoxParts(opts: {
     primitives: [
       {
         shape: 'box',
-        size: [endW, boxD - 2 * sideT, bottomT],
+        size: [bottomW, bottomD, bottomT],
         at: [cx, centerY, bottomZ + BOTTOM_RECESS + bottomT / 2],
       },
     ],
-    cut: { length: endW, width: boxD - 2 * sideT, thickness: bottomT },
+    cut: { length: bottomW, width: bottomD, thickness: bottomT },
   });
   return parts;
 }

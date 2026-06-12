@@ -4,7 +4,7 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { HALF_BLIND_LIP } from './drawerparts';
+import { BOTTOM_GROOVE, HALF_BLIND_LIP } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -43,9 +43,13 @@ export const drawerBox: ComponentDef = {
     { kind: 'material', key: 'material', label: 'Material', default: 'maple', tier: 'basic' },
     { kind: 'boolean', key: 'pull', label: 'Finger pull cutout', default: false, tier: 'advanced' },
     { kind: 'material', key: 'bottomMaterial', label: 'Bottom material', default: 'baltic-birch', tier: 'advanced' },
+    { kind: 'enum', key: 'slideType', label: 'Slides', default: 'side-mount', tier: 'advanced',
+      options: [
+        { value: 'side-mount', label: 'Side-mount' },
+        { value: 'undermount', label: 'Undermount' },
+      ] },
     { kind: 'length', key: 'sideThickness', label: 'Side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
     { kind: 'length', key: 'bottomThickness', label: 'Bottom thickness', default: inch(0.25), min: inch(0.125), max: inch(0.5), tier: 'advanced' },
-    { kind: 'length', key: 'bottomRecess', label: 'Bottom recess', default: inch(0.25), min: inch(0.125), max: inch(0.75), tier: 'advanced' },
   ],
   generate(p): GeneratedModel {
     const W = num(p, 'width');
@@ -53,7 +57,9 @@ export const drawerBox: ComponentDef = {
     const H = num(p, 'height');
     const sideT = num(p, 'sideThickness');
     const bottomT = num(p, 'bottomThickness');
-    const recess = num(p, 'bottomRecess');
+    // The bottom groove height follows the slides: undermounts need 1/2"
+    // under the bottom for the slide body, side-mounts 1/4".
+    const recess = str(p, 'slideType') === 'undermount' ? inch(0.5) : inch(0.25);
     const mat = str(p, 'material');
     const joinery = str(p, 'joinery');
     const halfBlind = joinery === 'half-blind';
@@ -71,9 +77,9 @@ export const drawerBox: ComponentDef = {
 
     // Engine joinery end to end: tails boards for the sides, pins boards for
     // the front and back (the front optionally scooped for the pull).
-    // Half-blind is the engine construction: the front carries blind sockets
-    // and the lap; the sides stop a lip short of it; the back stays through.
-    const sideLen = halfBlind ? D - HALF_BLIND_LIP : D;
+    // Half-blind laps BOTH corners: front and back carry blind sockets and
+    // the 1/16" lap, so the sides lose a lip at each end — 1/8" total.
+    const sideLen = halfBlind ? D - 2 * HALF_BLIND_LIP : D;
     for (const sx of [-1, 1]) {
       parts.push({
         id: `side-${sx}`,
@@ -86,13 +92,12 @@ export const drawerBox: ComponentDef = {
             length: sideLen,
             height: H,
             thickness: sideT,
-            at: [sx * (W / 2 - sideT / 2), halfBlind ? -HALF_BLIND_LIP / 2 : 0, H / 2],
+            at: [sx * (W / 2 - sideT / 2), 0, H / 2],
             lengthAxis: 'y',
             thicknessAxis: 'x',
             joint: jointType,
             jointDepth: sideT,
             lip: halfBlind ? HALF_BLIND_LIP : undefined,
-            lipEnd: halfBlind ? 'positive' : undefined,
           },
         ],
         cut: { length: sideLen, width: H, thickness: sideT },
@@ -103,7 +108,7 @@ export const drawerBox: ComponentDef = {
       const scooped = isFront && (p['pull'] as boolean);
       parts.push({
         id: isFront ? 'front' : 'back',
-        name: isFront ? `Front (${label})` : `Back (${halfBlind ? 'dovetailed' : label})`,
+        name: isFront ? `Front (${label})` : `Back (${label})`,
         material: mat,
         primitives: [
           {
@@ -118,7 +123,7 @@ export const drawerBox: ComponentDef = {
             outerSign: sy,
             joint: jointType,
             jointDepth: sideT,
-            lip: halfBlind && isFront ? HALF_BLIND_LIP : undefined,
+            lip: halfBlind ? HALF_BLIND_LIP : undefined,
             scoop: scooped
               ? { width: Math.min(inch(4.5), endW * 0.4), depth: Math.min(inch(1.125), H * 0.4) }
               : undefined,
@@ -128,14 +133,18 @@ export const drawerBox: ComponentDef = {
       });
     }
 
+    // The bottom rides in a 1/4"-deep groove all around, so it cuts 1/2"
+    // over the inside dimensions; its edges bury into the boards.
+    const bottomW = endW + 2 * BOTTOM_GROOVE;
+    const bottomD = D - 2 * sideT + 2 * BOTTOM_GROOVE;
     parts.push({
       id: 'bottom',
       name: 'Bottom',
       material: str(p, 'bottomMaterial'),
       primitives: [
-        { shape: 'box', size: [endW, D - 2 * sideT, bottomT], at: [0, 0, recess + bottomT / 2] },
+        { shape: 'box', size: [bottomW, bottomD, bottomT], at: [0, 0, recess + bottomT / 2] },
       ],
-      cut: { length: endW, width: D - 2 * sideT, thickness: bottomT },
+      cut: { length: bottomW, width: bottomD, thickness: bottomT },
     });
 
     const slideWarning = slideFitWarning(D);

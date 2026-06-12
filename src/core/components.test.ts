@@ -332,23 +332,43 @@ describe('drawer box', () => {
     expect(standard.findings).toHaveLength(0);
   });
 
-  it('half-blind default: lapped front, through back, sides stop at the lip', () => {
+  it('half-blind default: both corners lapped, sides lose a lip per end', () => {
     const base = defaultParams(def);
     expect(base.joinery).toBe('half-blind');
     const model = def.generate(base);
     const D = base.depth as number;
     const side = model.parts.find((p) => p.id === 'side-1')!;
     const tails = side.primitives[0] as { length?: number; lip?: number; lipEnd?: string };
-    expect(tails.length).toBeCloseTo(D - HALF_BLIND_LIP, 5);
+    expect(tails.length).toBeCloseTo(D - 2 * HALF_BLIND_LIP, 5); // 1/16" per end
     expect(tails.lip).toBeCloseTo(HALF_BLIND_LIP, 5);
-    expect(tails.lipEnd).toBe('positive'); // lap at the show front; through behind
-    const front = model.parts.find((p) => p.id === 'front')!;
-    expect(front.name).toContain('half-blind');
-    expect((front.primitives[0] as { lip?: number }).lip).toBeCloseTo(HALF_BLIND_LIP, 5);
-    const back = model.parts.find((p) => p.id === 'back')!;
-    expect((back.primitives[0] as { lip?: number }).lip).toBeUndefined();
+    expect(tails.lipEnd).toBeUndefined(); // lapped at both ends
+    for (const id of ['front', 'back']) {
+      const board = model.parts.find((p) => p.id === id)!;
+      expect(board.name).toContain('half-blind');
+      expect((board.primitives[0] as { lip?: number }).lip).toBeCloseTo(HALF_BLIND_LIP, 5);
+    }
     // The captured bottom carries its own stock.
     expect(model.parts.find((p) => p.id === 'bottom')!.material).toBe('baltic-birch');
+  });
+
+  it('bottom cuts 1/2" over the inside for its groove; recess follows the slides', () => {
+    const base = defaultParams(def);
+    const W = base.width as number;
+    const D = base.depth as number;
+    const sideT = base.sideThickness as number;
+    const model = def.generate(base);
+    const bottom = model.parts.find((p) => p.id === 'bottom')!;
+    expect(bottom.cut.length).toBeCloseTo(W - 2 * sideT + inch(0.5), 5);
+    expect(bottom.cut.width).toBeCloseTo(D - 2 * sideT + inch(0.5), 5);
+    // Side-mount slides: groove 1/4" up; undermounts: 1/2".
+    const prim = bottom.primitives[0] as { at: number[]; size: number[] };
+    expect(prim.at[2] - prim.size[2] / 2).toBeCloseTo(inch(0.25), 5);
+    const under = def.generate({ ...base, slideType: 'undermount' });
+    const uPrim = under.parts.find((p) => p.id === 'bottom')!.primitives[0] as {
+      at: number[];
+      size: number[];
+    };
+    expect(uPrim.at[2] - uPrim.size[2] / 2).toBeCloseTo(inch(0.5), 5);
   });
 });
 
