@@ -119,7 +119,7 @@ export type Primitive =
       /** Blind mortise pockets cut into the side faces. z is post-local
        *  (centered); width runs along the in-face horizontal axis, height
        *  along the post length, depth into the face. */
-      mortises: { face: 'x+' | 'x-' | 'y+' | 'y-'; z: number; width: number; height: number; depth: number; flare?: number; openTop?: boolean }[];
+      mortises: { face: 'x+' | 'x-' | 'y+' | 'y-'; z: number; width: number; height: number; depth: number; flare?: number; openTop?: boolean; roundBottom?: boolean }[];
     }
   | {
       shape: 'frenchDovetail';

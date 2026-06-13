@@ -139,15 +139,16 @@ export const entryBench: ComponentDef = {
     });
 
     // Aprons under the seat and rails under the shelf's front and back
-    // edges, running between the legs at the half-leg setback. Joinery into
-    // the legs (mortise & tenon by default) is added by the joint system —
-    // see defaultJoints below — so the aprons here are plain boards.
+    // edges, running between the legs. Each member is centered on its legs —
+    // its midplane lies on the leg centerline (legX/legY), so the mortise &
+    // tenon sits in the middle of the post. Joinery into the legs is added by
+    // the joint system (see defaultJoints), so these are plain boards here.
     const span = envW - 2 * legT;
     const endSpan = envD - 2 * legT;
     const apronH = Math.min(RAIL_HEIGHT, legH - seatT);
 
     for (const sy of [-1, 1]) {
-      const apronY = cy + sy * (envD / 2 - SB - apronT / 2);
+      const apronY = cy + sy * legY; // centered on the front/back legs
       const apronZ = H - seatT - apronH / 2;
       parts.push({
         id: `apron-${sy}`,
@@ -158,7 +159,7 @@ export const entryBench: ComponentDef = {
       });
     }
     for (const sx of [-1, 1]) {
-      const apronX = sx * (envW / 2 - SB - apronT / 2);
+      const apronX = sx * legX; // centered on the end legs
       const apronZ = H - seatT - apronH / 2;
       parts.push({
         id: `apron-end-${sx}`,
@@ -178,7 +179,7 @@ export const entryBench: ComponentDef = {
           {
             shape: 'box',
             size: [span, apronT, railH],
-            at: [0, cy + sy * (envD / 2 - SB - apronT / 2), shelfH - shelfT - railH / 2],
+            at: [0, cy + sy * legY, shelfH - shelfT - railH / 2], // centered on the legs
           },
         ],
         cut: { length: span, width: railH, thickness: apronT },
@@ -195,7 +196,7 @@ export const entryBench: ComponentDef = {
             {
               shape: 'box',
               size: [legT - SB, envD - 2 * legT, railH],
-              at: [sx * (envW / 2 - (legT + SB) / 2), cy, shelfH - shelfT - railH / 2],
+              at: [sx * legX, cy, shelfH - shelfT - railH / 2], // centered on the legs
             },
           ],
           cut: { length: envD - 2 * legT, width: railH, thickness: legT - SB },

@@ -41,6 +41,9 @@ export interface PostMortise {
   /** Open the groove out the post's top face (a sliding-dovetail socket the
    *  rail drops into from above). The band runs to the post top. */
   openTop?: boolean;
+  /** Round the groove floor to a half-round (the negative of a French
+   *  dovetail key's rounded router bottom) instead of a flat cap. */
+  roundBottom?: boolean;
 }
 
 /** Rounded-rect cross-section (centered) with optional rectangular notches
@@ -125,16 +128,17 @@ export function mortisedPostGeometry(
   const eps = 0.5;
   // Group mortises that share a Z band (rounded), combining their faces.
   type Notch = { w: number; d: number; flare?: number };
-  const groups = new Map<string, { z: number; bh: number; openTop: boolean; notches: Partial<Record<string, Notch>> }>();
+  const groups = new Map<string, { z: number; bh: number; openTop: boolean; roundBottom: boolean; notches: Partial<Record<string, Notch>> }>();
   for (const m of mortises) {
     const key = (Math.round(m.z * 100) / 100).toString();
     let g = groups.get(key);
     if (!g) {
-      g = { z: m.z, bh: m.height, openTop: false, notches: {} };
+      g = { z: m.z, bh: m.height, openTop: false, roundBottom: false, notches: {} };
       groups.set(key, g);
     }
     g.bh = Math.max(g.bh, m.height);
     if (m.openTop) g.openTop = true;
+    if (m.roundBottom) g.roundBottom = true;
     g.notches[m.face] = { w: m.width, d: Math.min(m.depth, (m.face.startsWith('x') ? hx : hy) * 0.8), flare: m.flare };
   }
   const bands = [...groups.values()].sort((a, b) => a.z - b.z);
@@ -149,6 +153,16 @@ export function mortisedPostGeometry(
     return g;
   };
 
+  // Shrink every notch toward a slit by factor f (1 = full, 0 = closed),
+  // keeping its depth — the cross-section used to round a groove floor.
+  const scaleNotches = (notches: Partial<Record<string, Notch>>, f: number) => {
+    const out: Partial<Record<string, Notch>> = {};
+    for (const [face, n] of Object.entries(notches)) {
+      if (n) out[face] = { w: n.w * f, d: n.d, flare: (n.flare ?? 0) * f };
+    }
+    return out;
+  };
+
   const pieces: THREE.BufferGeometry[] = [];
   let cursor = -h / 2;
   for (const b of bands) {
@@ -157,7 +171,28 @@ export function mortisedPostGeometry(
     // into from above); otherwise it's a blind band capped by plain stock.
     const z1 = b.openTop ? h / 2 : b.z + b.bh / 2;
     if (z0 - eps > cursor) pieces.push(extrude(cursor, z0 + eps, {})); // plain below, overlapping in
-    pieces.push(extrude(z0, z1, b.notches)); // notched band
+    if (b.roundBottom) {
+      // Round the groove floor to match a French dovetail key's half-round
+      // router bottom: over the bottom `rb`, the notch narrows to a slit
+      // following a semicircle (depth held — the round runs along the depth
+      // axis, as the male key's bottom does).
+      let rb = 0;
+      for (const n of Object.values(b.notches)) if (n) rb = Math.max(rb, n.w / 2 + (n.flare ?? 0));
+      rb = Math.min(rb, (z1 - z0) * 0.9);
+      const SUB = 10;
+      const zc = z0 + rb;
+      for (let k = 0; k < SUB; k++) {
+        const za = z0 + (rb * k) / SUB;
+        const zb = z0 + (rb * (k + 1)) / SUB;
+        // Evaluate at the band top (its widest point) so the socket always
+        // clears the key inside the sub-band.
+        const f = Math.sqrt(Math.max(1 - ((zc - zb) / rb) ** 2, 0));
+        pieces.push(extrude(za, zb + eps, scaleNotches(b.notches, f)));
+      }
+      pieces.push(extrude(zc, z1, b.notches)); // straight groove above the round
+    } else {
+      pieces.push(extrude(z0, z1, b.notches)); // notched band
+    }
     cursor = z1 - eps;
   }
   if (cursor < h / 2 - eps) pieces.push(extrude(cursor, h / 2, {})); // plain to the top (unless open)

@@ -9,6 +9,8 @@ import * as THREE from 'three';
 import type { Instance, ProjectDoc, Units } from '../core/types';
 import { evaluateInstance, modelBBox } from '../core/evaluate';
 import { formatLength } from '../core/units';
+import { buildCutList, boardFeet } from '../core/cutlist';
+import { MATERIAL_BY_ID } from '../core/materials';
 import { buildExportGroup } from './exportModel';
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
@@ -205,20 +207,61 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
     viewLabel(rightLeft + D / 2, yW + ds * 1.6, 'RIGHT'),
   ];
 
+  // Cut list (bill of materials): every part aggregated by stock size and
+  // material, with quantities, dimensions and shop notes — the rest of what a
+  // shop needs to build the piece beyond the elevations.
+  const rows = buildCutList({ schema: 1, name: inst.name, units: 'imperial', instances: [inst] })[0]?.rows ?? [];
+  const partTotal = rows.reduce((s, r) => s + r.qty, 0);
+  const bdft = rows.reduce((s, r) => s + boardFeet(r), 0);
+  const matNames = [...new Set(rows.map((r) => MATERIAL_BY_ID[r.material]?.name ?? r.material))];
+
   const contentRight = rightLeft + D;
   const titleY = frontBottom + dimOff + ds * 3;
+  const today = new Date().toISOString().slice(0, 10);
   const title = [
     `<line x1="${margin.toFixed(2)}" y1="${titleY.toFixed(2)}" x2="${contentRight.toFixed(2)}" y2="${titleY.toFixed(2)}" stroke="#1b1b1b" stroke-width="${(sw * 1.5).toFixed(3)}"/>`,
     `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 1.3).toFixed(2)}" font-size="${ts.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${esc(inst.name)}</text>`,
     `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 2.6).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif">${esc(`${formatLength(W, units)} W × ${formatLength(D, units)} D × ${formatLength(H, units)} H`)}</text>`,
+    `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 3.7).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif">${esc(`${partTotal} parts · ${bdft.toFixed(1)} bd ft · ${matNames.join(', ') || '—'}`)}</text>`,
     `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 1.3).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" text-anchor="end" font-family="sans-serif">MEJA Designs · mejadesigns.com</text>`,
-    `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 2.6).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#999" text-anchor="end" font-family="sans-serif">Proprietary drawing — not for distribution</text>`,
+    `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 2.6).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#666" text-anchor="end" font-family="sans-serif">${esc(`Third-angle · NTS · ${today}`)}</text>`,
+    `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 3.7).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#999" text-anchor="end" font-family="sans-serif">Proprietary drawing — not for distribution</text>`,
   ];
 
+  // Cut-list table, headed and ruled, below the title block.
+  const tableTop = titleY + ts * 4.6;
+  const rowH = ds * 1.7;
+  const tableW = contentRight - margin;
+  const cx = [0.0, 0.08, 0.42, 0.64, 0.86].map((f) => margin + f * tableW);
+  const rule = (y: number, weight = sw) =>
+    `<line x1="${margin.toFixed(2)}" y1="${y.toFixed(2)}" x2="${contentRight.toFixed(2)}" y2="${y.toFixed(2)}" stroke="#1b1b1b" stroke-width="${weight.toFixed(3)}"/>`;
+  const cell = (x: number, y: number, t: string, bold = false, end = false) =>
+    `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif"${bold ? ' font-weight="600"' : ''}${end ? ' text-anchor="end"' : ''}>${esc(t)}</text>`;
+  const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+  const table: string[] = [rule(tableTop, sw * 1.5)];
+  const hy = tableTop + rowH * 0.85;
+  table.push(cell(cx[0], hy, 'QTY', true));
+  table.push(cell(cx[1], hy, 'PART', true));
+  table.push(cell(cx[2], hy, 'MATERIAL', true));
+  table.push(cell(cx[3], hy, 'L × W × T', true));
+  table.push(cell(cx[4], hy, 'NOTES', true));
+  table.push(rule(tableTop + rowH));
+  rows.forEach((r, i) => {
+    const y = tableTop + rowH * (i + 1) + rowH * 0.7;
+    const dimStr = `${formatLength(r.length, units)} × ${formatLength(r.width, units)} × ${formatLength(r.thickness, units)}`;
+    table.push(cell(cx[0], y, `${r.qty}`));
+    table.push(cell(cx[1], y, clip(r.part, 28)));
+    table.push(cell(cx[2], y, clip(MATERIAL_BY_ID[r.material]?.name ?? r.material, 20)));
+    table.push(cell(cx[3], y, dimStr));
+    table.push(cell(cx[4], y, clip(r.note ?? '', 22)));
+  });
+  const tableBottom = tableTop + rowH * (rows.length + 1);
+  table.push(rule(tableBottom, sw * 1.5));
+
   return {
-    content: [views, ...dims, ...labels, ...title].join('\n'),
+    content: [views, ...dims, ...labels, ...title, ...table].join('\n'),
     width: contentRight + margin,
-    height: titleY + ts * 3.4,
+    height: tableBottom + margin,
   };
 }
 

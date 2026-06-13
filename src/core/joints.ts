@@ -193,7 +193,7 @@ function mortiseLeg(
   ra: BBox,
   axis: number,
   depth: number,
-  socket?: { width: number; height: number; flare: number; zCenter?: number; openTop?: boolean },
+  socket?: { width: number; height: number; flare: number; zCenter?: number; openTop?: boolean; roundBottom?: boolean },
 ): Part | null {
   if (axis === 2) return null; // mortise on a post's end face — not supported
   const { thinAxis, thin, wide } = tenonCrossSection(ra, axis);
@@ -212,6 +212,7 @@ function mortiseLeg(
     depth,
     flare,
     openTop: socket?.openTop,
+    roundBottom: socket?.roundBottom,
   });
 
   // Find an existing post to extend, or convert the leg's body primitive.
@@ -325,6 +326,7 @@ export function applyJoints(
           flare: (spec.tipThin - spec.rootThin) / 2,
           zCenter: spec.keyCenter,
           openTop: true,
+          roundBottom: true,
         });
         if (mortised) result.set(joint.legId, mortised);
       } else if (style === 'mortise-tenon') {

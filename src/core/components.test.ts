@@ -967,12 +967,13 @@ describe('entryway bench', () => {
     );
     expect(Math.max(...xs)).toBeCloseTo(W / 2 - ovEnd - legT / 2, 5);
     expect(shelf.cut.length).toBeCloseTo(W - 2 * ovEnd - legT, 5);
-    // Aprons share the same setback from the leg faces.
+    // Aprons are centered on the legs: the apron's midplane lies on the leg
+    // centerline (D/2 − front overhang − half a leg in from the seat edge).
     const apron = model.parts.find((p) => p.id === 'apron-1')!;
     const prim = apron.primitives[0] as { at: number[]; size: number[] };
     const D = base.depth as number;
     const ovFront = base.frontOverhang as number;
-    expect(prim.at[1] + prim.size[1] / 2).toBeCloseTo(D / 2 - ovFront - legT / 2, 5);
+    expect(prim.at[1]).toBeCloseTo(D / 2 - ovFront - legT / 2, 5);
   });
 
   it('stands on the floor with the seat at the requested height', () => {
