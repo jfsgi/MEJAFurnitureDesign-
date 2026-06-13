@@ -9,7 +9,7 @@ import { formatLength, formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
 import { exportModel, type ModelFormat } from '../studio/exportModel';
 import { instanceShopDrawingSVG, shopDrawingsSVG } from '../studio/shopDrawing';
-import { sendQuote } from '../studio/quoteApi';
+import { sendProduct } from '../studio/quoteApi';
 import { quotePayloadJSON } from '../core/quote';
 import { DownloadIcon, WarningIcon } from './icons';
 
@@ -84,20 +84,20 @@ export function DocumentsView() {
     useStore.getState().showToast(`${format.toUpperCase()} exported (millimeters, Z-up)`);
   };
 
-  // Quote export: each piece is sent as a product with its child parts, POSTed
-  // to the MEJA quoting app. If the POST doesn't land, the JSON downloads so
-  // the data isn't lost.
-  const exportQuote = async () => {
+  // Product-library export: each piece is sent as a parametric product (params
+  // + adjustable dimensions + child parts) to the CRM's product library. If the
+  // POST doesn't land, the JSON downloads so the data isn't lost.
+  const exportProduct = async () => {
     const toast = useStore.getState().showToast;
     if (doc.instances.length === 0) {
-      toast('Nothing to quote — add a piece first.');
+      toast('Nothing to send — add a piece first.');
       return;
     }
-    toast('Sending quote to the quoting system…');
-    const result = await sendQuote(doc);
+    toast('Adding to the product library…');
+    const result = await sendProduct(doc);
     toast(result.message);
     if (!result.ok) {
-      download(new Blob([quotePayloadJSON(doc)], { type: 'application/json' }), 'quote.json');
+      download(new Blob([quotePayloadJSON(doc)], { type: 'application/json' }), 'product.json');
     }
   };
 
@@ -156,10 +156,10 @@ export function DocumentsView() {
                 </button>
                 <button
                   className="btn"
-                  onClick={exportQuote}
-                  title="Send each piece to the quoting system as a product with its child parts"
+                  onClick={exportProduct}
+                  title="Add each piece to the CRM product library as a parametric product (dimensions + child parts)"
                 >
-                  <DownloadIcon /> Send to quote
+                  <DownloadIcon /> Add to product library
                 </button>
               </div>
             </div>

@@ -3,7 +3,7 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "headers": [
     {
       "source": "/assets/(.*)",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "source": "/((?!assets/).*)",
+      "source": "/((?!assets/|api/).*)",
       "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
     }
   ]

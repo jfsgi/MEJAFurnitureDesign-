@@ -37,11 +37,38 @@ describe('quote export', () => {
     expect(rail!.note).toMatch(/dowel/);
   });
 
-  it('serializes a stable, parseable payload envelope', () => {
-    const json = quotePayloadJSON(docWith('drawer-box', 'Box'));
+  it('carries the parametric source: component, params, and adjustable dimensions', () => {
+    const [bench] = buildQuoteProducts(docWith('entry-bench', 'Bench'));
+    expect(bench.componentId).toBe('entry-bench');
+    // Params are the native (mm) values the recompute endpoint consumes.
+    expect(bench.params.width).toBeGreaterThan(1000); // 48" ≈ 1219 mm
+    const width = bench.dimensions.find((d) => d.key === 'width');
+    expect(width).toBeDefined();
+    expect(width!.mm).toBeCloseTo(bench.params.width as number, 1);
+    expect(width!.maxMm).toBeGreaterThan(width!.minMm);
+  });
+
+  it('recomputes child parts when an overall dimension changes', () => {
+    const wider: ProjectDoc = {
+      schema: 1,
+      name: 'Quote test',
+      units: 'imperial',
+      // 60" wide instead of the 48" default — the seat must follow.
+      instances: [{ id: 'a', componentId: 'entry-bench', name: 'Bench', position: [0, 0], rotationZ: 0, params: { width: 60 * 25.4 } }],
+    };
+    const [bench] = buildQuoteProducts(wider);
+    expect(bench.overall.width).toBeCloseTo(60, 1);
+    const seat = bench.parts.find((p) => p.name === 'Seat')!;
+    expect(seat.length).toBeCloseTo(60, 1);
+  });
+
+  it('serializes a stable, parseable payload envelope with a recompute hook', () => {
+    const json = quotePayloadJSON(docWith('drawer-box', 'Box'), 'https://atelier3d.example/api/recompute');
     const parsed = JSON.parse(json) as ReturnType<typeof buildQuotePayload>;
     expect(parsed.source).toBe('Atelier3D');
     expect(parsed.units).toBe('in');
     expect(parsed.products[0].parts.length).toBeGreaterThan(0);
+    expect(parsed.recompute.url).toBe('https://atelier3d.example/api/recompute');
+    expect(parsed.recompute.method).toBe('POST');
   });
 });

@@ -1,10 +1,13 @@
-// Quote export: each design piece becomes a "product" carrying its overall
-// dimensions and a flat list of its child parts (the cut list), ready to post
-// to MEJA's quoting system to build the product and its parts. Pure and
-// serializable — the transport (live API or file) lives in the studio layer.
+// Product-library export: each design piece becomes a parametric "product" —
+// its overall dimensions, the child parts (cut list), AND the component params
+// and adjustable dimensions, so the CRM can store it in the product library and
+// later re-derive the parts when an overall dimension changes on a quote (by
+// POSTing the edited params back to the recompute endpoint). Pure and
+// serializable — the transport lives in the studio layer.
 
-import type { ProjectDoc, Units } from './types';
-import { evaluateInstance, modelBBox } from './evaluate';
+import type { LengthParam, ProjectDoc, Units } from './types';
+import { effectiveParams, evaluateInstance, modelBBox } from './evaluate';
+import { REGISTRY } from './components/registry';
 import { boardFeet, buildCutList } from './cutlist';
 import { MATERIAL_BY_ID } from './materials';
 import { MM_PER_INCH } from './units';
@@ -24,7 +27,19 @@ export interface QuotePart {
   note?: string;
 }
 
-/** One product = one design piece, with overall size and its child parts. */
+/** An adjustable dimension of a product (a length parameter), in millimeters
+ * (the native param unit the recompute endpoint consumes). */
+export interface QuoteDimension {
+  key: string;
+  label: string;
+  mm: number;
+  minMm: number;
+  maxMm: number;
+  tier: string;
+}
+
+/** One product = one design piece: overall size, child parts, AND the
+ * parametric source (component id + params + adjustable dimensions). */
 export interface QuoteProduct {
   id: string;
   name: string;
@@ -34,6 +49,11 @@ export interface QuoteProduct {
   boardFeet: number;
   /** Total piece count across all child parts. */
   partCount: number;
+  /** Native component params (millimeters / enums). POST these — with edits —
+   *  to the recompute endpoint to re-derive the parts. */
+  params: Record<string, unknown>;
+  /** The length params, with bounds (millimeters) — what a quote may change. */
+  dimensions: QuoteDimension[];
   parts: QuotePart[];
 }
 
@@ -43,6 +63,8 @@ export interface QuotePayload {
   project: string;
   units: 'in' | 'mm';
   generatedAt: string;
+  /** How the CRM re-derives a product's parts when a dimension changes. */
+  recompute: { url: string; method: 'POST'; body: string };
   products: QuoteProduct[];
 }
 
@@ -54,7 +76,8 @@ const round = (n: number, d: number): number => {
 const toUnit = (mm: number, units: Units): number =>
   units === 'imperial' ? round(mm / MM_PER_INCH, 3) : round(mm, 1);
 
-/** One product per instance: overall dimensions + every part as a child. */
+/** One product per instance: overall dimensions, every part as a child, and the
+ * parametric source so the product can be re-derived from edited dimensions. */
 export function buildQuoteProducts(doc: ProjectDoc): QuoteProduct[] {
   const units = doc.units;
   return doc.instances.map((inst) => {
@@ -79,6 +102,18 @@ export function buildQuoteProducts(doc: ProjectDoc): QuoteProduct[] {
           height: toUnit(box.max[2] - box.min[2], units),
         }
       : { width: 0, depth: 0, height: 0 };
+    const def = REGISTRY[inst.componentId];
+    const params = effectiveParams(inst);
+    const dimensions: QuoteDimension[] = (def?.params ?? [])
+      .filter((p): p is LengthParam => p.kind === 'length')
+      .map((p) => ({
+        key: p.key,
+        label: p.label,
+        mm: round(params[p.key] as number, 2),
+        minMm: p.min,
+        maxMm: p.max,
+        tier: p.tier,
+      }));
     return {
       id: inst.id,
       name: inst.name,
@@ -87,22 +122,29 @@ export function buildQuoteProducts(doc: ProjectDoc): QuoteProduct[] {
       materials: [...new Set(parts.map((p) => p.material))],
       boardFeet: round(parts.reduce((s, p) => s + p.boardFeet, 0), 2),
       partCount: parts.reduce((s, p) => s + p.qty, 0),
+      params: params as Record<string, unknown>,
+      dimensions,
       parts,
     };
   });
 }
 
-export function buildQuotePayload(doc: ProjectDoc): QuotePayload {
+export function buildQuotePayload(doc: ProjectDoc, recomputeUrl = '/api/recompute'): QuotePayload {
   return {
     source: 'Atelier3D',
     version: 1,
     project: doc.name,
     units: doc.units === 'imperial' ? 'in' : 'mm',
     generatedAt: new Date().toISOString(),
+    recompute: {
+      url: recomputeUrl,
+      method: 'POST',
+      body: 'POST { componentId, params, units } with edited params; returns the product with recomputed parts.',
+    },
     products: buildQuoteProducts(doc),
   };
 }
 
-export function quotePayloadJSON(doc: ProjectDoc): string {
-  return JSON.stringify(buildQuotePayload(doc), null, 2);
+export function quotePayloadJSON(doc: ProjectDoc, recomputeUrl?: string): string {
+  return JSON.stringify(buildQuotePayload(doc, recomputeUrl), null, 2);
 }
