@@ -148,14 +148,67 @@ function renderView(
   ].join('\n');
 }
 
-/** A two-view (face + edge) drawing of one part with hidden-line removal and a
- * dimensioned outline, laid out from (x0, yTop) within cellW. Returns the SVG
- * and the vertical space it consumed. */
+const JOINT_LABEL: Record<string, string> = {
+  'mortise-tenon': 'Mortise & tenon',
+  'french-dovetail': 'French dovetail',
+  'through-dovetail': 'Through dovetail',
+  'half-blind-dovetail': 'Half-blind dovetail',
+  'box-joint': 'Box joint',
+  dowel: 'Dowel',
+  butt: 'Butt',
+};
+
+/** Shop notes for a part: joinery, corner radii, edge treatments, and other
+ * machining a maker needs beyond the stock size. Read off the real primitives
+ * plus the instance's joint assignments. */
+function partDetails(
+  part: { id: string; primitives: Primitive[]; cut: { note?: string } },
+  joints: Record<string, string> | undefined,
+  units: Units,
+): string[] {
+  const out: string[] = [];
+  const add = (s: string) => {
+    if (s && !out.includes(s)) out.push(s);
+  };
+  if (part.cut.note) add(part.cut.note);
+  for (const prim of part.primitives) {
+    if (prim.shape === 'roundedSlab') {
+      if (prim.radius > 0.5) add(`${formatLength(prim.radius, units)} corner radius`);
+      if (prim.edge && prim.edge > 0.5)
+        add(`${formatLength(prim.edge, units)} ${prim.edgeMode === 'top' ? 'half-bullnose' : 'bullnose'} edge${prim.squareBack ? ' (square back)' : ''}`);
+    } else if (prim.shape === 'roundedNotchedSlab') {
+      if (prim.radius > 0.5) add(`${formatLength(prim.radius, units)} corner radius`);
+      add('Notched at the posts');
+    } else if (prim.shape === 'mortisedPost') {
+      if (prim.radius > 0.5) add(`${formatLength(prim.radius, units)} corner radius`);
+      const open = prim.mortises.some((m) => m.openTop);
+      const n = prim.mortises.length;
+      if (n) add(`${n} ${open ? 'sliding-dovetail socket' : 'mortise'}${n > 1 ? 's' : ''}`);
+    } else if (prim.shape === 'frenchDovetail') {
+      add('French dovetail key (slides in from the top)');
+    } else if (prim.shape === 'jointedBoard') {
+      add(prim.joint === 'box-joint' ? 'Box joint' : prim.lip ? 'Half-blind dovetail' : 'Through dovetail');
+    } else if (prim.shape === 'taperedBox') {
+      add('Tapered');
+    } else if (prim.shape === 'archedBoard') {
+      add(prim.arch === 'scoop' ? 'Finger-pull scoop' : 'Relief arch');
+    }
+  }
+  for (const [key, style] of Object.entries(joints ?? {})) {
+    if (key.split('|').includes(part.id)) add(`${JOINT_LABEL[style] ?? style} joint`);
+  }
+  return out;
+}
+
+/** A two-view (face + edge) drawing of one part with hidden-line removal, a
+ * dimensioned outline, and a shop-note list, laid out from (x0, yTop) within
+ * cellW. Returns the SVG and the vertical space it consumed. */
 function renderPartCell(
   pieces: Piece[],
   name: string,
   qty: number,
   cut: { length: number; width: number; thickness: number },
+  details: string[],
   units: Units,
   x0: number,
   yTop: number,
@@ -215,7 +268,13 @@ function renderPartCell(
     tx(x0 + ds * 0.7, (edgeTop + edgeBottom) / 2, formatLength(cut.thickness, units), true),
   ];
   const label = `<text x="${x0.toFixed(2)}" y="${labelY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${esc(qty > 1 ? `${name} ×${qty}` : name)}</text>`;
-  return { svg: [label, views, ...dims].join('\n'), height: yLen + ds * 1.4 - yTop };
+  const noteTop = yLen + ds * 1.9;
+  const notes = details.map(
+    (d, i) =>
+      `<text x="${x0.toFixed(2)}" y="${(noteTop + i * ds * 0.95).toFixed(2)}" font-size="${(ds * 0.78).toFixed(2)}" fill="#555" font-family="sans-serif">• ${esc(d)}</text>`,
+  );
+  const bottom = details.length ? noteTop + (details.length - 1) * ds * 0.95 + ds * 0.6 : yLen + ds;
+  return { svg: [label, views, ...dims, ...notes].join('\n'), height: bottom - yTop };
 }
 
 interface Drawing {
@@ -367,15 +426,16 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
     parts.push(
       `<text x="${margin.toFixed(2)}" y="${headerY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">PART DRAWINGS</text>`,
     );
+    // Two columns keep the part views large and readable.
     const gridW = contentRight - margin;
-    const cols = Math.max(1, Math.min(4, Math.floor(gridW / (span * 0.55))));
+    const cols = Math.max(1, Math.min(2, Math.floor(gridW / (span * 0.7))));
     const cellW = gridW / cols;
     let gy = headerY + ds * 1.4;
     let rowMaxH = 0;
     partDefs.forEach((d, i) => {
       const col = i % cols;
       if (col === 0 && i > 0) {
-        gy += rowMaxH + ds * 1.6;
+        gy += rowMaxH + ds * 2;
         rowMaxH = 0;
       }
       const c = renderPartCell(
@@ -383,10 +443,11 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
         d.part.name,
         d.row.qty,
         { length: d.row.length, width: d.row.width, thickness: d.row.thickness },
+        partDetails(d.part, inst.joints, units),
         units,
         margin + col * cellW,
         gy,
-        cellW - ds,
+        cellW - ds * 1.5,
         sw,
       );
       parts.push(c.svg);
