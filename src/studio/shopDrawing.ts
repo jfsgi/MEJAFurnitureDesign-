@@ -12,6 +12,12 @@ import { formatLength } from '../core/units';
 import { buildCutList, boardFeet } from '../core/cutlist';
 import { MATERIAL_BY_ID } from '../core/materials';
 import { buildExportGroup } from './exportModel';
+// Embedded as a base64 data URI so every drawing carries the MEJA logo and
+// stays self-contained when the SVG is downloaded or printed.
+import mejaLogo from '../assets/meja-logo.png?inline';
+
+const LOGO_W = 803; // native pixels of meja-logo.png (for the symbol viewBox)
+const LOGO_H = 868;
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
 
@@ -218,18 +224,27 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
   const contentRight = rightLeft + D;
   const titleY = frontBottom + dimOff + ds * 3;
   const today = new Date().toISOString().slice(0, 10);
+  // MEJA logo plate at the top-right of the title block; brand text stacks
+  // beneath it, right-aligned.
+  const logoH = ts * 2.0;
+  const logoW = logoH * (LOGO_W / LOGO_H);
+  const logoX = contentRight - logoW;
+  const logoY = titleY + ts * 0.4;
+  const brandTop = logoY + logoH + ds * 1.1;
   const title = [
     `<line x1="${margin.toFixed(2)}" y1="${titleY.toFixed(2)}" x2="${contentRight.toFixed(2)}" y2="${titleY.toFixed(2)}" stroke="#1b1b1b" stroke-width="${(sw * 1.5).toFixed(3)}"/>`,
     `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 1.3).toFixed(2)}" font-size="${ts.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${esc(inst.name)}</text>`,
     `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 2.6).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif">${esc(`${formatLength(W, units)} W × ${formatLength(D, units)} D × ${formatLength(H, units)} H`)}</text>`,
     `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 3.7).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif">${esc(`${partTotal} parts · ${bdft.toFixed(1)} bd ft · ${matNames.join(', ') || '—'}`)}</text>`,
-    `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 1.3).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" text-anchor="end" font-family="sans-serif">MEJA Designs · mejadesigns.com</text>`,
-    `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 2.6).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#666" text-anchor="end" font-family="sans-serif">${esc(`Third-angle · NTS · ${today}`)}</text>`,
-    `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 3.7).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#999" text-anchor="end" font-family="sans-serif">Proprietary drawing — not for distribution</text>`,
+    `<use href="#meja-logo" xlink:href="#meja-logo" x="${logoX.toFixed(2)}" y="${logoY.toFixed(2)}" width="${logoW.toFixed(2)}" height="${logoH.toFixed(2)}"/>`,
+    `<text x="${contentRight.toFixed(2)}" y="${brandTop.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" text-anchor="end" font-family="sans-serif">mejadesigns.com</text>`,
+    `<text x="${contentRight.toFixed(2)}" y="${(brandTop + ds * 1.1).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#666" text-anchor="end" font-family="sans-serif">${esc(`Third-angle · NTS · ${today}`)}</text>`,
+    `<text x="${contentRight.toFixed(2)}" y="${(brandTop + ds * 2.2).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#999" text-anchor="end" font-family="sans-serif">Proprietary drawing — not for distribution</text>`,
   ];
 
-  // Cut-list table, headed and ruled, below the title block.
-  const tableTop = titleY + ts * 4.6;
+  // Cut-list table, headed and ruled, below the title block (clear of the
+  // logo plate, which is the tallest element on the right).
+  const tableTop = Math.max(titleY + ts * 4.6, brandTop + ds * 2.9);
   const rowH = ds * 1.7;
   const tableW = contentRight - margin;
   const cx = [0.0, 0.08, 0.42, 0.64, 0.86].map((f) => margin + f * tableW);
@@ -266,7 +281,10 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
 }
 
 function wrap(content: string, width: number, height: number): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width.toFixed(2)} ${height.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}"><rect width="100%" height="100%" fill="#ffffff"/>${content}</svg>`;
+  // The MEJA logo is defined once as a scalable symbol; each drawing places it
+  // with <use>, so the base64 image appears a single time per document.
+  const defs = `<defs><symbol id="meja-logo" viewBox="0 0 ${LOGO_W} ${LOGO_H}"><image width="${LOGO_W}" height="${LOGO_H}" href="${mejaLogo}" xlink:href="${mejaLogo}"/></symbol></defs>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${width.toFixed(2)} ${height.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}">${defs}<rect width="100%" height="100%" fill="#ffffff"/>${content}</svg>`;
 }
 
 export function instanceShopDrawingSVG(inst: Instance, units: Units): string {
