@@ -280,8 +280,8 @@ export function archedBoardGeometry(
     // S-ramps up to the full height hz, then runs flat to the back. The low end
     // is at +X (so a waterfall-y rotation lands it on the drawer's front, +Y).
     const frontLow = hz - rise;
-    const ff = 0.28; // front flat fraction
-    const rf = 0.46; // ramp fraction
+    const ff = 0.16; // front flat fraction — keep the dip toward the front
+    const rf = 0.3; // ramp fraction; the back ~54% runs full height
     const smooth = (p: number) => p * p * (3 - 2 * p);
     const topAt = (x: number) => {
       const uu = (hx - x) / sx; // 0 at the low front (+hx), 1 at the back (−hx)

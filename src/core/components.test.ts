@@ -295,6 +295,16 @@ describe('drawer box', () => {
     expect(modelBBox(model)!.max[2]).toBeCloseTo(inch(5), 1);
   });
 
+  it('scooped front still takes the finger-pull cutout', () => {
+    const base = defaultParams(def);
+    const plain = def.generate({ ...base, scoopedSides: true });
+    expect((plain.parts.find((p) => p.id === 'front')!.primitives[0] as { shape: string }).shape).toBe('box');
+    const pulled = def.generate({ ...base, scoopedSides: true, pull: true });
+    const front = pulled.parts.find((p) => p.id === 'front')!.primitives[0] as { shape: string; arch?: string };
+    expect(front.shape).toBe('archedBoard');
+    expect(front.arch).toBe('scoop');
+  });
+
   it('records the joinery choice on the jointed parts', () => {
     const base = defaultParams(def);
     const dovetail = def.generate(base);

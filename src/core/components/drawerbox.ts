@@ -85,11 +85,19 @@ export const drawerBox: ComponentDef = {
       // finger-joint boards are uniform height, so they can't carry the ramped
       // top + the front/back joints at two different heights.
       const frontH = Math.min(Math.max(num(p, 'frontHeight'), inch(0.75)), H - inch(0.75));
+      const pull = p['pull'] as boolean;
+      const pullW = Math.min(inch(5.5877), W * 0.4);
+      const pullD = Math.min(inch(0.75), frontH * 0.5);
+      const frontAt: [number, number, number] = [0, D / 2 - sideT / 2, frontH / 2];
       parts.push({
         id: 'front',
-        name: 'Front (low)',
+        name: pull ? 'Front (low, pull)' : 'Front (low)',
         material: mat,
-        primitives: [{ shape: 'box', size: [W, sideT, frontH], at: [0, D / 2 - sideT / 2, frontH / 2], grain: 'x' }],
+        primitives: [
+          pull
+            ? { shape: 'archedBoard', size: [W, sideT, frontH], at: frontAt, arch: 'scoop', rise: pullD, shoulder: (W - pullW) / 2 }
+            : { shape: 'box', size: [W, sideT, frontH], at: frontAt, grain: 'x' },
+        ],
         cut: { length: W, width: frontH, thickness: sideT },
       });
       parts.push({
