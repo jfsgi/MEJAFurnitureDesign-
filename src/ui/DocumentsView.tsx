@@ -7,6 +7,7 @@ import { SHEET_L, SHEET_W, buildStockBreakdown, type SheetLayout } from '../core
 import { MATERIAL_BY_ID } from '../core/materials';
 import { formatLength, formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
+import { exportModel, type ModelFormat } from '../studio/exportModel';
 import { DownloadIcon, WarningIcon } from './icons';
 
 function SheetDiagram({ layout, index, units }: { layout: SheetLayout; index: number; units: 'imperial' | 'metric' }) {
@@ -53,13 +54,23 @@ export function DocumentsView() {
   const unitMark = units === 'imperial' ? 'inches' : 'mm';
   const dim = (mm: number) => formatLengthBare(mm, units);
 
-  const exportCSV = () => {
-    const blob = new Blob([cutListCSV(doc, units)], { type: 'text/csv' });
+  const download = (blob: Blob, suffix: string) => {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `${doc.name.replace(/[^\w.-]+/g, '-')}-cutlist.csv`;
+    a.download = `${doc.name.replace(/[^\w.-]+/g, '-')}-${suffix}`;
     a.click();
     URL.revokeObjectURL(a.href);
+  };
+
+  const exportCSV = () => download(new Blob([cutListCSV(doc, units)], { type: 'text/csv' }), 'cutlist.csv');
+
+  const export3D = (format: ModelFormat) => {
+    if (doc.instances.length === 0) {
+      useStore.getState().showToast('Nothing to export — add a piece first.');
+      return;
+    }
+    download(exportModel(doc, format), `model.${format}`);
+    useStore.getState().showToast(`${format.toUpperCase()} exported (millimeters, Z-up)`);
   };
 
   const stock = page === 'stock' ? buildStockBreakdown(doc) : null;
@@ -86,7 +97,7 @@ export function DocumentsView() {
           <button className="doc-item" disabled title="Arrives in Phase 2">
             Assembly drawings
           </button>
-          <button className="doc-item" disabled title="Arrives in Phase 2">
+          <button className="doc-item" disabled title="3D export (STL / OBJ) lives on the cut list page; DXF / STEP arrive in Phase 2">
             DXF / STEP export
           </button>
         </div>
@@ -102,9 +113,17 @@ export function DocumentsView() {
                   {doc.name} · regenerated live from the model · dimensions in {unitMark}
                 </div>
               </div>
-              <button className="btn" onClick={exportCSV}>
-                <DownloadIcon /> Export CSV
-              </button>
+              <div className="sheet-actions">
+                <button className="btn" onClick={exportCSV}>
+                  <DownloadIcon /> Export CSV
+                </button>
+                <button className="btn" onClick={() => export3D('stl')} title="3D mesh for CAM / 3D printing">
+                  <DownloadIcon /> Export STL
+                </button>
+                <button className="btn" onClick={() => export3D('obj')} title="3D model with per-part names">
+                  <DownloadIcon /> Export OBJ
+                </button>
+              </div>
             </div>
 
             {groups.length === 0 && (

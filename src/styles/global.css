@@ -1205,3 +1205,10 @@ button {
   margin-bottom: 6px;
   cursor: pointer;
 }
+
+/* Document export buttons grouped in the sheet header. */
+.sheet-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
