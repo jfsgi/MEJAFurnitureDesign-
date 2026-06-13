@@ -85,10 +85,18 @@ describe('joinery engine', () => {
       | { shape: string; top: [number, number]; bottom: [number, number] }
       | undefined;
     expect(tongue).toBeDefined();
-    // The tongue is a dovetail: its two ends differ in the wide cross-section.
-    expect(tongue!.top[0]).not.toBeCloseTo(tongue!.bottom[0], 1);
+    // The tongue is a dovetail: it flares in the thickness axis, so the two
+    // ends differ in exactly one cross-section slot (and match in the other).
+    const dt0 = Math.abs(tongue!.top[0] - tongue!.bottom[0]);
+    const dt1 = Math.abs(tongue!.top[1] - tongue!.bottom[1]);
+    expect(Math.max(dt0, dt1)).toBeGreaterThan(1); // flares
+    expect(Math.min(dt0, dt1)).toBeCloseTo(0, 1); // constant in the wide axis
     const leg = out.find((p) => p.id === 'leg')!;
-    expect(leg.primitives.some((p) => p.shape === 'mortisedPost')).toBe(true);
+    const legPost = leg.primitives.find((p) => p.shape === 'mortisedPost') as
+      | { mortises: { flare?: number }[] }
+      | undefined;
+    expect(legPost).toBeDefined();
+    expect(legPost!.mortises[0].flare).toBeGreaterThan(0); // dovetail socket, not straight
   });
 
   it('dowel adds dowels to the rail without cutting the leg', () => {

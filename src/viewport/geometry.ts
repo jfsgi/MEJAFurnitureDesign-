@@ -29,12 +29,15 @@ export interface PostMortise {
   face: 'x+' | 'x-' | 'y+' | 'y-';
   /** Pocket center along the post's length (Z), post-local (centered at 0). */
   z: number;
-  /** Pocket size along the in-face horizontal axis. */
+  /** Pocket size along the in-face horizontal axis (at the mouth). */
   width: number;
   /** Pocket size along the post length (Z). */
   height: number;
   /** Pocket depth into the face. */
   depth: number;
+  /** Dovetail flare: the pocket widens this much per side toward its depth
+   *  (a sliding-dovetail socket). 0 = straight mortise walls. */
+  flare?: number;
 }
 
 /** Rounded-rect cross-section (centered) with optional rectangular notches
@@ -43,18 +46,19 @@ function postCrossSection(
   hx: number,
   hy: number,
   r: number,
-  notches: Partial<Record<'x+' | 'x-' | 'y+' | 'y-', { w: number; d: number }>>,
+  notches: Partial<Record<'x+' | 'x-' | 'y+' | 'y-', { w: number; d: number; flare?: number }>>,
 ): THREE.Shape {
   const s = new THREE.Shape();
   const clampW = (w: number, span: number) => Math.min(w, span * 0.9);
   s.moveTo(-(hx - r), -hy);
-  // Bottom edge (face y-): +x, inward +y.
+  // Bottom edge (face y-): +x, inward +y. A dovetail flare widens the deep side.
   const yb = notches['y-'];
   if (yb) {
     const w = clampW(yb.w, 2 * (hx - r)) / 2;
+    const fw = w + (yb.flare ?? 0);
     s.lineTo(-w, -hy);
-    s.lineTo(-w, -hy + yb.d);
-    s.lineTo(w, -hy + yb.d);
+    s.lineTo(-fw, -hy + yb.d);
+    s.lineTo(fw, -hy + yb.d);
     s.lineTo(w, -hy);
   }
   s.lineTo(hx - r, -hy);
@@ -63,9 +67,10 @@ function postCrossSection(
   const xp = notches['x+'];
   if (xp) {
     const w = clampW(xp.w, 2 * (hy - r)) / 2;
+    const fw = w + (xp.flare ?? 0);
     s.lineTo(hx, -w);
-    s.lineTo(hx - xp.d, -w);
-    s.lineTo(hx - xp.d, w);
+    s.lineTo(hx - xp.d, -fw);
+    s.lineTo(hx - xp.d, fw);
     s.lineTo(hx, w);
   }
   s.lineTo(hx, hy - r);
@@ -74,9 +79,10 @@ function postCrossSection(
   const yt = notches['y+'];
   if (yt) {
     const w = clampW(yt.w, 2 * (hx - r)) / 2;
+    const fw = w + (yt.flare ?? 0);
     s.lineTo(w, hy);
-    s.lineTo(w, hy - yt.d);
-    s.lineTo(-w, hy - yt.d);
+    s.lineTo(fw, hy - yt.d);
+    s.lineTo(-fw, hy - yt.d);
     s.lineTo(-w, hy);
   }
   s.lineTo(-(hx - r), hy);
@@ -85,9 +91,10 @@ function postCrossSection(
   const xm = notches['x-'];
   if (xm) {
     const w = clampW(xm.w, 2 * (hy - r)) / 2;
+    const fw = w + (xm.flare ?? 0);
     s.lineTo(-hx, w);
-    s.lineTo(-hx + xm.d, w);
-    s.lineTo(-hx + xm.d, -w);
+    s.lineTo(-hx + xm.d, fw);
+    s.lineTo(-hx + xm.d, -fw);
     s.lineTo(-hx, -w);
   }
   s.lineTo(-hx, -(hy - r));
@@ -114,7 +121,8 @@ export function mortisedPostGeometry(
   const r = Math.max(0, Math.min(radius, hx - 0.1, hy - 0.1));
   const eps = 0.5;
   // Group mortises that share a Z band (rounded), combining their faces.
-  const groups = new Map<string, { z: number; bh: number; notches: Partial<Record<string, { w: number; d: number }>> }>();
+  type Notch = { w: number; d: number; flare?: number };
+  const groups = new Map<string, { z: number; bh: number; notches: Partial<Record<string, Notch>> }>();
   for (const m of mortises) {
     const key = (Math.round(m.z * 100) / 100).toString();
     let g = groups.get(key);
@@ -123,11 +131,11 @@ export function mortisedPostGeometry(
       groups.set(key, g);
     }
     g.bh = Math.max(g.bh, m.height);
-    g.notches[m.face] = { w: m.width, d: Math.min(m.depth, (m.face.startsWith('x') ? hx : hy) * 0.8) };
+    g.notches[m.face] = { w: m.width, d: Math.min(m.depth, (m.face.startsWith('x') ? hx : hy) * 0.8), flare: m.flare };
   }
   const bands = [...groups.values()].sort((a, b) => a.z - b.z);
 
-  const extrude = (z0: number, z1: number, notches: Partial<Record<string, { w: number; d: number }>>) => {
+  const extrude = (z0: number, z1: number, notches: Partial<Record<string, Notch>>) => {
     const g = new THREE.ExtrudeGeometry(postCrossSection(hx, hy, r, notches), {
       depth: z1 - z0,
       bevelEnabled: false,

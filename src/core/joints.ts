@@ -114,21 +114,28 @@ function tenonPrims(rail: Part, ra: BBox, la: BBox, axis: number, tenonLen: numb
  * cross-section slots for a given projection axis (verified empirically). */
 const TAPER_ORDER: Record<number, [number, number]> = { 0: [2, 1], 1: [0, 2], 2: [0, 1] };
 
-/** Adds a French (sliding) dovetail tongue to the rail: a key projecting from
- * the rail end that flares wider toward its tip, in the board's wide axis —
- * the male half digitized from MEJA's drawing. The mating socket is cut by
- * the same mortise routine (it holds the tongue's tip section). */
+/** French (sliding) dovetail geometry, digitized from MEJA's drawing: a key
+ * projecting from the rail end that flares across the board THICKNESS (not
+ * the width) — root ≈ 0.45 t, tip ≈ 0.667 t over the stock thickness t — and
+ * runs most of the board width. The female socket is the negative. */
+function dovetailSpec(ra: BBox, axis: number, proj: number) {
+  const { thinAxis, wideAxis } = tenonCrossSection(ra, axis);
+  const t = size(ra, thinAxis); // stock thickness (the flaring axis)
+  const tipThin = 0.667 * t;
+  const rootThin = 0.45 * t;
+  const wideExtent = Math.max(size(ra, wideAxis) - 2 * SHOULDER, size(ra, wideAxis) * 0.5);
+  return { thinAxis, wideAxis, tipThin, rootThin, wideExtent, proj };
+}
+
 function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Primitive[] {
-  const { thinAxis, wideAxis, thin, wide } = tenonCrossSection(ra, axis);
-  const flare = Math.min(proj * 0.19, ((wide - thin) / 2) * 0.6); // ~10.7° dovetail
-  const tipWide = wide;
-  const rootWide = Math.max(wide - 2 * flare, thin * 1.2);
+  const { thinAxis, wideAxis, tipThin, rootThin, wideExtent } = dovetailSpec(ra, axis, proj);
   const dir = Math.sign(center(la, axis) - center(ra, axis)) || 1;
   const railEnd = center(ra, axis) + (dir * size(ra, axis)) / 2;
   const [f, s] = TAPER_ORDER[axis];
-  const dim = (perpAxis: number, wideVal: number): number => (perpAxis === wideAxis ? wideVal : thin);
-  const tip: [number, number] = [dim(f, tipWide), dim(s, tipWide)];
-  const root: [number, number] = [dim(f, rootWide), dim(s, rootWide)];
+  // Flare the thin (thickness) axis; keep the wide extent constant.
+  const dim = (perpAxis: number, thinVal: number): number => (perpAxis === thinAxis ? thinVal : wideExtent);
+  const tip: [number, number] = [dim(f, tipThin), dim(s, tipThin)];
+  const root: [number, number] = [dim(f, rootThin), dim(s, rootThin)];
   const at: [number, number, number] = [0, 0, 0];
   at[axis] = railEnd + (dir * proj) / 2;
   at[thinAxis] = center(ra, thinAxis);
@@ -136,7 +143,7 @@ function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Pr
   return [
     {
       shape: 'taperedBox',
-      top: dir > 0 ? tip : root, // taperedBox 'top' is the +axis end
+      top: dir > 0 ? tip : root, // taperedBox 'top' is the +axis end (the tip when dir>0)
       bottom: dir > 0 ? root : tip,
       height: proj,
       at,
@@ -152,16 +159,31 @@ function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Pr
  * square post for a box leg). Multiple joints on one leg accumulate into the
  * same post. Legs that aren't post-shaped (tapered, etc.) return null.
  */
-function mortiseLeg(leg: Part, la: BBox, ra: BBox, axis: number, depth: number): Part | null {
+function mortiseLeg(
+  leg: Part,
+  la: BBox,
+  ra: BBox,
+  axis: number,
+  depth: number,
+  socket?: { width: number; height: number; flare: number },
+): Part | null {
   if (axis === 2) return null; // mortise on a post's end face — not supported
-  const { thinAxis, wideAxis, thin, wide } = tenonCrossSection(ra, axis);
+  const { thinAxis, thin, wide } = tenonCrossSection(ra, axis);
   // In-face horizontal axis = the perp axis that isn't the post length (Z=2).
   const horiz = axis === 0 ? 1 : 0;
-  const horizSize = horiz === thinAxis ? thin : wide;
-  const vertSize = 2 === thinAxis ? thin : wide; // along the post length (Z)
-  void wideAxis;
+  const horizSize = socket ? socket.width : horiz === thinAxis ? thin : wide;
+  const vertSize = socket ? socket.height : 2 === thinAxis ? thin : wide; // along Z
+  const flare = socket?.flare;
   const dir = Math.sign(center(ra, axis) - center(la, axis)) || 1; // toward the rail
   const face = (['x', 'y'] as const)[axis] + (dir > 0 ? '+' : '-');
+  const mortise = (z: number) => ({
+    face: face as PostMortiseFace,
+    z,
+    width: horizSize,
+    height: vertSize,
+    depth,
+    flare,
+  });
 
   // Find an existing post to extend, or convert the leg's body primitive.
   const existing = leg.primitives.find((p) => p.shape === 'mortisedPost') as
@@ -170,12 +192,7 @@ function mortiseLeg(leg: Part, la: BBox, ra: BBox, axis: number, depth: number):
   const zLocalCenter = (Math.max(la.min[2], ra.min[2]) + Math.min(la.max[2], ra.max[2])) / 2;
 
   if (existing) {
-    const zLocal = zLocalCenter - existing.at[2];
-    const mortises = [
-      ...existing.mortises,
-      { face: face as PostMortiseFace, z: zLocal, width: horizSize, height: vertSize, depth },
-    ];
-    const updated: Primitive = { ...existing, mortises };
+    const updated: Primitive = { ...existing, mortises: [...existing.mortises, mortise(zLocalCenter - existing.at[2])] };
     return { ...leg, primitives: leg.primitives.map((p) => (p === existing ? updated : p)) };
   }
 
@@ -195,7 +212,7 @@ function mortiseLeg(leg: Part, la: BBox, ra: BBox, axis: number, depth: number):
     at,
     radius,
     grain: 'z',
-    mortises: [{ face: face as PostMortiseFace, z: zLocalCenter - at[2], width: horizSize, height: vertSize, depth }],
+    mortises: [mortise(zLocalCenter - at[2])],
   };
   const others = leg.primitives.filter((p) => p !== src);
   return { ...leg, primitives: [post, ...others] };
@@ -261,12 +278,22 @@ export function applyJoints(
       const ra = boxes.get(joint.railId)!;
       const la = boxes.get(joint.legId)!;
       const tenonLen = Math.min(inch(0.875), size(la, joint.axis) * 0.6);
-      if (style === 'mortise-tenon' || style === 'french-dovetail') {
-        const male =
-          style === 'french-dovetail'
-            ? dovetailTonguePrims(ra, la, joint.axis, tenonLen)
-            : tenonPrims(rail, ra, la, joint.axis, tenonLen);
-        result.set(joint.railId, { ...rail, primitives: [...rail.primitives, ...male] });
+      if (style === 'french-dovetail') {
+        const proj = Math.min(tenonLen, size(la, joint.axis) * 0.6);
+        const spec = dovetailSpec(ra, joint.axis, proj);
+        result.set(joint.railId, {
+          ...rail,
+          primitives: [...rail.primitives, ...dovetailTonguePrims(ra, la, joint.axis, proj)],
+        });
+        // Socket: mouth = root width, flaring to the tip — the tongue's negative.
+        const mortised = mortiseLeg(leg, la, ra, joint.axis, proj, {
+          width: spec.rootThin,
+          height: spec.wideExtent,
+          flare: (spec.tipThin - spec.rootThin) / 2,
+        });
+        if (mortised) result.set(joint.legId, mortised);
+      } else if (style === 'mortise-tenon') {
+        result.set(joint.railId, { ...rail, primitives: [...rail.primitives, ...tenonPrims(rail, ra, la, joint.axis, tenonLen)] });
         const mortised = mortiseLeg(leg, la, ra, joint.axis, tenonLen);
         if (mortised) result.set(joint.legId, mortised);
       } else if (style === 'dowel') {
