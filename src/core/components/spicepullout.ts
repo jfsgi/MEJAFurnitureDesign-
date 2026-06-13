@@ -1,8 +1,9 @@
 // Base-cabinet pull-out spice rack, after MEJA's narrow filler pull-out
-// (El Compa Ruffles style): four corner posts carry a stack of shelves, and
-// each shelf is fenced on its long sides by round dowel galley rails so the
-// jars ride out of the cabinet without spilling. The unit rolls out on
-// side-mount or undermount slides; it's modeled standing on the floor.
+// (El Compa Ruffles style): four corner posts carry a stack of shelves,
+// solid front and back panels close the pull-direction ends, and each shelf
+// is fenced on its long sides by round dowel galley rails so the jars ride
+// out of the cabinet without spilling. The unit rolls out on side-mount or
+// undermount slides; it's modeled standing on the floor.
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
@@ -86,6 +87,18 @@ export const spicePullout: ComponentDef = {
           thickness: st,
           note: i === 0 ? `${slide === 'undermount' ? 'Undermount' : 'Side-mount'} slide base` : undefined,
         },
+      });
+    }
+
+    // Solid panels close the front and back (the pull-direction ends),
+    // flush with the posts and spanning the full height.
+    for (const sy of [-1, 1]) {
+      parts.push({
+        id: sy > 0 ? 'front-panel' : 'back-panel',
+        name: sy > 0 ? 'Front panel' : 'Back panel',
+        material: mat,
+        primitives: [{ shape: 'box', size: [innerW, st, H], at: [0, sy * (D / 2 - st / 2), H / 2] }],
+        cut: { length: H, width: innerW, thickness: st },
       });
     }
 

@@ -652,6 +652,9 @@ describe('spice rack pull-out', () => {
     expect(names.filter((n) => n === 'Corner post')).toHaveLength(4);
     expect(names.filter((n) => n === 'Bottom shelf')).toHaveLength(1);
     expect(names.filter((n) => n === 'Shelf')).toHaveLength(2); // tiers − 1 at default tiers = 3
+    // Solid front and back close the pull-direction ends.
+    expect(names.filter((n) => n === 'Front panel')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Back panel')).toHaveLength(1);
     // tiers × 2 sides × railRows + 2 top tie rails = 3·2·2 + 2
     expect(names.filter((n) => n === 'Galley rail')).toHaveLength(14);
   });
