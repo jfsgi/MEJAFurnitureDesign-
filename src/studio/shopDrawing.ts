@@ -257,11 +257,12 @@ function renderJointDetail(
   parts.push(
     `<polygon points="${x0k.toFixed(2)},${(midY - rootPx / 2).toFixed(2)} ${(x0k + depthPx).toFixed(2)},${(midY - tipPx / 2).toFixed(2)} ${(x0k + depthPx).toFixed(2)},${(midY + tipPx / 2).toFixed(2)} ${x0k.toFixed(2)},${(midY + rootPx / 2).toFixed(2)}" fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
   );
-  parts.push(hdim(x0k, x0k + depthPx, midY + Math.max(tipPx, rootPx) / 2 + ds * 1.0, `${L(f.depth)} deep`));
+  const baseY = midY + Math.max(tipPx, rootPx) / 2;
+  parts.push(hdim(x0k, x0k + depthPx, baseY + ds * 1.0, `${L(f.depth)} deep`));
   parts.push(vdim(midY - rootPx / 2, midY + rootPx / 2, x0k - ds * 0.7, L(f.rootThin)));
   parts.push(vdim(midY - tipPx / 2, midY + tipPx / 2, x0k + depthPx + ds * 0.7, L(f.tipThin)));
-  parts.push(txt(dx0, midY + Math.max(tipPx, rootPx) / 2 + ds * 2.0, `Run ${L(f.runH)} (slides in from the top)`, 'start'));
-  return { svg: parts.join(''), height: midY + Math.max(tipPx, rootPx) / 2 + ds * 2.4 - dyTop };
+  parts.push(txt(dx0, baseY + ds * 3.0, `Run ${L(f.runH)}, slides in from the top`, 'start'));
+  return { svg: parts.join(''), height: baseY + ds * 3.4 - dyTop };
 }
 function partDetails(
   part: { id: string; primitives: Primitive[]; cut: { note?: string } },
@@ -410,18 +411,17 @@ function renderPartCell(
       `<text x="${x0.toFixed(2)}" y="${(noteTop + i * ds * 0.95).toFixed(2)}" font-size="${(ds * 0.78).toFixed(2)}" fill="#555" font-family="sans-serif">• ${esc(d)}</text>`,
   );
   const notesBottom = details.length ? noteTop + (details.length - 1) * ds * 0.95 + ds * 0.6 : yLen + ds;
-  // Dimensioned joint detail(s) to the right of the notes.
-  const detailX = x0 + cellW * 0.5;
-  const detailW = cellW * 0.5;
+  // Dimensioned joint detail(s), stacked BELOW the notes at full width so
+  // nothing overlaps the note text.
   const detailSvg: string[] = [];
-  let dy = yLen + ds * 1.4;
+  let dy = notesBottom + ds * 0.4;
   for (const f of features) {
-    const titleY = dy + ds;
-    const d = renderJointDetail(f, units, detailX, titleY, detailW, sw, ds);
+    const titleY = dy + ds * 0.9;
+    const d = renderJointDetail(f, units, x0 + ds, titleY, cellW * 0.66, sw, ds);
     detailSvg.push(d.svg);
-    dy = titleY + d.height + ds * 0.8;
+    dy = titleY + d.height + ds * 1.0;
   }
-  const bottom = Math.max(notesBottom, features.length ? dy : 0);
+  const bottom = features.length ? dy : notesBottom;
   return { svg: [label, views, ...dims, ...radius, ...notes, ...detailSvg].join('\n'), height: bottom - yTop };
 }
 
@@ -571,21 +571,31 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
   let partsBottom = tableBottom;
   if (partDefs.length > 0) {
     const headerY = tableBottom + ds * 2.2;
-    parts.push(
-      `<text x="${margin.toFixed(2)}" y="${headerY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">PART DRAWINGS</text>`,
-    );
-    // Two columns keep the part views large and readable.
+    // Two columns keep the part views large and readable; each part is boxed in
+    // its own card, rows share a uniform height.
     const gridW = contentRight - margin;
     const cols = Math.max(1, Math.min(2, Math.floor(gridW / (span * 0.7))));
     const cellW = gridW / cols;
-    let gy = headerY + ds * 1.4;
+    const borders: string[] = [];
+    const cells: string[] = [];
+    let gy = headerY + ds * 1.7;
     let rowMaxH = 0;
+    let rowCols: number[] = [];
+    const flushRow = (h: number) => {
+      for (const x of rowCols)
+        borders.push(
+          `<rect x="${x.toFixed(2)}" y="${(gy - ds * 0.8).toFixed(2)}" width="${(cellW - ds * 0.5).toFixed(2)}" height="${(h + ds * 1.1).toFixed(2)}" rx="${(ds * 0.3).toFixed(2)}" fill="none" stroke="#d8d4c8" stroke-width="${sw.toFixed(3)}"/>`,
+        );
+      rowCols = [];
+    };
     partDefs.forEach((d, i) => {
       const col = i % cols;
       if (col === 0 && i > 0) {
-        gy += rowMaxH + ds * 2;
+        flushRow(rowMaxH);
+        gy += rowMaxH + ds * 2.4;
         rowMaxH = 0;
       }
+      const cellX = margin + col * cellW;
       const inMT = Object.entries(inst.joints ?? {}).some(
         ([k, s]) => s === 'mortise-tenon' && k.split('|').includes(d.part.id),
       );
@@ -598,14 +608,21 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
         partJointFeatures(d.part, inMT),
         partCornerRadius(d.part),
         units,
-        margin + col * cellW,
+        cellX + ds * 0.7,
         gy,
-        cellW - ds * 1.5,
+        cellW - ds * 1.8,
         sw,
       );
-      parts.push(c.svg);
+      cells.push(c.svg);
+      rowCols.push(cellX);
       rowMaxH = Math.max(rowMaxH, c.height);
     });
+    flushRow(rowMaxH);
+    parts.push(
+      `<text x="${margin.toFixed(2)}" y="${headerY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">PART DRAWINGS</text>`,
+      ...borders,
+      ...cells,
+    );
     partsBottom = gy + rowMaxH;
   }
 
