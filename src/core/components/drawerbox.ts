@@ -4,7 +4,7 @@
 
 import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
 import { formatLength, inch } from '../units';
-import { BOTTOM_GROOVE, HALF_BLIND_LIP } from './drawerparts';
+import { BOTTOM_GROOVE, HALF_BLIND_LIP, drawerBottomPrims } from './drawerparts';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
 const str = (p: ParamValues, k: string): string => p[k] as string;
@@ -59,7 +59,8 @@ export const drawerBox: ComponentDef = {
     const bottomT = num(p, 'bottomThickness');
     // The bottom groove height follows the slides: undermounts need 1/2"
     // under the bottom for the slide body, side-mounts 1/4".
-    const recess = str(p, 'slideType') === 'undermount' ? inch(0.5) : inch(0.25);
+    const undermount = str(p, 'slideType') === 'undermount';
+    const recess = undermount ? inch(0.5) : inch(0.25);
     const mat = str(p, 'material');
     const joinery = str(p, 'joinery');
     const halfBlind = joinery === 'half-blind';
@@ -139,11 +140,9 @@ export const drawerBox: ComponentDef = {
     const bottomD = D - 2 * sideT + 2 * BOTTOM_GROOVE;
     parts.push({
       id: 'bottom',
-      name: 'Bottom',
+      name: undermount ? 'Bottom (undermount notches)' : 'Bottom',
       material: str(p, 'bottomMaterial'),
-      primitives: [
-        { shape: 'box', size: [bottomW, bottomD, bottomT], at: [0, 0, recess + bottomT / 2] },
-      ],
+      primitives: drawerBottomPrims(bottomW, bottomD, bottomT, [0, 0, recess + bottomT / 2], undermount),
       cut: { length: bottomW, width: bottomD, thickness: bottomT },
     });
 

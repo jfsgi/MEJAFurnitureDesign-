@@ -3,7 +3,7 @@
 // rendered by the 4K engine's joinery generator, plus a recessed bottom,
 // sized for side-mount slides.
 
-import type { Part } from '../types';
+import type { Part, Primitive } from '../types';
 import { inch } from '../units';
 
 const BOTTOM_RECESS = inch(0.25); // drawer bottom sits up in its groove
@@ -26,6 +26,33 @@ export type BoxJoinery = 'dovetail' | 'box-joint';
 
 export type CaseJoinery = 'half-blind-dovetail' | 'through-dovetail' | 'box-joint';
 
+/** Undermount slides need the drawer bottom notched at its two back corners
+ * to clear the locking devices. */
+const UNDERMOUNT_NOTCH_W = inch(0.75); // along the back edge, per corner
+const UNDERMOUNT_NOTCH_D = inch(1.375); // forward from the back edge
+
+/**
+ * Drawer-bottom primitive(s): one panel, or — for undermount slides — a panel
+ * notched at the two BACK corners (−Y) to clear the slide locks. The notch is
+ * cut by building the panel as a front portion plus a back-center strip.
+ */
+export function drawerBottomPrims(
+  w: number,
+  d: number,
+  t: number,
+  at: [number, number, number],
+  undermount = false,
+): Primitive[] {
+  if (!undermount) return [{ shape: 'box', size: [w, d, t], at }];
+  const nw = Math.min(UNDERMOUNT_NOTCH_W, w * 0.25);
+  const nd = Math.min(UNDERMOUNT_NOTCH_D, d * 0.45);
+  const [cx, cy, cz] = at;
+  return [
+    { shape: 'box', size: [w, d - nd, t], at: [cx, cy + nd / 2, cz] }, // front portion
+    { shape: 'box', size: [w - 2 * nw, nd, t], at: [cx, cy - d / 2 + nd / 2, cz] }, // back center strip
+  ];
+}
+
 export function drawerBoxParts(opts: {
   idPrefix: string;
   boxW: number;
@@ -42,6 +69,8 @@ export function drawerBoxParts(opts: {
   centerX?: number;
   /** Corner joint rendered at all four corners. */
   joinery?: BoxJoinery;
+  /** Notch the bottom's back corners for undermount slide hardware. */
+  undermount?: boolean;
 }): Part[] {
   const { idPrefix, boxW, boxD, boxH, centerY, bottomZ, sideT, bottomT, material, pull } = opts;
   const cx = opts.centerX ?? 0;
@@ -111,15 +140,15 @@ export function drawerBoxParts(opts: {
   const bottomD = boxD - 2 * sideT + 2 * BOTTOM_GROOVE;
   parts.push({
     id: `${idPrefix}-bottom`,
-    name: 'Drawer bottom',
+    name: opts.undermount ? 'Drawer bottom (undermount notches)' : 'Drawer bottom',
     material,
-    primitives: [
-      {
-        shape: 'box',
-        size: [bottomW, bottomD, bottomT],
-        at: [cx, centerY, bottomZ + BOTTOM_RECESS + bottomT / 2],
-      },
-    ],
+    primitives: drawerBottomPrims(
+      bottomW,
+      bottomD,
+      bottomT,
+      [cx, centerY, bottomZ + BOTTOM_RECESS + bottomT / 2],
+      opts.undermount,
+    ),
     cut: { length: bottomW, width: bottomD, thickness: bottomT },
   });
   return parts;

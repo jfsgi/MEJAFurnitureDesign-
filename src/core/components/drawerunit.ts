@@ -111,6 +111,11 @@ export const drawerUnit: ComponentDef = {
     { kind: 'length', key: 'boxSideThickness', label: 'Box side thickness', default: inch(0.5), min: inch(0.375), max: inch(0.75), tier: 'advanced' },
     { kind: 'length', key: 'insetReveal', label: 'Inset reveal', default: inch(0.125), min: inch(0.0625), max: inch(0.25), tier: 'advanced' },
     { kind: 'length', key: 'overlayReveal', label: 'Overlay reveal', default: inch(0.0625), min: inch(0.03125), max: inch(0.25), tier: 'advanced' },
+    { kind: 'enum', key: 'slideType', label: 'Slides', default: 'side-mount', tier: 'advanced',
+      options: [
+        { value: 'side-mount', label: 'Side-mount' },
+        { value: 'undermount', label: 'Undermount' },
+      ] },
   ],
   generate(p): GeneratedModel {
     const W = num(p, 'width');
@@ -277,6 +282,7 @@ export const drawerUnit: ComponentDef = {
             bottomT: inch(0.25),
             material: boxMat,
             centerX: colX,
+            undermount: str(p, 'slideType') === 'undermount',
           }),
         );
       }

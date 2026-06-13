@@ -1078,3 +1078,19 @@ describe('art-back entry shelf', () => {
     expect(crowded.findings.some((f) => f.message.includes('crowd'))).toBe(true);
   });
 });
+
+describe('drawer box undermount notches', () => {
+  const def = REGISTRY['drawer-box'];
+
+  it('notches the bottom back corners only for undermount slides', () => {
+    const base = defaultParams(def);
+    const side = def.generate({ ...base, slideType: 'side-mount' }).parts.find((p) => p.id === 'bottom')!;
+    expect(side.primitives).toHaveLength(1); // plain panel
+    const under = def.generate({ ...base, slideType: 'undermount' }).parts.find((p) => p.id === 'bottom')!;
+    expect(under.primitives).toHaveLength(2); // front portion + back-center strip (corners notched)
+    expect(under.name).toContain('undermount');
+    // The back strip is narrower than the full panel (the notches).
+    const widths = under.primitives.map((pr) => (pr as { size: number[] }).size[0]).sort((a, b) => a - b);
+    expect(widths[0]).toBeLessThan(widths[1]);
+  });
+});
