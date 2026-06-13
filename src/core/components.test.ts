@@ -279,6 +279,22 @@ describe('drawer box', () => {
     expect(names.filter((n) => n === 'Bottom')).toHaveLength(1);
   });
 
+  it('scooped sides: low front, full back, waterfall sides', () => {
+    const base = defaultParams(def);
+    const model = def.generate({ ...base, scoopedSides: true, height: inch(5), frontHeight: inch(1.75) });
+    const front = model.parts.find((p) => p.id === 'front')!;
+    expect(front.cut.width).toBeCloseTo(inch(1.75), 5); // the front is the low height
+    const back = model.parts.find((p) => p.id === 'back')!;
+    expect(back.cut.width).toBeCloseTo(inch(5), 5); // the back is full height
+    const side = model.parts.find((p) => p.id === 'side-1')!;
+    const prim = side.primitives[0] as { shape: string; arch?: string; rise?: number };
+    expect(prim.shape).toBe('archedBoard');
+    expect(prim.arch).toBe('waterfall-y');
+    expect(prim.rise).toBeCloseTo(inch(5) - inch(1.75), 5); // ramps the full drop
+    // The box still occupies its full height.
+    expect(modelBBox(model)!.max[2]).toBeCloseTo(inch(5), 1);
+  });
+
   it('records the joinery choice on the jointed parts', () => {
     const base = defaultParams(def);
     const dovetail = def.generate(base);

@@ -216,17 +216,18 @@ function arcOffset(u: number, c: number, r: number): number {
  */
 export function archedBoardGeometry(
   size: V3,
-  arch: 'bottom-x' | 'bottom-y' | 'front' | 'scoop',
+  arch: 'bottom-x' | 'bottom-y' | 'front' | 'scoop' | 'waterfall' | 'waterfall-y',
   rise: number,
   shoulder = 0,
   endSkew = 0,
   uvOffset: UV = [0, 0],
 ): THREE.BufferGeometry {
-  if (arch === 'bottom-y') {
-    // Build along X, then rotate the finished geometry into Y.
+  if (arch === 'bottom-y' || arch === 'waterfall-y') {
+    // Build along X, then rotate the finished geometry into Y (length → +Y, so
+    // the waterfall's low front end lands on model +Y, the drawer's front).
     const geo = archedBoardGeometry(
       [size[1], size[0], size[2]],
-      'bottom-x',
+      arch === 'bottom-y' ? 'bottom-x' : 'waterfall',
       rise,
       shoulder,
       endSkew,
@@ -266,6 +267,50 @@ export function archedBoardGeometry(
       const p1: V3 = [s * hx, hy, -hz];
       const p2: V3 = [s * hx, hy, hz];
       const p3: V3 = [s * hx, -hy, hz];
+      const quad = s > 0 ? [p0, p1, p2, p3] : [p1, p0, p3, p2];
+      mb.quad(quad[0], quad[1], quad[2], quad[3],
+        [v(quad[0][1]), v(quad[0][2])], [v(quad[1][1]), v(quad[1][2])],
+        [v(quad[2][1]), v(quad[2][2])], [v(quad[3][1]), v(quad[3][2])]);
+    }
+    return mb.build();
+  }
+
+  if (arch === 'waterfall') {
+    // Low-front scoop side: the top sits at (hz − rise) across a flat front,
+    // S-ramps up to the full height hz, then runs flat to the back. The low end
+    // is at +X (so a waterfall-y rotation lands it on the drawer's front, +Y).
+    const frontLow = hz - rise;
+    const ff = 0.28; // front flat fraction
+    const rf = 0.46; // ramp fraction
+    const smooth = (p: number) => p * p * (3 - 2 * p);
+    const topAt = (x: number) => {
+      const uu = (hx - x) / sx; // 0 at the low front (+hx), 1 at the back (−hx)
+      if (uu <= ff) return frontLow;
+      if (uu >= ff + rf) return hz;
+      return frontLow + (hz - frontLow) * smooth((uu - ff) / rf);
+    };
+    const segs = ARC_SEGMENTS * 2;
+    const xs: number[] = [];
+    for (let i = 0; i <= segs; i++) xs.push(-hx + (2 * hx * i) / segs);
+    for (let i = 0; i < xs.length - 1; i++) {
+      const [x0, x1] = [xs[i], xs[i + 1]];
+      const [z0, z1] = [topAt(x0), topAt(x1)];
+      // +Y face, −Y face, and the curved top strip.
+      mb.quad([x0, hy, z0], [x1, hy, z1], [x1, hy, -hz], [x0, hy, -hz],
+        [u(x0), v(z0)], [u(x1), v(z1)], [u(x1), v(-hz)], [u(x0), v(-hz)]);
+      mb.quad([x0, -hy, -hz], [x1, -hy, -hz], [x1, -hy, z1], [x0, -hy, z0],
+        [u(x0), v(-hz)], [u(x1), v(-hz)], [u(x1), v(z1)], [u(x0), v(z0)]);
+      mb.quad([x0, -hy, z0], [x1, -hy, z1], [x1, hy, z1], [x0, hy, z0],
+        [u(x0), v(-hy)], [u(x1), v(-hy)], [u(x1), v(hy)], [u(x0), v(hy)]);
+    }
+    mb.quad([-hx, hy, -hz], [hx, hy, -hz], [hx, -hy, -hz], [-hx, -hy, -hz],
+      [u(-hx), v(hy)], [u(hx), v(hy)], [u(hx), v(-hy)], [u(-hx), v(-hy)]);
+    for (const s of [-1, 1]) {
+      const top = s > 0 ? frontLow : hz; // +X end is the low front
+      const p0: V3 = [s * hx, -hy, -hz];
+      const p1: V3 = [s * hx, hy, -hz];
+      const p2: V3 = [s * hx, hy, top];
+      const p3: V3 = [s * hx, -hy, top];
       const quad = s > 0 ? [p0, p1, p2, p3] : [p1, p0, p3, p2];
       mb.quad(quad[0], quad[1], quad[2], quad[3],
         [v(quad[0][1]), v(quad[0][2])], [v(quad[1][1]), v(quad[1][2])],

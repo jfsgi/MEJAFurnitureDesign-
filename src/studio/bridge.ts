@@ -64,7 +64,7 @@ function modelGrainAxis(prim: Primitive): 'x' | 'y' | 'z' {
     case 'taperedBox':
       return prim.axis ?? 'z';
     case 'archedBoard':
-      return prim.arch === 'bottom-y' ? 'y' : 'x';
+      return prim.arch === 'bottom-y' || prim.arch === 'waterfall-y' ? 'y' : 'x';
     case 'roundedSlab':
       return prim.axis === 'y' ? 'z' : 'x';
     case 'roundedNotchedSlab':
@@ -141,7 +141,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.shoulder ?? 0,
             prim.endSkew ?? 0,
           );
-          grain = prim.arch === 'bottom-y' ? 'y' : 'x';
+          grain = prim.arch === 'bottom-y' || prim.arch === 'waterfall-y' ? 'y' : 'x';
         } else if (prim.shape === 'roundedSlab') {
           const vertical = prim.axis === 'y';
           geometry = roundedSlabGeometry(

@@ -187,8 +187,11 @@ export type Primitive =
       at: [number, number, number];
       /** bottom-x/-y: relief arch cut up into the lower edge along that axis;
        *  front: convex half-ellipse bulge on the +Y edge, springing from the corners;
-       *  scoop: smooth finger-pull relief cut down into the top edge along X. */
-      arch: 'bottom-x' | 'bottom-y' | 'front' | 'scoop';
+       *  scoop: smooth finger-pull relief cut down into the top edge along X;
+       *  waterfall/-y: top edge ramps from a low front (+length end) up to the
+       *  full back via an S-curve — a low-front "scoop side" drawer board. */
+      arch: 'bottom-x' | 'bottom-y' | 'front' | 'scoop' | 'waterfall' | 'waterfall-y';
+      /** waterfall: the drop from full height to the low front (height − frontHeight). */
       rise: number;
       /** Flat ends left at either side of a bottom arch. */
       shoulder?: number;

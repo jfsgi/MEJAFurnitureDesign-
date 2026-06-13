@@ -42,6 +42,8 @@ export const drawerBox: ComponentDef = {
       ] },
     { kind: 'material', key: 'material', label: 'Material', default: 'maple', tier: 'basic' },
     { kind: 'boolean', key: 'pull', label: 'Finger pull cutout', default: false, tier: 'advanced' },
+    { kind: 'boolean', key: 'scoopedSides', label: 'Scooped sides (low front)', default: false, tier: 'advanced' },
+    { kind: 'length', key: 'frontHeight', label: 'Scoop front height', default: inch(1.75), min: inch(0.75), max: inch(6), tier: 'advanced' },
     { kind: 'material', key: 'bottomMaterial', label: 'Bottom material', default: 'baltic-birch', tier: 'advanced' },
     { kind: 'enum', key: 'slideType', label: 'Slides', default: 'side-mount', tier: 'advanced',
       options: [
@@ -76,62 +78,103 @@ export const drawerBox: ComponentDef = {
     const parts: Part[] = [];
     const findings: Finding[] = [];
 
-    // Engine joinery end to end: tails boards for the sides, pins boards for
-    // the front and back (the front optionally scooped for the pull).
-    // Half-blind laps BOTH corners: front and back carry blind sockets and
-    // the 1/16" lap, so the sides lose a lip at each end — 1/8" total.
-    const sideLen = halfBlind ? D - 2 * HALF_BLIND_LIP : D;
-    for (const sx of [-1, 1]) {
+    const scoopedSides = p['scoopedSides'] as boolean;
+    if (scoopedSides) {
+      // Low-front "waterfall" box: a low front, a full back, and sides that ramp
+      // from the front height up to the back. Butt-jointed — the engine's
+      // finger-joint boards are uniform height, so they can't carry the ramped
+      // top + the front/back joints at two different heights.
+      const frontH = Math.min(Math.max(num(p, 'frontHeight'), inch(0.75)), H - inch(0.75));
       parts.push({
-        id: `side-${sx}`,
-        name: `Side (${label})`,
+        id: 'front',
+        name: 'Front (low)',
         material: mat,
-        primitives: [
-          {
-            shape: 'jointedBoard',
-            role: 'tails',
-            length: sideLen,
-            height: H,
-            thickness: sideT,
-            at: [sx * (W / 2 - sideT / 2), 0, H / 2],
-            lengthAxis: 'y',
-            thicknessAxis: 'x',
-            joint: jointType,
-            jointDepth: sideT,
-            lip: halfBlind ? HALF_BLIND_LIP : undefined,
-          },
-        ],
-        cut: { length: sideLen, width: H, thickness: sideT },
+        primitives: [{ shape: 'box', size: [W, sideT, frontH], at: [0, D / 2 - sideT / 2, frontH / 2], grain: 'x' }],
+        cut: { length: W, width: frontH, thickness: sideT },
       });
-    }
-    for (const sy of [-1, 1] as const) {
-      const isFront = sy > 0;
-      const scooped = isFront && (p['pull'] as boolean);
       parts.push({
-        id: isFront ? 'front' : 'back',
-        name: isFront ? `Front (${label})` : `Back (${label})`,
+        id: 'back',
+        name: 'Back',
         material: mat,
-        primitives: [
-          {
-            shape: 'jointedBoard',
-            role: 'pins',
-            length: W,
-            height: H,
-            thickness: sideT,
-            at: [0, sy * (D / 2 - sideT / 2), H / 2],
-            lengthAxis: 'x',
-            thicknessAxis: 'y',
-            outerSign: sy,
-            joint: jointType,
-            jointDepth: sideT,
-            lip: halfBlind ? HALF_BLIND_LIP : undefined,
-            scoop: scooped
-              ? { width: Math.min(inch(5.5877), endW * 0.4), depth: Math.min(inch(0.75), H * 0.4) }
-              : undefined,
-          },
-        ],
+        primitives: [{ shape: 'box', size: [W, sideT, H], at: [0, -(D / 2 - sideT / 2), H / 2], grain: 'x' }],
         cut: { length: W, width: H, thickness: sideT },
       });
+      const scoopSideLen = D - 2 * sideT;
+      for (const sx of [-1, 1]) {
+        parts.push({
+          id: `side-${sx}`,
+          name: 'Side (scooped)',
+          material: mat,
+          primitives: [
+            {
+              shape: 'archedBoard',
+              size: [sideT, scoopSideLen, H],
+              at: [sx * (W / 2 - sideT / 2), 0, H / 2],
+              arch: 'waterfall-y',
+              rise: H - frontH,
+            },
+          ],
+          cut: { length: scoopSideLen, width: H, thickness: sideT },
+        });
+      }
+    } else {
+      // Engine joinery end to end: tails boards for the sides, pins boards for
+      // the front and back (the front optionally scooped for the pull).
+      // Half-blind laps BOTH corners: front and back carry blind sockets and
+      // the 1/16" lap, so the sides lose a lip at each end — 1/8" total.
+      const sideLen = halfBlind ? D - 2 * HALF_BLIND_LIP : D;
+      for (const sx of [-1, 1]) {
+        parts.push({
+          id: `side-${sx}`,
+          name: `Side (${label})`,
+          material: mat,
+          primitives: [
+            {
+              shape: 'jointedBoard',
+              role: 'tails',
+              length: sideLen,
+              height: H,
+              thickness: sideT,
+              at: [sx * (W / 2 - sideT / 2), 0, H / 2],
+              lengthAxis: 'y',
+              thicknessAxis: 'x',
+              joint: jointType,
+              jointDepth: sideT,
+              lip: halfBlind ? HALF_BLIND_LIP : undefined,
+            },
+          ],
+          cut: { length: sideLen, width: H, thickness: sideT },
+        });
+      }
+      for (const sy of [-1, 1] as const) {
+        const isFront = sy > 0;
+        const scooped = isFront && (p['pull'] as boolean);
+        parts.push({
+          id: isFront ? 'front' : 'back',
+          name: isFront ? `Front (${label})` : `Back (${label})`,
+          material: mat,
+          primitives: [
+            {
+              shape: 'jointedBoard',
+              role: 'pins',
+              length: W,
+              height: H,
+              thickness: sideT,
+              at: [0, sy * (D / 2 - sideT / 2), H / 2],
+              lengthAxis: 'x',
+              thicknessAxis: 'y',
+              outerSign: sy,
+              joint: jointType,
+              jointDepth: sideT,
+              lip: halfBlind ? HALF_BLIND_LIP : undefined,
+              scoop: scooped
+                ? { width: Math.min(inch(5.5877), endW * 0.4), depth: Math.min(inch(0.75), H * 0.4) }
+                : undefined,
+            },
+          ],
+          cut: { length: W, width: H, thickness: sideT },
+        });
+      }
     }
 
     // The bottom rides in a 1/4"-deep groove all around, so it cuts 1/2"
