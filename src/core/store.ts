@@ -5,7 +5,7 @@
 import { create } from 'zustand';
 import type { JointStyle, ParamValue, ParamValues, ProjectDoc, Units } from './types';
 import { REGISTRY } from './components/registry';
-import { instanceBBox } from './evaluate';
+import { defaultParams, instanceBBox } from './evaluate';
 import { jointKey } from './joints';
 import { inch } from './units';
 
@@ -170,8 +170,10 @@ export const useStore = create<State>()((set, get) => {
       }
       pos = maxX === -Infinity ? [0, 0] : [maxX + inch(24), 0];
     }
+    const def = REGISTRY[componentId];
+    const joints = def?.defaultJoints?.(def ? { ...defaultParams(def), ...params } : params);
     get().commitDoc((doc) => {
-      doc.instances.push({ id, componentId, name, position: pos!, rotationZ: 0, params });
+      doc.instances.push({ id, componentId, name, position: pos!, rotationZ: 0, params, joints });
     });
     set({ selectedId: id });
   };

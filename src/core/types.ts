@@ -107,6 +107,19 @@ export type Primitive =
       grain?: 'x' | 'y' | 'z';
     }
   | {
+      shape: 'mortisedPost';
+      /** w, d, h — the post stands along Z (h is its length). */
+      size: [number, number, number];
+      at: [number, number, number];
+      /** Vertical-corner radius (0 = square post). */
+      radius: number;
+      grain?: 'x' | 'y' | 'z';
+      /** Blind mortise pockets cut into the side faces. z is post-local
+       *  (centered); width runs along the in-face horizontal axis, height
+       *  along the post length, depth into the face. */
+      mortises: { face: 'x+' | 'x-' | 'y+' | 'y-'; z: number; width: number; height: number; depth: number }[];
+    }
+  | {
       shape: 'jointedBoard';
       /** Tails carry the toothed ends (sides); pins carry the complements. */
       role: 'tails' | 'pins';
@@ -179,6 +192,10 @@ export interface ComponentDef {
   mount?: 'floor' | 'wall';
   params: ParamDef[];
   generate(params: ParamValues): GeneratedModel;
+  /** Default joinery for the piece's joints, applied when an instance is
+   *  added (keyed by the sorted part-id pair). The joint editor overrides
+   *  these per joint. */
+  defaultJoints?(params: ParamValues): Record<string, JointStyle>;
 }
 
 /** Joinery a user can assign to a joint between two parts. */

@@ -1288,3 +1288,5 @@ button {
 .joint-picker-styles .btn {
   justify-content: flex-start;
 }
+
+.joint-picker-done { color: #1a9d5c; font-weight: 600; }

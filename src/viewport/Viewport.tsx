@@ -25,6 +25,7 @@ import {
   archedBoardGeometry,
   grainBoxGeometry,
   longestAxis,
+  mortisedPostGeometry,
   roundedSlabGeometry,
   taperedBoxGeometry,
 } from './geometry';
@@ -61,6 +62,7 @@ function PrimitiveMesh({
   selected,
   hovered,
   partHovered,
+  jointed,
   seed,
   partId,
 }: {
@@ -69,13 +71,17 @@ function PrimitiveMesh({
   selected: boolean;
   hovered: boolean;
   partHovered: boolean;
+  jointed: boolean;
   seed: string;
   partId: string;
 }) {
   // Cylinders, engine-jointed boards, and rounded slabs (engine box UVs)
   // carry grain along V — rotated texture.
   const rotatedGrain =
-    prim.shape === 'cylinder' || prim.shape === 'jointedBoard' || prim.shape === 'roundedSlab';
+    prim.shape === 'cylinder' ||
+    prim.shape === 'jointedBoard' ||
+    prim.shape === 'roundedSlab' ||
+    prim.shape === 'mortisedPost';
   const grainTex = mat.grain ? getWoodTexture(mat.id, rotatedGrain) : null;
 
   const geo = useMemo(() => {
@@ -100,6 +106,11 @@ function PrimitiveMesh({
         prim.at,
         prim.axis ?? 'z',
       );
+    }
+    if (prim.shape === 'mortisedPost') {
+      const geo = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
+      applyBoxUVs(geo, GRAIN_MM_U, prim.grain ?? 'z', offset[0], offset[1]);
+      return geo;
     }
     if (prim.shape === 'archedBoard') {
       return archedBoardGeometry(
@@ -144,14 +155,17 @@ function PrimitiveMesh({
   // brightens neutrally (a color tint would distort wood tones). The exact part under
   // the cursor brightens a step further than the rest of its assembly.
   const highlight = hovered && !selected;
+  // A completed joint tints its parts green (unless the part is also under
+  // the cursor / picked, where the white highlight wins for clarity).
+  const showJointed = jointed && !partHovered;
   const material = (
     <meshStandardMaterial
       color={grainTex ? '#ffffff' : mat.color}
       map={grainTex}
       roughness={mat.roughness}
       metalness={mat.metalness}
-      emissive={highlight || selected || partHovered ? '#ffffff' : '#000000'}
-      emissiveIntensity={partHovered ? 0.15 : highlight ? 0.08 : selected ? 0.04 : 0}
+      emissive={showJointed ? '#2bd47a' : highlight || selected || partHovered ? '#ffffff' : '#000000'}
+      emissiveIntensity={showJointed ? 0.22 : partHovered ? 0.15 : highlight ? 0.08 : selected ? 0.04 : 0}
     />
   );
   const edges = (
@@ -235,6 +249,15 @@ function InstanceGroup({ inst }: { inst: Instance }) {
   const jointPickIds = useStore((s) =>
     s.jointPick?.instanceId === inst.id ? s.jointPick.partIds : null,
   );
+  const jointMode = useStore((s) => s.jointMode);
+  // Part ids that participate in a completed joint (shown green in joint mode).
+  const jointedIds = useMemo(() => {
+    const set = new Set<string>();
+    if (jointMode && inst.joints) {
+      for (const key of Object.keys(inst.joints)) for (const id of key.split('|')) set.add(id);
+    }
+    return set;
+  }, [jointMode, inst.joints]);
   const snap = useStore((s) => s.snap);
   const units = useStore((s) => s.doc.units);
   const { select, hover, setHoveredPart, setPosition, beginGesture, endGesture } =
@@ -356,6 +379,7 @@ function InstanceGroup({ inst }: { inst: Instance }) {
                   (hoveredPartIds?.includes(part.id) ?? false) ||
                   (jointPickIds?.includes(part.id) ?? false)
                 }
+                jointed={jointedIds.has(part.id)}
                 seed={`${inst.id}/${part.id}`}
                 partId={part.id}
               />
@@ -735,6 +759,7 @@ function JointPicker() {
             ? 'End-to-face joint'
             : 'Corner joint'
           : "These parts don't meet — pick two that touch."}
+        {current !== 'butt' && <span className="joint-picker-done"> · ✓ {JOINT_LABELS[current]} set</span>}
       </div>
       {joint && (
         <div className="joint-picker-styles">

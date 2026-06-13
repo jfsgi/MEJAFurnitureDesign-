@@ -25,6 +25,134 @@ class MeshBuilder {
 
 const ARC_SEGMENTS = 24;
 
+export interface PostMortise {
+  face: 'x+' | 'x-' | 'y+' | 'y-';
+  /** Pocket center along the post's length (Z), post-local (centered at 0). */
+  z: number;
+  /** Pocket size along the in-face horizontal axis. */
+  width: number;
+  /** Pocket size along the post length (Z). */
+  height: number;
+  /** Pocket depth into the face. */
+  depth: number;
+}
+
+/** Rounded-rect cross-section (centered) with optional rectangular notches
+ * cut into the middle of each face — the mortise mouths. */
+function postCrossSection(
+  hx: number,
+  hy: number,
+  r: number,
+  notches: Partial<Record<'x+' | 'x-' | 'y+' | 'y-', { w: number; d: number }>>,
+): THREE.Shape {
+  const s = new THREE.Shape();
+  const clampW = (w: number, span: number) => Math.min(w, span * 0.9);
+  s.moveTo(-(hx - r), -hy);
+  // Bottom edge (face y-): +x, inward +y.
+  const yb = notches['y-'];
+  if (yb) {
+    const w = clampW(yb.w, 2 * (hx - r)) / 2;
+    s.lineTo(-w, -hy);
+    s.lineTo(-w, -hy + yb.d);
+    s.lineTo(w, -hy + yb.d);
+    s.lineTo(w, -hy);
+  }
+  s.lineTo(hx - r, -hy);
+  s.absarc(hx - r, -(hy - r), r, -Math.PI / 2, 0, false);
+  // Right edge (face x+): +y, inward -x.
+  const xp = notches['x+'];
+  if (xp) {
+    const w = clampW(xp.w, 2 * (hy - r)) / 2;
+    s.lineTo(hx, -w);
+    s.lineTo(hx - xp.d, -w);
+    s.lineTo(hx - xp.d, w);
+    s.lineTo(hx, w);
+  }
+  s.lineTo(hx, hy - r);
+  s.absarc(hx - r, hy - r, r, 0, Math.PI / 2, false);
+  // Top edge (face y+): -x, inward -y.
+  const yt = notches['y+'];
+  if (yt) {
+    const w = clampW(yt.w, 2 * (hx - r)) / 2;
+    s.lineTo(w, hy);
+    s.lineTo(w, hy - yt.d);
+    s.lineTo(-w, hy - yt.d);
+    s.lineTo(-w, hy);
+  }
+  s.lineTo(-(hx - r), hy);
+  s.absarc(-(hx - r), hy - r, r, Math.PI / 2, Math.PI, false);
+  // Left edge (face x-): -y, inward +x.
+  const xm = notches['x-'];
+  if (xm) {
+    const w = clampW(xm.w, 2 * (hy - r)) / 2;
+    s.lineTo(-hx, w);
+    s.lineTo(-hx + xm.d, w);
+    s.lineTo(-hx + xm.d, -w);
+    s.lineTo(-hx, -w);
+  }
+  s.lineTo(-hx, -(hy - r));
+  s.absarc(-(hx - r), -(hy - r), r, Math.PI, Math.PI * 1.5, false);
+  return s;
+}
+
+/**
+ * Vertical post (extruded along Z) with rounded vertical corners and real
+ * blind mortise pockets cut into its faces. Built as a stack of extrusions:
+ * plain rounded bands, and notched bands over each mortise's height. Plain
+ * bands overlap the notched bands slightly so the pocket floor/ceiling read
+ * cleanly and the internal caps bury inside solid (no z-fighting).
+ */
+export function mortisedPostGeometry(
+  w: number,
+  d: number,
+  h: number,
+  radius: number,
+  mortises: PostMortise[],
+): THREE.BufferGeometry {
+  const hx = w / 2;
+  const hy = d / 2;
+  const r = Math.max(0, Math.min(radius, hx - 0.1, hy - 0.1));
+  const eps = 0.5;
+  // Group mortises that share a Z band (rounded), combining their faces.
+  const groups = new Map<string, { z: number; bh: number; notches: Partial<Record<string, { w: number; d: number }>> }>();
+  for (const m of mortises) {
+    const key = (Math.round(m.z * 100) / 100).toString();
+    let g = groups.get(key);
+    if (!g) {
+      g = { z: m.z, bh: m.height, notches: {} };
+      groups.set(key, g);
+    }
+    g.bh = Math.max(g.bh, m.height);
+    g.notches[m.face] = { w: m.width, d: Math.min(m.depth, (m.face.startsWith('x') ? hx : hy) * 0.8) };
+  }
+  const bands = [...groups.values()].sort((a, b) => a.z - b.z);
+
+  const extrude = (z0: number, z1: number, notches: Partial<Record<string, { w: number; d: number }>>) => {
+    const g = new THREE.ExtrudeGeometry(postCrossSection(hx, hy, r, notches), {
+      depth: z1 - z0,
+      bevelEnabled: false,
+      curveSegments: ARC_SEGMENTS,
+    });
+    g.translate(0, 0, z0);
+    return g;
+  };
+
+  const pieces: THREE.BufferGeometry[] = [];
+  let cursor = -h / 2;
+  for (const b of bands) {
+    const z0 = b.z - b.bh / 2;
+    const z1 = b.z + b.bh / 2;
+    if (z0 - eps > cursor) pieces.push(extrude(cursor, z0 + eps, {})); // plain below, overlapping in
+    pieces.push(extrude(z0, z1, b.notches)); // notched band
+    cursor = z1 - eps;
+  }
+  pieces.push(extrude(cursor, h / 2, {})); // plain to the top
+  const merged = mergeGeometries(pieces, false);
+  for (const p of pieces) p.dispose();
+  return merged ?? new THREE.BoxGeometry(w, d, h);
+}
+
+
 /** Circular-arc sampler: chord half-length c, rise r, returns offset above the chord. */
 function arcOffset(u: number, c: number, r: number): number {
   if (r <= 1e-6) return 0; // rise dialed to zero — a straight edge

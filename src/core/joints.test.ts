@@ -42,17 +42,35 @@ describe('joinery engine', () => {
     expect(detectJoint(post, far, bboxOf(post)!, bboxOf(far)!)).toBeNull();
   });
 
-  it('mortise & tenon adds a tenon to the rail and frames a mortise in the leg', () => {
+  it('mortise & tenon adds a tenon to the rail and a mortise to the leg', () => {
     const joints = { [jointKey('leg', 'rail')]: 'mortise-tenon' as const };
     const out = applyJoints([post, rail], joints, bboxOf);
     const outRail = out.find((p) => p.id === 'rail')!;
     const outLeg = out.find((p) => p.id === 'leg')!;
     expect(outRail.primitives.length).toBe(2); // body + tenon
-    // The leg is rebuilt as a back slab + frame pieces around the pocket.
-    expect(outLeg.primitives.length).toBeGreaterThan(1);
-    // The mortise leaves a void: no single prim spans the original full leg.
-    const full = outLeg.primitives.every((pr) => pr.shape === 'box' && pr.size[0] * pr.size[1] * pr.size[2] < 50 * 50 * 400);
-    expect(full).toBe(true);
+    expect(outRail.primitives[1].shape).toBe('box');
+    // The leg becomes a mortised post carrying one pocket on the rail's face.
+    const post0 = outLeg.primitives.find((p) => p.shape === 'mortisedPost') as
+      | { shape: string; mortises: { face: string }[] }
+      | undefined;
+    expect(post0).toBeDefined();
+    expect(post0!.mortises.length).toBe(1);
+    expect(post0!.mortises[0].face).toBe('x+'); // rail meets the post's +x face
+  });
+
+  it('two joints on one leg accumulate into the same mortised post', () => {
+    const rail2 = boxPart('rail2', 'End apron', [40, 300, 60], [0, 175, 350]);
+    const joints = {
+      [jointKey('leg', 'rail')]: 'mortise-tenon' as const,
+      [jointKey('leg', 'rail2')]: 'mortise-tenon' as const,
+    };
+    const out = applyJoints([post, rail, rail2], joints, bboxOf);
+    const outLeg = out.find((p) => p.id === 'leg')!;
+    const post0 = outLeg.primitives.find((p) => p.shape === 'mortisedPost') as
+      | { mortises: { face: string }[] }
+      | undefined;
+    expect(post0).toBeDefined();
+    expect(post0!.mortises.length).toBe(2); // one per rail, on perpendicular faces
   });
 
   it('butt clears the joint (no added geometry)', () => {

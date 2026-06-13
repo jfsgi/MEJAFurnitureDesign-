@@ -10,6 +10,8 @@ import { inch } from './units';
 
 const TOL = 1; // mm, faces within this are "touching"
 
+type PostMortiseFace = 'x+' | 'x-' | 'y+' | 'y-';
+
 export interface DetectedJoint {
   kind: 'end-face' | 'corner';
   aId: string;
@@ -79,88 +81,88 @@ function bodyBox(part: Part): Extract<Primitive, { shape: 'box' }> | null {
 const TENON_FRACTION = 1 / 3;
 const SHOULDER = inch(0.375);
 
+/** The tenon's perpendicular cross-section for a rail meeting a leg along
+ * `axis`: which perp axis is thickness vs width, and each one's size. */
+function tenonCrossSection(ra: BBox, axis: number) {
+  const perp = [0, 1, 2].filter((i) => i !== axis);
+  const [thinAxis, wideAxis] = size(ra, perp[0]) <= size(ra, perp[1]) ? perp : [perp[1], perp[0]];
+  const thin = size(ra, thinAxis) * TENON_FRACTION;
+  const wide = Math.max(size(ra, wideAxis) - 2 * SHOULDER, size(ra, wideAxis) * 0.4);
+  return { thinAxis, wideAxis, thin, wide };
+}
+
 /** Adds a centered tenon to the rail, projecting from its end into the leg. */
 function tenonPrims(rail: Part, ra: BBox, la: BBox, axis: number, tenonLen: number): Primitive[] {
   const body = bodyBox(rail);
   if (!body) return [];
-  const perp = [0, 1, 2].filter((i) => i !== axis);
+  const { thinAxis, wideAxis, thin, wide } = tenonCrossSection(ra, axis);
   const dims: [number, number, number] = [...body.size];
   const at: [number, number, number] = [...body.at];
-  // The rail end on the leg side.
   const dir = Math.sign(center(la, axis) - center(ra, axis)) || 1;
   const railEnd = center(ra, axis) + (dir * size(ra, axis)) / 2;
-  // Thickness = smaller perpendicular dim; width = larger.
-  const [pThin, pWide] = size(ra, perp[0]) <= size(ra, perp[1]) ? perp : [perp[1], perp[0]];
   dims[axis] = tenonLen;
-  dims[pThin] = size(ra, pThin) * TENON_FRACTION;
-  dims[pWide] = Math.max(size(ra, pWide) - 2 * SHOULDER, size(ra, pWide) * 0.4);
+  dims[thinAxis] = thin;
+  dims[wideAxis] = wide;
   at[axis] = railEnd + (dir * tenonLen) / 2;
-  at[pThin] = center(ra, pThin);
-  at[pWide] = center(ra, pWide);
+  at[thinAxis] = center(ra, thinAxis);
+  at[wideAxis] = center(ra, wideAxis);
   const grain = (['x', 'y', 'z'] as const)[axis];
   return [{ shape: 'box', size: dims, at, grain }];
 }
 
-/** Rebuilds a box leg with a blind mortise pocket cut into one face: a back
- * slab plus a four-piece frame around the opening (CSG-free, real void). */
+/**
+ * Cuts a blind mortise into the leg, matching the rail's tenon. The leg
+ * becomes a `mortisedPost` (preserving a roundedSlab's corner radius, or a
+ * square post for a box leg). Multiple joints on one leg accumulate into the
+ * same post. Legs that aren't post-shaped (tapered, etc.) return null.
+ */
 function mortiseLeg(leg: Part, la: BBox, ra: BBox, axis: number, depth: number): Part | null {
-  const body = bodyBox(leg);
-  if (!body) return null;
-  const perp = [0, 1, 2].filter((i) => i !== axis);
+  if (axis === 2) return null; // mortise on a post's end face — not supported
+  const { thinAxis, wideAxis, thin, wide } = tenonCrossSection(ra, axis);
+  // In-face horizontal axis = the perp axis that isn't the post length (Z=2).
+  const horiz = axis === 0 ? 1 : 0;
+  const horizSize = horiz === thinAxis ? thin : wide;
+  const vertSize = 2 === thinAxis ? thin : wide; // along the post length (Z)
+  void wideAxis;
   const dir = Math.sign(center(ra, axis) - center(la, axis)) || 1; // toward the rail
-  const face = center(la, axis) + (dir * body.size[axis]) / 2;
-  // Pocket cross-section = the tenon's (thickness × width), centered on the
-  // overlap with the rail.
-  const pocket: Record<number, [number, number]> = {}; // axis → [center, half]
-  for (const i of perp) {
-    const c = (Math.max(la.min[i], ra.min[i]) + Math.min(la.max[i], ra.max[i])) / 2;
-    const railSize = ra.max[i] - ra.min[i];
-    const isThin = railSize <= ra.max[perp[0] === i ? perp[1] : perp[0]] - ra.min[perp[0] === i ? perp[1] : perp[0]];
-    const half = (isThin ? railSize * TENON_FRACTION : Math.max(railSize - 2 * SHOULDER, railSize * 0.4)) / 2;
-    pocket[i] = [c, half];
+  const face = (['x', 'y'] as const)[axis] + (dir > 0 ? '+' : '-');
+
+  // Find an existing post to extend, or convert the leg's body primitive.
+  const existing = leg.primitives.find((p) => p.shape === 'mortisedPost') as
+    | Extract<Primitive, { shape: 'mortisedPost' }>
+    | undefined;
+  const zLocalCenter = (Math.max(la.min[2], ra.min[2]) + Math.min(la.max[2], ra.max[2])) / 2;
+
+  if (existing) {
+    const zLocal = zLocalCenter - existing.at[2];
+    const mortises = [
+      ...existing.mortises,
+      { face: face as PostMortiseFace, z: zLocal, width: horizSize, height: vertSize, depth },
+    ];
+    const updated: Primitive = { ...existing, mortises };
+    return { ...leg, primitives: leg.primitives.map((p) => (p === existing ? updated : p)) };
   }
-  const box = (sz: [number, number, number], at: [number, number, number]): Primitive => ({
-    shape: 'box',
+
+  // Convert a roundedSlab or box body to a mortised post.
+  const slab = leg.primitives.find((p) => p.shape === 'roundedSlab') as
+    | Extract<Primitive, { shape: 'roundedSlab' }>
+    | undefined;
+  const box = bodyBox(leg);
+  const src = slab ?? box;
+  if (!src) return null;
+  const sz: [number, number, number] = slab ? slab.size : box!.size;
+  const at: [number, number, number] = slab ? slab.at : box!.at;
+  const radius = slab ? slab.radius : 0;
+  const post: Primitive = {
+    shape: 'mortisedPost',
     size: sz,
     at,
-    grain: body.grain,
-  });
-  const prims: Primitive[] = [];
-  // Back slab: the leg minus the pocket-depth layer on the rail side.
-  const backSize: [number, number, number] = [...body.size];
-  const backAt: [number, number, number] = [...body.at];
-  backSize[axis] = body.size[axis] - depth;
-  backAt[axis] = body.at[axis] - (dir * depth) / 2;
-  prims.push(box(backSize, backAt));
-  // Front layer (thickness = depth), framed around the pocket on perp axes.
-  const layerAt = face - (dir * depth) / 2;
-  const [p, q] = perp;
-  const lp = body.at[p] - body.size[p] / 2;
-  const hp = body.at[p] + body.size[p] / 2;
-  const lq = body.at[q] - body.size[q] / 2;
-  const hq = body.at[q] + body.size[q] / 2;
-  const [pc, ph] = pocket[p];
-  const [qc, qh] = pocket[q];
-  const frame: Array<[number, number, number, number]> = [
-    [lp, pc - ph, lq, hq], // p-low strip (full q)
-    [pc + ph, hp, lq, hq], // p-high strip (full q)
-    [pc - ph, pc + ph, lq, qc - qh], // q-low between
-    [pc - ph, pc + ph, qc + qh, hq], // q-high between
-  ];
-  for (const [p0, p1, q0, q1] of frame) {
-    if (p1 - p0 < 0.5 || q1 - q0 < 0.5) continue;
-    const sz: [number, number, number] = [0, 0, 0];
-    const at: [number, number, number] = [0, 0, 0];
-    sz[axis] = depth;
-    at[axis] = layerAt;
-    sz[p] = p1 - p0;
-    at[p] = (p0 + p1) / 2;
-    sz[q] = q1 - q0;
-    at[q] = (q0 + q1) / 2;
-    prims.push(box(sz, at));
-  }
-  const others = leg.primitives.filter((pr) => pr !== body);
-  return { ...leg, primitives: [...prims, ...others] };
+    radius,
+    grain: 'z',
+    mortises: [{ face: face as PostMortiseFace, z: zLocalCenter - at[2], width: horizSize, height: vertSize, depth }],
+  };
+  const others = leg.primitives.filter((p) => p !== src);
+  return { ...leg, primitives: [post, ...others] };
 }
 
 /** Two dowels spanning the interface, set in from the rail's edges. */

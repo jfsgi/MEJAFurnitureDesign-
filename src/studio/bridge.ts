@@ -10,6 +10,7 @@ import { MATERIAL_BY_ID } from '../core/materials';
 import {
   archedBoardGeometry,
   longestAxis,
+  mortisedPostGeometry,
   roundedSlabGeometry,
   taperedBoxGeometry,
 } from '../viewport/geometry';
@@ -64,6 +65,8 @@ function modelGrainAxis(prim: Primitive): 'x' | 'y' | 'z' {
       return prim.arch === 'bottom-y' ? 'y' : 'x';
     case 'roundedSlab':
       return prim.axis === 'y' ? 'z' : 'x';
+    case 'mortisedPost':
+      return prim.grain ?? 'z';
     default:
       return 'z'; // cylinders stand vertical in model space
   }
@@ -146,6 +149,9 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
           );
           if (vertical) geometry.rotateX(-Math.PI / 2);
           grain = prim.grain ?? (vertical ? 'z' : 'x');
+        } else if (prim.shape === 'mortisedPost') {
+          geometry = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
+          grain = prim.grain ?? 'z';
         } else {
           geometry = new THREE.CylinderGeometry(
             prim.radiusTop,
