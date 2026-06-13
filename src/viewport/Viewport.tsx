@@ -23,6 +23,7 @@ import { inch, snapMM } from '../core/units';
 import { useStore } from '../core/store';
 import {
   archedBoardGeometry,
+  frenchDovetailGeometry,
   grainBoxGeometry,
   longestAxis,
   mortisedPostGeometry,
@@ -81,7 +82,8 @@ function PrimitiveMesh({
     prim.shape === 'cylinder' ||
     prim.shape === 'jointedBoard' ||
     prim.shape === 'roundedSlab' ||
-    prim.shape === 'mortisedPost';
+    prim.shape === 'mortisedPost' ||
+    prim.shape === 'frenchDovetail';
   const grainTex = mat.grain ? getWoodTexture(mat.id, rotatedGrain) : null;
 
   const geo = useMemo(() => {
@@ -110,6 +112,12 @@ function PrimitiveMesh({
     if (prim.shape === 'mortisedPost') {
       const geo = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
       applyBoxUVs(geo, GRAIN_MM_U, prim.grain ?? 'z', offset[0], offset[1]);
+      return geo;
+    }
+    if (prim.shape === 'frenchDovetail') {
+      const geo = frenchDovetailGeometry(prim.depth, prim.rootThin, prim.tipThin, prim.runH, prim.dir);
+      if (prim.interfaceAxis === 'y') geo.rotateZ(Math.PI / 2);
+      applyBoxUVs(geo, GRAIN_MM_U, prim.grain ?? prim.interfaceAxis, offset[0], offset[1]);
       return geo;
     }
     if (prim.shape === 'archedBoard') {
@@ -167,6 +175,7 @@ function PrimitiveMesh({
       metalness={mat.metalness}
       emissive={showJointed ? '#2bd47a' : highlight || selected || partHovered ? '#ffffff' : '#000000'}
       emissiveIntensity={showJointed ? 0.22 : partHovered ? 0.15 : highlight ? 0.08 : selected ? 0.04 : 0}
+      side={prim.shape === 'frenchDovetail' ? THREE.DoubleSide : THREE.FrontSide}
     />
   );
   const edges = (

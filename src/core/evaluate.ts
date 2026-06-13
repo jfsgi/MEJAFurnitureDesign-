@@ -149,6 +149,11 @@ function primCorners(prim: Primitive): [number, number, number][] {
     [hx, hy, hz] = [prim.size[0] / 2, prim.size[1] / 2, prim.size[2] / 2];
   } else if (prim.shape === 'mortisedPost') {
     [hx, hy, hz] = [prim.size[0] / 2, prim.size[1] / 2, prim.size[2] / 2];
+  } else if (prim.shape === 'frenchDovetail') {
+    const halfDepth = prim.depth / 2;
+    const halfThin = prim.tipThin / 2;
+    [hx, hy, hz] =
+      prim.interfaceAxis === 'x' ? [halfDepth, halfThin, prim.runH / 2] : [halfThin, halfDepth, prim.runH / 2];
   } else if (prim.shape === 'archedBoard') {
     // Stock extents; a front bulge reaches past +Y by its rise, an angled end
     // trim past the +length face by its skew.

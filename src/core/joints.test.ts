@@ -79,18 +79,14 @@ describe('joinery engine', () => {
     expect(out.find((p) => p.id === 'leg')!.primitives.length).toBe(1);
   });
 
-  it('french dovetail gives the rail a flaring tongue and the leg a socket', () => {
+  it('french dovetail gives the rail a stopped flaring key and the leg a socket', () => {
     const out = applyJoints([post, rail], { [jointKey('leg', 'rail')]: 'french-dovetail' as const }, bboxOf);
-    const tongue = out.find((p) => p.id === 'rail')!.primitives.find((p) => p.shape === 'taperedBox') as
-      | { shape: string; top: [number, number]; bottom: [number, number] }
+    const key = out.find((p) => p.id === 'rail')!.primitives.find((p) => p.shape === 'frenchDovetail') as
+      | { shape: string; rootThin: number; tipThin: number; runH: number; depth: number }
       | undefined;
-    expect(tongue).toBeDefined();
-    // The tongue is a dovetail: it flares in the thickness axis, so the two
-    // ends differ in exactly one cross-section slot (and match in the other).
-    const dt0 = Math.abs(tongue!.top[0] - tongue!.bottom[0]);
-    const dt1 = Math.abs(tongue!.top[1] - tongue!.bottom[1]);
-    expect(Math.max(dt0, dt1)).toBeGreaterThan(1); // flares
-    expect(Math.min(dt0, dt1)).toBeCloseTo(0, 1); // constant in the wide axis
+    expect(key).toBeDefined();
+    expect(key!.tipThin).toBeGreaterThan(key!.rootThin); // dovetail flare across the thickness
+    expect(key!.runH).toBeGreaterThan(0); // a stopped vertical run (rounded bottom)
     const leg = out.find((p) => p.id === 'leg')!;
     const legPost = leg.primitives.find((p) => p.shape === 'mortisedPost') as
       | { mortises: { flare?: number }[] }

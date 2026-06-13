@@ -482,6 +482,99 @@ export function roundedSlabGeometry(
   return geometry;
 }
 
+/**
+ * French (sliding) dovetail key: a stopped tongue that projects along X,
+ * flares across its thickness (Y) from root to tip — the dovetail — and runs
+ * vertically (Z), ending in a rounded router-bit bottom (a half-round of the
+ * thickness). Canonical, centered at the origin; the caller rotates it onto
+ * the joint axes. Rendered double-sided, so winding is not load-bearing.
+ */
+export function frenchDovetailGeometry(
+  depth: number,
+  rootThin: number,
+  tipThin: number,
+  runH: number,
+  dir: 1 | -1,
+): THREE.BufferGeometry {
+  const M = 12; // arc segments on the rounded bottom
+  const profile = (th: number): Array<[number, number]> => {
+    const top = runH / 2;
+    const rb = th / 2;
+    const zc = -runH / 2 + rb; // arc center height
+    const pts: Array<[number, number]> = [[th / 2, top], [-th / 2, top]];
+    for (let i = 0; i <= M; i++) {
+      const a = Math.PI + (Math.PI * i) / M; // left → bottom → right
+      pts.push([rb * Math.cos(a), zc + rb * Math.sin(a)]);
+    }
+    return pts;
+  };
+  const xRoot = -dir * (depth / 2);
+  const xTip = dir * (depth / 2);
+  const root = profile(rootThin);
+  const tip = profile(tipThin);
+  const n = root.length;
+  const pos: number[] = [];
+  const P = (x: number, p: [number, number]): [number, number, number] => [x, p[0], p[1]];
+  const tri = (a: [number, number, number], b: [number, number, number], c: [number, number, number]) =>
+    pos.push(...a, ...b, ...c);
+  // Side walls between the root and tip profiles.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a = P(xRoot, root[i]);
+    const b = P(xRoot, root[j]);
+    const c = P(xTip, tip[j]);
+    const d = P(xTip, tip[i]);
+    tri(a, b, c);
+    tri(a, c, d);
+  }
+  // End caps (fans from point 0 of each profile).
+  for (let i = 1; i < n - 1; i++) {
+    tri(P(xRoot, root[0]), P(xRoot, root[i]), P(xRoot, root[i + 1]));
+    tri(P(xTip, tip[0]), P(xTip, tip[i + 1]), P(xTip, tip[i]));
+  }
+  // The key is convex, so orient every triangle to face away from its
+  // centroid — consistent outward normals, correct when rendered single-sided.
+  let cx = 0;
+  let cy = 0;
+  let cz = 0;
+  const verts = pos.length / 3;
+  for (let i = 0; i < pos.length; i += 3) {
+    cx += pos[i];
+    cy += pos[i + 1];
+    cz += pos[i + 2];
+  }
+  cx /= verts;
+  cy /= verts;
+  cz /= verts;
+  for (let t = 0; t < pos.length; t += 9) {
+    const ux = pos[t + 3] - pos[t];
+    const uy = pos[t + 4] - pos[t + 1];
+    const uz = pos[t + 5] - pos[t + 2];
+    const vx = pos[t + 6] - pos[t];
+    const vy = pos[t + 7] - pos[t + 1];
+    const vz = pos[t + 8] - pos[t + 2];
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const mx = (pos[t] + pos[t + 3] + pos[t + 6]) / 3 - cx;
+    const my = (pos[t + 1] + pos[t + 4] + pos[t + 7]) / 3 - cy;
+    const mz = (pos[t + 2] + pos[t + 5] + pos[t + 8]) / 3 - cz;
+    if (nx * mx + ny * my + nz * mz < 0) {
+      // Swap vertices 1 and 2 to flip the winding outward.
+      for (let k = 0; k < 3; k++) {
+        const tmp = pos[t + 3 + k];
+        pos[t + 3 + k] = pos[t + 6 + k];
+        pos[t + 6 + k] = tmp;
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Index of the longest dimension — the grain runs along it (boards are cut that way). */
 export function longestAxis(size: V3): 0 | 1 | 2 {
   if (size[0] >= size[1] && size[0] >= size[2]) return 0;

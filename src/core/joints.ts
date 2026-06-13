@@ -110,10 +110,6 @@ function tenonPrims(rail: Part, ra: BBox, la: BBox, axis: number, tenonLen: numb
   return [{ shape: 'box', size: dims, at, grain }];
 }
 
-/** Maps a tapered tongue's perpendicular axes to taperedBox's [first, second]
- * cross-section slots for a given projection axis (verified empirically). */
-const TAPER_ORDER: Record<number, [number, number]> = { 0: [2, 1], 1: [0, 2], 2: [0, 1] };
-
 /** French (sliding) dovetail geometry, digitized from MEJA's drawing: a key
  * projecting from the rail end that flares across the board THICKNESS (not
  * the width) — root ≈ 0.45 t, tip ≈ 0.667 t over the stock thickness t — and
@@ -129,26 +125,26 @@ function dovetailSpec(ra: BBox, axis: number, proj: number) {
 
 function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Primitive[] {
   const { thinAxis, wideAxis, tipThin, rootThin, wideExtent } = dovetailSpec(ra, axis, proj);
-  const dir = Math.sign(center(la, axis) - center(ra, axis)) || 1;
+  const dir = (Math.sign(center(la, axis) - center(ra, axis)) || 1) as 1 | -1;
   const railEnd = center(ra, axis) + (dir * size(ra, axis)) / 2;
-  const [f, s] = TAPER_ORDER[axis];
-  // Flare the thin (thickness) axis; keep the wide extent constant.
-  const dim = (perpAxis: number, thinVal: number): number => (perpAxis === thinAxis ? thinVal : wideExtent);
-  const tip: [number, number] = [dim(f, tipThin), dim(s, tipThin)];
-  const root: [number, number] = [dim(f, rootThin), dim(s, rootThin)];
+  // Run is along the wide axis (the post/board height, model Z here). The key
+  // is stopped — it runs the wide extent and ends in a rounded router bottom.
   const at: [number, number, number] = [0, 0, 0];
   at[axis] = railEnd + (dir * proj) / 2;
   at[thinAxis] = center(ra, thinAxis);
   at[wideAxis] = center(ra, wideAxis);
+  void wideAxis;
   return [
     {
-      shape: 'taperedBox',
-      top: dir > 0 ? tip : root, // taperedBox 'top' is the +axis end (the tip when dir>0)
-      bottom: dir > 0 ? root : tip,
-      height: proj,
+      shape: 'frenchDovetail',
       at,
-      align: [0, 0],
-      axis: (['x', 'y', 'z'] as const)[axis],
+      depth: proj,
+      rootThin,
+      tipThin,
+      runH: wideExtent,
+      dir,
+      interfaceAxis: (['x', 'y', 'z'] as const)[axis] as 'x' | 'y',
+      grain: (['x', 'y', 'z'] as const)[axis],
     },
   ];
 }

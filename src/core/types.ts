@@ -122,6 +122,23 @@ export type Primitive =
       mortises: { face: 'x+' | 'x-' | 'y+' | 'y-'; z: number; width: number; height: number; depth: number; flare?: number }[];
     }
   | {
+      shape: 'frenchDovetail';
+      /** Center of the key's bounding volume. */
+      at: [number, number, number];
+      /** Projection into the mating piece (the joint depth). */
+      depth: number;
+      /** Thickness of the key at its root (rail face) and tip (deep end). */
+      rootThin: number;
+      tipThin: number;
+      /** Vertical run of the key; it ends in a rounded router bottom. */
+      runH: number;
+      /** Which end of the interface axis the tip points toward. */
+      dir: 1 | -1;
+      /** World axis the key projects along (x or y). Run is along Z. */
+      interfaceAxis: 'x' | 'y';
+      grain?: 'x' | 'y' | 'z';
+    }
+  | {
       shape: 'jointedBoard';
       /** Tails carry the toothed ends (sides); pins carry the complements. */
       role: 'tails' | 'pins';

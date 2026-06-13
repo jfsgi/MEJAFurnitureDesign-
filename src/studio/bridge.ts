@@ -9,6 +9,7 @@ import { evaluateInstance, partBBox } from '../core/evaluate';
 import { MATERIAL_BY_ID } from '../core/materials';
 import {
   archedBoardGeometry,
+  frenchDovetailGeometry,
   longestAxis,
   mortisedPostGeometry,
   roundedSlabGeometry,
@@ -153,6 +154,10 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
         } else if (prim.shape === 'mortisedPost') {
           geometry = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
           grain = prim.grain ?? 'z';
+        } else if (prim.shape === 'frenchDovetail') {
+          geometry = frenchDovetailGeometry(prim.depth, prim.rootThin, prim.tipThin, prim.runH, prim.dir);
+          if (prim.interfaceAxis === 'y') geometry.rotateZ(Math.PI / 2);
+          grain = prim.grain ?? prim.interfaceAxis;
         } else {
           geometry = new THREE.CylinderGeometry(
             prim.radiusTop,
