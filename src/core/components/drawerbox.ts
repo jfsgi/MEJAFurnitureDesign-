@@ -44,6 +44,7 @@ export const drawerBox: ComponentDef = {
     { kind: 'boolean', key: 'pull', label: 'Finger pull cutout', default: false, tier: 'advanced' },
     { kind: 'boolean', key: 'scoopedSides', label: 'Scooped sides (low front)', default: false, tier: 'advanced' },
     { kind: 'length', key: 'frontHeight', label: 'Scoop front height', default: inch(1.75), min: inch(0.75), max: inch(6), tier: 'advanced' },
+    { kind: 'length', key: 'scoopRun', label: 'Scoop length (from front)', default: inch(4), min: inch(1.5), max: inch(18), tier: 'advanced' },
     { kind: 'material', key: 'bottomMaterial', label: 'Bottom material', default: 'baltic-birch', tier: 'advanced' },
     { kind: 'enum', key: 'slideType', label: 'Slides', default: 'side-mount', tier: 'advanced',
       options: [
@@ -108,6 +109,8 @@ export const drawerBox: ComponentDef = {
         cut: { length: W, width: H, thickness: sideT },
       });
       const scoopSideLen = D - 2 * sideT;
+      // How far back from the front the side rises to full height (variable).
+      const scoopRun = Math.min(Math.max(num(p, 'scoopRun'), inch(1.5)), scoopSideLen * 0.9);
       for (const sx of [-1, 1]) {
         parts.push({
           id: `side-${sx}`,
@@ -120,6 +123,7 @@ export const drawerBox: ComponentDef = {
               at: [sx * (W / 2 - sideT / 2), 0, H / 2],
               arch: 'waterfall-y',
               rise: H - frontH,
+              shoulder: scoopRun,
             },
           ],
           cut: { length: scoopSideLen, width: H, thickness: sideT },
