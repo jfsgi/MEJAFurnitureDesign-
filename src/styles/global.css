@@ -1212,3 +1212,22 @@ button {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* Shop drawing sheets in the Documents view. */
+.shop-drawing {
+  margin: 0 0 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-ctl);
+  background: #fff;
+  padding: 12px;
+}
+.shop-drawing-svg svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.sheet-empty {
+  color: var(--text-2, #777);
+  font-size: 14px;
+  padding: 24px 0;
+}

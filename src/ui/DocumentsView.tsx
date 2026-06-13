@@ -8,6 +8,7 @@ import { MATERIAL_BY_ID } from '../core/materials';
 import { formatLength, formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
 import { exportModel, type ModelFormat } from '../studio/exportModel';
+import { instanceShopDrawingSVG, shopDrawingsSVG } from '../studio/shopDrawing';
 import { DownloadIcon, WarningIcon } from './icons';
 
 function SheetDiagram({ layout, index, units }: { layout: SheetLayout; index: number; units: 'imperial' | 'metric' }) {
@@ -48,7 +49,7 @@ function SheetDiagram({ layout, index, units }: { layout: SheetLayout; index: nu
 
 export function DocumentsView() {
   const doc = useStore((s) => s.doc);
-  const [page, setPage] = useState<'cutlist' | 'stock'>('cutlist');
+  const [page, setPage] = useState<'cutlist' | 'stock' | 'drawings'>('cutlist');
   const groups = buildCutList(doc);
   const units = doc.units;
   const unitMark = units === 'imperial' ? 'inches' : 'mm';
@@ -63,6 +64,14 @@ export function DocumentsView() {
   };
 
   const exportCSV = () => download(new Blob([cutListCSV(doc, units)], { type: 'text/csv' }), 'cutlist.csv');
+
+  const exportDrawings = () => {
+    if (doc.instances.length === 0) {
+      useStore.getState().showToast('Nothing to draw — add a piece first.');
+      return;
+    }
+    download(new Blob([shopDrawingsSVG(doc, units)], { type: 'image/svg+xml' }), 'shop-drawings.svg');
+  };
 
   const export3D = (format: ModelFormat) => {
     if (doc.instances.length === 0) {
@@ -94,8 +103,11 @@ export function DocumentsView() {
           >
             Stock breakdown
           </button>
-          <button className="doc-item" disabled title="Arrives in Phase 2">
-            Assembly drawings
+          <button
+            className={`doc-item${page === 'drawings' ? ' doc-item--active' : ''}`}
+            onClick={() => setPage('drawings')}
+          >
+            Shop drawings
           </button>
           <button className="doc-item" disabled title="3D export (STL / OBJ) lives on the cut list page; DXF / STEP arrive in Phase 2">
             DXF / STEP export
@@ -239,6 +251,38 @@ export function DocumentsView() {
                   <SheetDiagram key={i} layout={layout} index={i} units={units} />
                 ))}
               </section>
+            )}
+          </div>
+        )}
+
+        {page === 'drawings' && (
+          <div className="sheet">
+            <div className="sheet-header">
+              <div>
+                <h1 className="sheet-title">Shop drawings</h1>
+                <div className="sheet-sub">
+                  {doc.name} · third-angle elevations with overall dimensions · {unitMark}
+                </div>
+              </div>
+              <div className="sheet-actions">
+                <button className="btn" onClick={exportDrawings}>
+                  <DownloadIcon /> Export SVG
+                </button>
+                <button className="btn" onClick={() => window.print()}>Print</button>
+              </div>
+            </div>
+            {doc.instances.length === 0 ? (
+              <p className="sheet-empty">Add a piece to the design to generate its shop drawing.</p>
+            ) : (
+              doc.instances.map((inst) => (
+                <figure key={inst.id} className="shop-drawing">
+                  <div
+                    className="shop-drawing-svg"
+                    // SVG is generated from the model; no user HTML is injected.
+                    dangerouslySetInnerHTML={{ __html: instanceShopDrawingSVG(inst, units) }}
+                  />
+                </figure>
+              ))
             )}
           </div>
         )}
