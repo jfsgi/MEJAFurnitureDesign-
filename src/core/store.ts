@@ -96,6 +96,7 @@ interface State {
   pickJointPart(instanceId: string, partId: string): void;
   clearJointPick(): void;
   setJoint(instanceId: string, partA: string, partB: string, style: JointStyle): void;
+  setFrenchDovetailConfig(instanceId: string, patch: Record<string, number>): void;
   showToast(message: string, undoable?: boolean): void;
   dismissToast(): void;
 
@@ -276,6 +277,16 @@ export const useStore = create<State>()((set, get) => {
       });
       set({ jointPick: null });
       get().showToast(style === 'butt' ? 'Joint cleared' : `Joint set: ${style.replace(/-/g, ' ')}`);
+    },
+    setFrenchDovetailConfig: (instanceId, patch) => {
+      get().commitDoc((doc) => {
+        const inst = doc.instances.find((i) => i.id === instanceId);
+        if (!inst) return;
+        inst.jointConfig = {
+          ...inst.jointConfig,
+          frenchDovetail: { ...inst.jointConfig?.frenchDovetail, ...patch },
+        };
+      });
     },
     showToast: (message, undoable = false) => set({ toast: { id: ++toastSeq, message, undoable } }),
     dismissToast: () => set({ toast: null }),

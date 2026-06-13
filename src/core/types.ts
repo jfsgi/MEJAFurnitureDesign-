@@ -119,7 +119,7 @@ export type Primitive =
       /** Blind mortise pockets cut into the side faces. z is post-local
        *  (centered); width runs along the in-face horizontal axis, height
        *  along the post length, depth into the face. */
-      mortises: { face: 'x+' | 'x-' | 'y+' | 'y-'; z: number; width: number; height: number; depth: number; flare?: number }[];
+      mortises: { face: 'x+' | 'x-' | 'y+' | 'y-'; z: number; width: number; height: number; depth: number; flare?: number; openTop?: boolean }[];
     }
   | {
       shape: 'frenchDovetail';
@@ -236,6 +236,15 @@ export interface Instance {
   params: ParamValues; // sparse overrides; missing keys use the component defaults
   /** Per-joint joinery overrides, keyed by the sorted pair of part ids. */
   joints?: Record<string, JointStyle>;
+  /** Tunable joint geometry for this piece (e.g. French dovetail dims). */
+  jointConfig?: {
+    frenchDovetail?: {
+      depthIn?: number;
+      tipRatio?: number;
+      rootRatio?: number;
+      bottomStopRatio?: number;
+    };
+  };
 }
 
 export interface ProjectDoc {

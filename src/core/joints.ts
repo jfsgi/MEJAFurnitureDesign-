@@ -110,30 +110,62 @@ function tenonPrims(rail: Part, ra: BBox, la: BBox, axis: number, tenonLen: numb
   return [{ shape: 'box', size: dims, at, grain }];
 }
 
-/** French (sliding) dovetail geometry, digitized from MEJA's drawing: a key
- * projecting from the rail end that flares across the board THICKNESS (not
- * the width) — root ≈ 0.45 t, tip ≈ 0.667 t over the stock thickness t — and
- * runs most of the board width. The female socket is the negative. */
-function dovetailSpec(ra: BBox, axis: number, proj: number) {
-  const { thinAxis, wideAxis } = tenonCrossSection(ra, axis);
-  const t = size(ra, thinAxis); // stock thickness (the flaring axis)
-  const tipThin = 0.667 * t;
-  const rootThin = 0.45 * t;
-  const wideExtent = Math.max(size(ra, wideAxis) - 2 * SHOULDER, size(ra, wideAxis) * 0.5);
-  return { thinAxis, wideAxis, tipThin, rootThin, wideExtent, proj };
+/** French dovetail defaults (from MEJA's drawing), all overridable per piece. */
+export interface FrenchDovetailConfig {
+  /** Tongue projection into the mating piece, inches. */
+  depthIn: number;
+  /** Tip / root thickness as a fraction of the stock thickness (the flare). */
+  tipRatio: number;
+  rootRatio: number;
+  /** Where the rounded bottom stops, as a fraction of the board height up
+   *  from the bottom edge (the key starts flush at the top). */
+  bottomStopRatio: number;
 }
 
-function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Primitive[] {
-  const { thinAxis, wideAxis, tipThin, rootThin, wideExtent } = dovetailSpec(ra, axis, proj);
+export const DEFAULT_FRENCH_DOVETAIL: FrenchDovetailConfig = {
+  depthIn: 0.4375, // 7/16"
+  tipRatio: 0.667,
+  rootRatio: 0.45,
+  bottomStopRatio: 0.25,
+};
+
+/**
+ * French (sliding) dovetail geometry, digitized from MEJA's drawing: a key
+ * projecting from the rail end that flares across the board THICKNESS — root
+ * ≈ 0.45 t, tip ≈ 0.667 t — running from the board's TOP edge (it slides in
+ * from the top) down to a rounded router bottom that stops short of the
+ * lower edge. Every dimension is configurable. The female socket is the
+ * negative. `cfg` overrides the defaults.
+ */
+function dovetailSpec(ra: BBox, axis: number, cfg?: Partial<FrenchDovetailConfig>) {
+  const c = { ...DEFAULT_FRENCH_DOVETAIL, ...cfg };
+  const { thinAxis, wideAxis } = tenonCrossSection(ra, axis);
+  const t = size(ra, thinAxis); // stock thickness (the flaring axis)
+  const tipThin = c.tipRatio * t;
+  const rootThin = c.rootRatio * t;
+  const top = ra.max[wideAxis];
+  const bottom = ra.min[wideAxis];
+  const boardH = top - bottom;
+  const stop = Math.min(Math.max(c.bottomStopRatio * boardH, tipThin * 0.6), boardH * 0.6);
+  const runH = boardH - stop; // from the top edge down to the rounded bottom
+  const keyCenter = top - runH / 2; // so the top is flush with the board's top
+  return { thinAxis, wideAxis, tipThin, rootThin, runH, keyCenter };
+}
+
+function dovetailTonguePrims(
+  ra: BBox,
+  la: BBox,
+  axis: number,
+  proj: number,
+  spec: ReturnType<typeof dovetailSpec>,
+): Primitive[] {
+  const { thinAxis, wideAxis, tipThin, rootThin, runH, keyCenter } = spec;
   const dir = (Math.sign(center(la, axis) - center(ra, axis)) || 1) as 1 | -1;
   const railEnd = center(ra, axis) + (dir * size(ra, axis)) / 2;
-  // Run is along the wide axis (the post/board height, model Z here). The key
-  // is stopped — it runs the wide extent and ends in a rounded router bottom.
   const at: [number, number, number] = [0, 0, 0];
   at[axis] = railEnd + (dir * proj) / 2;
   at[thinAxis] = center(ra, thinAxis);
-  at[wideAxis] = center(ra, wideAxis);
-  void wideAxis;
+  at[wideAxis] = keyCenter;
   return [
     {
       shape: 'frenchDovetail',
@@ -141,7 +173,7 @@ function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Pr
       depth: proj,
       rootThin,
       tipThin,
-      runH: wideExtent,
+      runH,
       dir,
       interfaceAxis: (['x', 'y', 'z'] as const)[axis] as 'x' | 'y',
       grain: (['x', 'y', 'z'] as const)[axis],
@@ -161,7 +193,7 @@ function mortiseLeg(
   ra: BBox,
   axis: number,
   depth: number,
-  socket?: { width: number; height: number; flare: number },
+  socket?: { width: number; height: number; flare: number; zCenter?: number; openTop?: boolean },
 ): Part | null {
   if (axis === 2) return null; // mortise on a post's end face — not supported
   const { thinAxis, thin, wide } = tenonCrossSection(ra, axis);
@@ -179,13 +211,15 @@ function mortiseLeg(
     height: vertSize,
     depth,
     flare,
+    openTop: socket?.openTop,
   });
 
   // Find an existing post to extend, or convert the leg's body primitive.
   const existing = leg.primitives.find((p) => p.shape === 'mortisedPost') as
     | Extract<Primitive, { shape: 'mortisedPost' }>
     | undefined;
-  const zLocalCenter = (Math.max(la.min[2], ra.min[2]) + Math.min(la.max[2], ra.max[2])) / 2;
+  const overlapCenter = (Math.max(la.min[2], ra.min[2]) + Math.min(la.max[2], ra.max[2])) / 2;
+  const zLocalCenter = socket?.zCenter ?? overlapCenter;
 
   if (existing) {
     const updated: Primitive = { ...existing, mortises: [...existing.mortises, mortise(zLocalCenter - existing.at[2])] };
@@ -247,8 +281,10 @@ export function applyJoints(
   parts: Part[],
   joints: Record<string, JointStyle> | undefined,
   bbox: (p: Part) => BBox | null,
+  jointConfig?: { frenchDovetail?: Partial<FrenchDovetailConfig> },
 ): Part[] {
   if (!joints || Object.keys(joints).length === 0) return parts;
+  const fdConfig = jointConfig?.frenchDovetail;
   const byId = new Map(parts.map((p) => [p.id, p]));
   const boxes = new Map<string, BBox>();
   for (const p of parts) {
@@ -275,17 +311,20 @@ export function applyJoints(
       const la = boxes.get(joint.legId)!;
       const tenonLen = Math.min(inch(0.875), size(la, joint.axis) * 0.6);
       if (style === 'french-dovetail') {
-        const proj = Math.min(tenonLen, size(la, joint.axis) * 0.6);
-        const spec = dovetailSpec(ra, joint.axis, proj);
+        const spec = dovetailSpec(ra, joint.axis, fdConfig);
+        const proj = Math.min(inch({ ...DEFAULT_FRENCH_DOVETAIL, ...fdConfig }.depthIn), size(la, joint.axis) * 0.85);
         result.set(joint.railId, {
           ...rail,
-          primitives: [...rail.primitives, ...dovetailTonguePrims(ra, la, joint.axis, proj)],
+          primitives: [...rail.primitives, ...dovetailTonguePrims(ra, la, joint.axis, proj, spec)],
         });
-        // Socket: mouth = root width, flaring to the tip — the tongue's negative.
+        // Socket: the tongue's negative — flares to the tip, runs from the leg
+        // top down to the rounded stop (open at the top so the rail slides in).
         const mortised = mortiseLeg(leg, la, ra, joint.axis, proj, {
           width: spec.rootThin,
-          height: spec.wideExtent,
+          height: spec.runH,
           flare: (spec.tipThin - spec.rootThin) / 2,
+          zCenter: spec.keyCenter,
+          openTop: true,
         });
         if (mortised) result.set(joint.legId, mortised);
       } else if (style === 'mortise-tenon') {

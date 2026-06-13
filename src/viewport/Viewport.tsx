@@ -732,7 +732,7 @@ function JointPicker() {
   const jointMode = useStore((s) => s.jointMode);
   const pick = useStore((s) => s.jointPick);
   const doc = useStore((s) => s.doc);
-  const { setJoint, clearJointPick } = useStore.getState();
+  const { setJoint, clearJointPick, setFrenchDovetailConfig } = useStore.getState();
   if (!jointMode) return null;
 
   if (!pick || pick.partIds.length < 2) {
@@ -781,6 +781,33 @@ function JointPicker() {
             >
               {JOINT_LABELS[s]}
             </button>
+          ))}
+        </div>
+      )}
+      {current === 'french-dovetail' && (
+        <div className="joint-config">
+          <div className="joint-config-title">French dovetail</div>
+          {(
+            [
+              ['depthIn', 'Depth (in)', 0.4375, 0.125, 2, 0.0625],
+              ['tipRatio', 'Tip / stock', 0.667, 0.4, 0.95, 0.01],
+              ['rootRatio', 'Root / stock', 0.45, 0.25, 0.9, 0.01],
+              ['bottomStopRatio', 'Bottom stop', 0.25, 0, 0.6, 0.05],
+            ] as const
+          ).map(([key, label, def, min, max, step]) => (
+            <label key={key} className="joint-config-row">
+              <span>{label}</span>
+              <input
+                type="number"
+                min={min}
+                max={max}
+                step={step}
+                value={inst.jointConfig?.frenchDovetail?.[key] ?? def}
+                onChange={(e) =>
+                  setFrenchDovetailConfig(inst.id, { [key]: Number(e.target.value) })
+                }
+              />
+            </label>
           ))}
         </div>
       )}

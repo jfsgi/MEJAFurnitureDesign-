@@ -38,6 +38,9 @@ export interface PostMortise {
   /** Dovetail flare: the pocket widens this much per side toward its depth
    *  (a sliding-dovetail socket). 0 = straight mortise walls. */
   flare?: number;
+  /** Open the groove out the post's top face (a sliding-dovetail socket the
+   *  rail drops into from above). The band runs to the post top. */
+  openTop?: boolean;
 }
 
 /** Rounded-rect cross-section (centered) with optional rectangular notches
@@ -122,15 +125,16 @@ export function mortisedPostGeometry(
   const eps = 0.5;
   // Group mortises that share a Z band (rounded), combining their faces.
   type Notch = { w: number; d: number; flare?: number };
-  const groups = new Map<string, { z: number; bh: number; notches: Partial<Record<string, Notch>> }>();
+  const groups = new Map<string, { z: number; bh: number; openTop: boolean; notches: Partial<Record<string, Notch>> }>();
   for (const m of mortises) {
     const key = (Math.round(m.z * 100) / 100).toString();
     let g = groups.get(key);
     if (!g) {
-      g = { z: m.z, bh: m.height, notches: {} };
+      g = { z: m.z, bh: m.height, openTop: false, notches: {} };
       groups.set(key, g);
     }
     g.bh = Math.max(g.bh, m.height);
+    if (m.openTop) g.openTop = true;
     g.notches[m.face] = { w: m.width, d: Math.min(m.depth, (m.face.startsWith('x') ? hx : hy) * 0.8), flare: m.flare };
   }
   const bands = [...groups.values()].sort((a, b) => a.z - b.z);
@@ -149,12 +153,14 @@ export function mortisedPostGeometry(
   let cursor = -h / 2;
   for (const b of bands) {
     const z0 = b.z - b.bh / 2;
-    const z1 = b.z + b.bh / 2;
+    // An open-top band runs out the post's top face (a groove the rail slides
+    // into from above); otherwise it's a blind band capped by plain stock.
+    const z1 = b.openTop ? h / 2 : b.z + b.bh / 2;
     if (z0 - eps > cursor) pieces.push(extrude(cursor, z0 + eps, {})); // plain below, overlapping in
     pieces.push(extrude(z0, z1, b.notches)); // notched band
     cursor = z1 - eps;
   }
-  pieces.push(extrude(cursor, h / 2, {})); // plain to the top
+  if (cursor < h / 2 - eps) pieces.push(extrude(cursor, h / 2, {})); // plain to the top (unless open)
   const merged = mergeGeometries(pieces, false);
   for (const p of pieces) p.dispose();
   return merged ?? new THREE.BoxGeometry(w, d, h);

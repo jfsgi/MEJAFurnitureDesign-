@@ -32,7 +32,7 @@ export function evaluateInstance(inst: Instance): GeneratedModel {
   try {
     const model = def.generate(effectiveParams(inst));
     if (inst.joints && Object.keys(inst.joints).length > 0) {
-      return { ...model, parts: applyJoints(model.parts, inst.joints, partBBox) };
+      return { ...model, parts: applyJoints(model.parts, inst.joints, partBBox, inst.jointConfig) };
     }
     return model;
   } catch (err) {
