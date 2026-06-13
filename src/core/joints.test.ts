@@ -79,6 +79,18 @@ describe('joinery engine', () => {
     expect(out.find((p) => p.id === 'leg')!.primitives.length).toBe(1);
   });
 
+  it('french dovetail gives the rail a flaring tongue and the leg a socket', () => {
+    const out = applyJoints([post, rail], { [jointKey('leg', 'rail')]: 'french-dovetail' as const }, bboxOf);
+    const tongue = out.find((p) => p.id === 'rail')!.primitives.find((p) => p.shape === 'taperedBox') as
+      | { shape: string; top: [number, number]; bottom: [number, number] }
+      | undefined;
+    expect(tongue).toBeDefined();
+    // The tongue is a dovetail: its two ends differ in the wide cross-section.
+    expect(tongue!.top[0]).not.toBeCloseTo(tongue!.bottom[0], 1);
+    const leg = out.find((p) => p.id === 'leg')!;
+    expect(leg.primitives.some((p) => p.shape === 'mortisedPost')).toBe(true);
+  });
+
   it('dowel adds dowels to the rail without cutting the leg', () => {
     const out = applyJoints([post, rail], { [jointKey('leg', 'rail')]: 'dowel' as const }, bboxOf);
     expect(out.find((p) => p.id === 'rail')!.primitives.length).toBe(3); // body + 2 dowels

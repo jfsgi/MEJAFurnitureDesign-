@@ -54,7 +54,7 @@ export function detectJoint(a: Part, b: Part, ba: BBox, bb: BBox): DetectedJoint
     'box-joint',
     'butt',
   ];
-  const endStyles: JointStyle[] = ['mortise-tenon', 'dowel', 'butt'];
+  const endStyles: JointStyle[] = ['mortise-tenon', 'french-dovetail', 'dowel', 'butt'];
   // A rail runs along the interface axis (its end meets the other's face).
   if (longA === axis && longB !== axis)
     return { kind: 'end-face', aId: a.id, bId: b.id, axis, railId: a.id, legId: b.id, styles: endStyles };
@@ -108,6 +108,42 @@ function tenonPrims(rail: Part, ra: BBox, la: BBox, axis: number, tenonLen: numb
   at[wideAxis] = center(ra, wideAxis);
   const grain = (['x', 'y', 'z'] as const)[axis];
   return [{ shape: 'box', size: dims, at, grain }];
+}
+
+/** Maps a tapered tongue's perpendicular axes to taperedBox's [first, second]
+ * cross-section slots for a given projection axis (verified empirically). */
+const TAPER_ORDER: Record<number, [number, number]> = { 0: [2, 1], 1: [0, 2], 2: [0, 1] };
+
+/** Adds a French (sliding) dovetail tongue to the rail: a key projecting from
+ * the rail end that flares wider toward its tip, in the board's wide axis —
+ * the male half digitized from MEJA's drawing. The mating socket is cut by
+ * the same mortise routine (it holds the tongue's tip section). */
+function dovetailTonguePrims(ra: BBox, la: BBox, axis: number, proj: number): Primitive[] {
+  const { thinAxis, wideAxis, thin, wide } = tenonCrossSection(ra, axis);
+  const flare = Math.min(proj * 0.19, ((wide - thin) / 2) * 0.6); // ~10.7° dovetail
+  const tipWide = wide;
+  const rootWide = Math.max(wide - 2 * flare, thin * 1.2);
+  const dir = Math.sign(center(la, axis) - center(ra, axis)) || 1;
+  const railEnd = center(ra, axis) + (dir * size(ra, axis)) / 2;
+  const [f, s] = TAPER_ORDER[axis];
+  const dim = (perpAxis: number, wideVal: number): number => (perpAxis === wideAxis ? wideVal : thin);
+  const tip: [number, number] = [dim(f, tipWide), dim(s, tipWide)];
+  const root: [number, number] = [dim(f, rootWide), dim(s, rootWide)];
+  const at: [number, number, number] = [0, 0, 0];
+  at[axis] = railEnd + (dir * proj) / 2;
+  at[thinAxis] = center(ra, thinAxis);
+  at[wideAxis] = center(ra, wideAxis);
+  return [
+    {
+      shape: 'taperedBox',
+      top: dir > 0 ? tip : root, // taperedBox 'top' is the +axis end
+      bottom: dir > 0 ? root : tip,
+      height: proj,
+      at,
+      align: [0, 0],
+      axis: (['x', 'y', 'z'] as const)[axis],
+    },
+  ];
 }
 
 /**
@@ -225,8 +261,12 @@ export function applyJoints(
       const ra = boxes.get(joint.railId)!;
       const la = boxes.get(joint.legId)!;
       const tenonLen = Math.min(inch(0.875), size(la, joint.axis) * 0.6);
-      if (style === 'mortise-tenon') {
-        result.set(joint.railId, { ...rail, primitives: [...rail.primitives, ...tenonPrims(rail, ra, la, joint.axis, tenonLen)] });
+      if (style === 'mortise-tenon' || style === 'french-dovetail') {
+        const male =
+          style === 'french-dovetail'
+            ? dovetailTonguePrims(ra, la, joint.axis, tenonLen)
+            : tenonPrims(rail, ra, la, joint.axis, tenonLen);
+        result.set(joint.railId, { ...rail, primitives: [...rail.primitives, ...male] });
         const mortised = mortiseLeg(leg, la, ra, joint.axis, tenonLen);
         if (mortised) result.set(joint.legId, mortised);
       } else if (style === 'dowel') {
