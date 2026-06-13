@@ -1,7 +1,16 @@
-// Live quote hook: POSTs the product/parts payload to MEJA's quoting system.
-// The endpoint and key come from build env (VITE_QUOTE_API_URL,
-// VITE_QUOTE_API_KEY). When no endpoint is configured the caller falls back to
-// downloading the JSON, so the export always produces something.
+// Live quote hook: POSTs the product/parts payload to MEJA's quoting system —
+// a separate Vercel + Supabase app. The target is configured at build time:
+//
+//   VITE_QUOTE_API_URL   the receiving endpoint. Either a Vercel API route in
+//                        the quoting app (https://<quoting-app>/api/quotes) or
+//                        a Supabase Edge Function
+//                        (https://<ref>.supabase.co/functions/v1/<name>).
+//   VITE_QUOTE_API_KEY   the bearer/service token. Sent as both
+//                        `Authorization: Bearer …` and the Supabase `apikey`
+//                        header, so the same value works for either target.
+//
+// When no endpoint is configured the caller falls back to downloading the
+// JSON, so the export always produces something.
 
 import type { ProjectDoc } from '../core/types';
 import { quotePayloadJSON } from '../core/quote';
@@ -41,7 +50,9 @@ export async function sendQuote(doc: ProjectDoc): Promise<QuoteSendResult> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        // Supabase Edge Functions / REST want both headers; a Vercel route
+        // reads whichever it expects and ignores the other.
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}`, apikey: apiKey } : {}),
       },
       body: quotePayloadJSON(doc),
     });
