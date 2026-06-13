@@ -1,33 +1,34 @@
 // Live quote hook: POSTs the product/parts payload to MEJA's quoting system —
-// a separate Vercel + Supabase app. The target is configured at build time:
+// the MEJA CRM & Order Management app (Next.js + Supabase on Vercel). It POSTs
+// to the public deployment by default; both the URL and the (optional) token
+// are overridable at build time:
 //
-//   VITE_QUOTE_API_URL   the receiving endpoint. Either a Vercel API route in
-//                        the quoting app (https://<quoting-app>/api/quotes) or
-//                        a Supabase Edge Function
-//                        (https://<ref>.supabase.co/functions/v1/<name>).
-//   VITE_QUOTE_API_KEY   the bearer/service token. Sent as both
-//                        `Authorization: Bearer …` and the Supabase `apikey`
-//                        header, so the same value works for either target.
-//
-// When no endpoint is configured the caller falls back to downloading the
-// JSON, so the export always produces something.
+//   VITE_QUOTE_API_URL   receiving endpoint (default: the public CRM intake
+//                        route). Point it elsewhere for staging, or at a
+//                        Supabase Edge Function.
+//   VITE_QUOTE_API_KEY   token, only if the route requires one (the public
+//                        route does not). Sent as both `Authorization: Bearer …`
+//                        and the Supabase `apikey` header.
 
 import type { ProjectDoc } from '../core/types';
 import { quotePayloadJSON } from '../core/quote';
 
+/** MEJA CRM & Order Management — public Vercel deployment, quote intake route. */
+const DEFAULT_QUOTE_URL = 'https://meja-crm-order-management.vercel.app/api/quotes';
+
 interface Endpoint {
-  url?: string;
+  url: string;
   apiKey?: string;
 }
 
 function endpoint(): Endpoint {
   const env = import.meta.env as unknown as Record<string, string | undefined>;
-  return { url: env.VITE_QUOTE_API_URL, apiKey: env.VITE_QUOTE_API_KEY };
+  return { url: env.VITE_QUOTE_API_URL || DEFAULT_QUOTE_URL, apiKey: env.VITE_QUOTE_API_KEY };
 }
 
-/** True when a live quote endpoint is configured at build time. */
-export function quoteApiConfigured(): boolean {
-  return !!endpoint().url;
+/** The quote endpoint Atelier3D will POST to. */
+export function quoteApiUrl(): string {
+  return endpoint().url;
 }
 
 export interface QuoteSendResult {
@@ -42,9 +43,6 @@ export interface QuoteSendResult {
 /** POSTs the quote payload to the configured quoting API. */
 export async function sendQuote(doc: ProjectDoc): Promise<QuoteSendResult> {
   const { url, apiKey } = endpoint();
-  if (!url) {
-    return { ok: false, sent: false, message: 'No quote API configured (set VITE_QUOTE_API_URL).' };
-  }
   try {
     const res = await fetch(url, {
       method: 'POST',

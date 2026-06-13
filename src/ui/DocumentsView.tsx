@@ -9,7 +9,7 @@ import { formatLength, formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
 import { exportModel, type ModelFormat } from '../studio/exportModel';
 import { instanceShopDrawingSVG, shopDrawingsSVG } from '../studio/shopDrawing';
-import { quoteApiConfigured, sendQuote } from '../studio/quoteApi';
+import { sendQuote } from '../studio/quoteApi';
 import { quotePayloadJSON } from '../core/quote';
 import { DownloadIcon, WarningIcon } from './icons';
 
@@ -84,22 +84,21 @@ export function DocumentsView() {
     useStore.getState().showToast(`${format.toUpperCase()} exported (millimeters, Z-up)`);
   };
 
-  // Quote export: each piece is sent as a product with its child parts. POSTs
-  // to the configured quoting API, or downloads the JSON when none is set.
+  // Quote export: each piece is sent as a product with its child parts, POSTed
+  // to the MEJA quoting app. If the POST doesn't land, the JSON downloads so
+  // the data isn't lost.
   const exportQuote = async () => {
     const toast = useStore.getState().showToast;
     if (doc.instances.length === 0) {
       toast('Nothing to quote — add a piece first.');
       return;
     }
-    if (!quoteApiConfigured()) {
-      download(new Blob([quotePayloadJSON(doc)], { type: 'application/json' }), 'quote.json');
-      toast('No quote API configured — downloaded the quote JSON instead.');
-      return;
-    }
     toast('Sending quote to the quoting system…');
     const result = await sendQuote(doc);
     toast(result.message);
+    if (!result.ok) {
+      download(new Blob([quotePayloadJSON(doc)], { type: 'application/json' }), 'quote.json');
+    }
   };
 
   const stock = page === 'stock' ? buildStockBreakdown(doc) : null;
