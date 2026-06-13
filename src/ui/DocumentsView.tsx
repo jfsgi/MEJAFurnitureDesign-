@@ -9,6 +9,8 @@ import { formatLength, formatLengthBare } from '../core/units';
 import { useStore } from '../core/store';
 import { exportModel, type ModelFormat } from '../studio/exportModel';
 import { instanceShopDrawingSVG, shopDrawingsSVG } from '../studio/shopDrawing';
+import { quoteApiConfigured, sendQuote } from '../studio/quoteApi';
+import { quotePayloadJSON } from '../core/quote';
 import { DownloadIcon, WarningIcon } from './icons';
 
 function SheetDiagram({ layout, index, units }: { layout: SheetLayout; index: number; units: 'imperial' | 'metric' }) {
@@ -82,6 +84,24 @@ export function DocumentsView() {
     useStore.getState().showToast(`${format.toUpperCase()} exported (millimeters, Z-up)`);
   };
 
+  // Quote export: each piece is sent as a product with its child parts. POSTs
+  // to the configured quoting API, or downloads the JSON when none is set.
+  const exportQuote = async () => {
+    const toast = useStore.getState().showToast;
+    if (doc.instances.length === 0) {
+      toast('Nothing to quote — add a piece first.');
+      return;
+    }
+    if (!quoteApiConfigured()) {
+      download(new Blob([quotePayloadJSON(doc)], { type: 'application/json' }), 'quote.json');
+      toast('No quote API configured — downloaded the quote JSON instead.');
+      return;
+    }
+    toast('Sending quote to the quoting system…');
+    const result = await sendQuote(doc);
+    toast(result.message);
+  };
+
   const stock = page === 'stock' ? buildStockBreakdown(doc) : null;
 
   return (
@@ -134,6 +154,13 @@ export function DocumentsView() {
                 </button>
                 <button className="btn" onClick={() => export3D('obj')} title="3D model with per-part names">
                   <DownloadIcon /> Export OBJ
+                </button>
+                <button
+                  className="btn"
+                  onClick={exportQuote}
+                  title="Send each piece to the quoting system as a product with its child parts"
+                >
+                  <DownloadIcon /> Send to quote
                 </button>
               </div>
             </div>
