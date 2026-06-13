@@ -12,6 +12,8 @@ export interface CutRow {
   width: number;
   thickness: number;
   material: string;
+  /** Shop note carried from the part (e.g. joinery detail). */
+  note?: string;
   /** Ids of the model parts aggregated into this row (hover sync with the viewport). */
   partIds: string[];
 }
@@ -26,8 +28,8 @@ export function buildCutList(doc: ProjectDoc): CutGroup[] {
     const model = evaluateInstance(inst);
     const byKey = new Map<string, CutRow>();
     for (const part of model.parts) {
-      const { length, width, thickness } = part.cut;
-      const key = [part.name, length.toFixed(2), width.toFixed(2), thickness.toFixed(2), part.material].join('|');
+      const { length, width, thickness, note } = part.cut;
+      const key = [part.name, length.toFixed(2), width.toFixed(2), thickness.toFixed(2), part.material, note ?? ''].join('|');
       const row = byKey.get(key);
       if (row) {
         row.qty += 1;
@@ -40,6 +42,7 @@ export function buildCutList(doc: ProjectDoc): CutGroup[] {
           width,
           thickness,
           material: part.material,
+          note,
           partIds: [part.id],
         });
       }
@@ -63,7 +66,7 @@ export function cutListCSV(doc: ProjectDoc, units: Units): string {
   const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
   const unitMark = units === 'imperial' ? 'in' : 'mm';
   const lines = [
-    ['Item', 'Part', 'Qty', `Length (${unitMark})`, `Width (${unitMark})`, `Thickness (${unitMark})`, 'Material', 'Board ft']
+    ['Item', 'Part', 'Qty', `Length (${unitMark})`, `Width (${unitMark})`, `Thickness (${unitMark})`, 'Material', 'Board ft', 'Notes']
       .map(esc)
       .join(','),
   ];
@@ -79,6 +82,7 @@ export function cutListCSV(doc: ProjectDoc, units: Units): string {
           esc(dim(row.thickness)),
           esc(MATERIAL_BY_ID[row.material]?.name ?? row.material),
           boardFeet(row).toFixed(2),
+          esc(row.note ?? ''),
         ].join(','),
       );
     }

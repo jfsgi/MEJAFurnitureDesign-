@@ -157,7 +157,7 @@ export interface Part {
   material: string; // material id
   primitives: Primitive[];
   // Stock dimensions for the cut list; length runs along the grain.
-  cut: { length: number; width: number; thickness: number };
+  cut: { length: number; width: number; thickness: number; note?: string };
 }
 
 export interface Finding {

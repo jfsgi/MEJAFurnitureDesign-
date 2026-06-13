@@ -4,7 +4,7 @@
 // front and back rails under the shelf edges, and a rail under each end
 // of the shelf between the leg pairs.
 
-import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part } from '../types';
+import type { ComponentDef, Finding, GeneratedModel, ParamValues, Part, Primitive } from '../types';
 import { formatLength, inch } from '../units';
 
 const num = (p: ParamValues, k: string): number => p[k] as number;
@@ -29,6 +29,8 @@ export const entryBench: ComponentDef = {
     { kind: 'length', key: 'seatThickness', label: 'Seat thickness', default: inch(0.8125), min: inch(0.625), max: inch(2), tier: 'advanced' },
     { kind: 'length', key: 'legThickness', label: 'Leg thickness', default: inch(2.5), min: inch(1.5), max: inch(3.5), tier: 'advanced' },
     { kind: 'length', key: 'apronThickness', label: 'Apron thickness', default: inch(0.75), min: inch(0.5), max: inch(1.25), tier: 'advanced' },
+    { kind: 'boolean', key: 'mortiseTenon', label: 'Mortise & tenon aprons', default: true, tier: 'advanced' },
+    { kind: 'length', key: 'tenonLength', label: 'Tenon length', default: inch(0.875), min: inch(0.375), max: inch(2), tier: 'advanced' },
     { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(0.8125), min: inch(0.625), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'endOverhang', label: 'Seat end overhang', default: inch(1), min: 0, max: inch(3), tier: 'advanced' },
     { kind: 'length', key: 'frontOverhang', label: 'Seat front overhang', default: inch(0.75), min: 0, max: inch(2), tier: 'advanced' },
@@ -41,6 +43,7 @@ export const entryBench: ComponentDef = {
     const legT = num(p, 'legThickness');
     const apronT = num(p, 'apronThickness');
     const shelfT = num(p, 'shelfThickness');
+    const mt = p['mortiseTenon'] as boolean;
     const shelfH = num(p, 'shelfHeight');
     const ovEnd = num(p, 'endOverhang');
     const ovFront = num(p, 'frontOverhang');
@@ -135,35 +138,68 @@ export const entryBench: ComponentDef = {
     // edges, running between the legs at the half-leg setback; end rails
     // (toggleable) close the shelf frame between each leg pair.
     const span = envW - 2 * legT;
+    const endSpan = envD - 2 * legT;
     const apronH = Math.min(RAIL_HEIGHT, legH - seatT);
+
+    // Mortise & tenon: a centered tenon runs from each apron end into the
+    // leg, shouldered on all four edges. It stays blind in the leg, so its
+    // length is capped a hair short of the leg's far face. Tenons are part
+    // of the apron piece (one board, cut long), hidden in the assembled
+    // view and shown projecting in the exploded view.
+    const tenL = mt ? Math.min(num(p, 'tenonLength'), legT - inch(0.125)) : 0;
+    const tenTh = apronT / 3; // centered, shoulders apronT/3 each face
+    const tenShoulderZ = inch(0.375);
+    const tenH = Math.max(apronH - 2 * tenShoulderZ, apronH * 0.5);
+    const tenonNote = mt
+      ? `Mortise & tenon: ${formatLength(tenL, 'imperial')} tenons both ends`
+      : undefined;
+
     for (const sy of [-1, 1]) {
+      const apronY = sy * (envD / 2 - SB - apronT / 2);
+      const apronZ = H - seatT - apronH / 2;
+      const prims: Primitive[] = [
+        { shape: 'box', size: [span, apronT, apronH], at: [0, apronY, apronZ] },
+      ];
+      if (mt) {
+        for (const sx of [-1, 1]) {
+          prims.push({
+            shape: 'box',
+            size: [tenL, tenTh, tenH],
+            at: [sx * (span / 2 + tenL / 2), apronY, apronZ],
+            grain: 'x',
+          });
+        }
+      }
       parts.push({
         id: `apron-${sy}`,
         name: 'Apron',
         material: mat,
-        primitives: [
-          {
-            shape: 'box',
-            size: [span, apronT, apronH],
-            at: [0, sy * (envD / 2 - SB - apronT / 2), H - seatT - apronH / 2],
-          },
-        ],
-        cut: { length: span, width: apronH, thickness: apronT },
+        primitives: prims,
+        cut: { length: span + 2 * tenL, width: apronH, thickness: apronT, note: tenonNote },
       });
     }
     for (const sx of [-1, 1]) {
+      const apronX = sx * (envW / 2 - SB - apronT / 2);
+      const apronZ = H - seatT - apronH / 2;
+      const prims: Primitive[] = [
+        { shape: 'box', size: [apronT, endSpan, apronH], at: [apronX, 0, apronZ] },
+      ];
+      if (mt) {
+        for (const sy of [-1, 1]) {
+          prims.push({
+            shape: 'box',
+            size: [tenTh, tenL, tenH],
+            at: [apronX, sy * (endSpan / 2 + tenL / 2), apronZ],
+            grain: 'y',
+          });
+        }
+      }
       parts.push({
         id: `apron-end-${sx}`,
         name: 'End apron',
         material: mat,
-        primitives: [
-          {
-            shape: 'box',
-            size: [apronT, envD - 2 * legT, apronH],
-            at: [sx * (envW / 2 - SB - apronT / 2), 0, H - seatT - apronH / 2],
-          },
-        ],
-        cut: { length: envD - 2 * legT, width: apronH, thickness: apronT },
+        primitives: prims,
+        cut: { length: endSpan + 2 * tenL, width: apronH, thickness: apronT, note: tenonNote },
       });
     }
     const railH = Math.min(RAIL_HEIGHT, shelfH - shelfT);
