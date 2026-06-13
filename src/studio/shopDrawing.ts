@@ -9,9 +9,10 @@ import * as THREE from 'three';
 import type { Instance, ProjectDoc, Units } from '../core/types';
 import { evaluateInstance, modelBBox } from '../core/evaluate';
 import { formatLength } from '../core/units';
+import type { Primitive } from '../core/types';
 import { buildCutList, boardFeet } from '../core/cutlist';
 import { MATERIAL_BY_ID } from '../core/materials';
-import { buildExportGroup } from './exportModel';
+import { buildExportGroup, buildPartGroup } from './exportModel';
 // Embedded as a base64 data URI so every drawing carries the MEJA logo and
 // stays self-contained when the SVG is downloaded or printed.
 import mejaLogo from '../assets/meja-logo.png?inline';
@@ -30,13 +31,8 @@ interface Piece {
 type Proj = (x: number, y: number, z: number) => [number, number];
 type Depth = (x: number, y: number, z: number) => number; // larger = nearer the viewer
 
-/** Real feature edges + bbox for every primitive of one piece, in the piece's
- * local model space (instance placement/rotation dropped — a shop drawing is
- * the canonical piece). */
-function collectPieces(inst: Instance): Piece[] {
-  const local: Instance = { ...inst, position: [0, 0], rotationZ: 0 };
-  const doc: ProjectDoc = { schema: 1, name: inst.name, units: 'imperial', instances: [local] };
-  const group = buildExportGroup(doc);
+/** Feature edges + bbox for every mesh in a group, in model space. */
+function groupToPieces(group: THREE.Group): Piece[] {
   group.updateMatrixWorld(true);
   const pieces: Piece[] = [];
   const a = new THREE.Vector3();
@@ -57,6 +53,20 @@ function collectPieces(inst: Instance): Piece[] {
     o.geometry.dispose();
   });
   return pieces;
+}
+
+/** Real feature edges + bbox for every primitive of one piece, in the piece's
+ * local model space (instance placement/rotation dropped — a shop drawing is
+ * the canonical piece). */
+function collectPieces(inst: Instance): Piece[] {
+  const local: Instance = { ...inst, position: [0, 0], rotationZ: 0 };
+  const doc: ProjectDoc = { schema: 1, name: inst.name, units: 'imperial', instances: [local] };
+  return groupToPieces(buildExportGroup(doc));
+}
+
+/** Feature edges for a single part, framed on its own. */
+function collectPartPieces(primitives: Primitive[]): Piece[] {
+  return groupToPieces(buildPartGroup(primitives));
 }
 
 const lerp = (A: number[], B: number[], t: number): V3 => [
@@ -136,6 +146,76 @@ function renderView(
     `<g fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}" stroke-linecap="round">${solid.map((l) => l + '/>').join('')}</g>`,
     `<g fill="none" stroke="#8a8a8a" stroke-width="${(sw * 0.8).toFixed(3)}" stroke-dasharray="${(sw * 4).toFixed(2)} ${(sw * 3).toFixed(2)}">${hidden.map((l) => l + '/>').join('')}</g>`,
   ].join('\n');
+}
+
+/** A two-view (face + edge) drawing of one part with hidden-line removal and a
+ * dimensioned outline, laid out from (x0, yTop) within cellW. Returns the SVG
+ * and the vertical space it consumed. */
+function renderPartCell(
+  pieces: Piece[],
+  name: string,
+  qty: number,
+  cut: { length: number; width: number; thickness: number },
+  units: Units,
+  x0: number,
+  yTop: number,
+  cellW: number,
+  sw: number,
+): { svg: string; height: number } {
+  const mn: V3 = [Infinity, Infinity, Infinity];
+  const mx: V3 = [-Infinity, -Infinity, -Infinity];
+  for (const p of pieces)
+    for (let i = 0; i < 3; i++) {
+      mn[i] = Math.min(mn[i], p.min[i]);
+      mx[i] = Math.max(mx[i], p.max[i]);
+    }
+  const ext: V3 = [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
+  // thin = thickness (look through it for the face); long = length; mid = width.
+  const thin = (ext[0] <= ext[1] && ext[0] <= ext[2] ? 0 : ext[1] <= ext[2] ? 1 : 2) as 0 | 1 | 2;
+  const rest = ([0, 1, 2] as const).filter((a) => a !== thin);
+  const long = (ext[rest[0]] >= ext[rest[1]] ? rest[0] : rest[1]) as 0 | 1 | 2;
+  const mid = (rest[0] === long ? rest[1] : rest[0]) as 0 | 1 | 2;
+  const [L, Wd, T] = [ext[long], ext[mid], ext[thin]];
+
+  const ds = Math.max(cellW * 0.035, 3);
+  const padL = ds * 2.4; // room for the width/thickness dims on the left
+  const drawW = cellW - padL - ds;
+  const gap = ds * 1.1;
+  const scale = Math.min(drawW / Math.max(L, 1e-3), (cellW * 0.7 - gap) / Math.max(Wd + T, 1e-3));
+
+  const labelY = yTop + ds;
+  const faceTop = labelY + ds * 0.9;
+  const faceBottom = faceTop + Wd * scale;
+  const edgeTop = faceBottom + gap;
+  const edgeBottom = edgeTop + T * scale;
+  const vx0 = x0 + padL;
+  const co = (x: number, y: number, z: number, axis: 0 | 1 | 2) => [x, y, z][axis];
+
+  const projFace: Proj = (x, y, z) => [vx0 + (co(x, y, z, long) - mn[long]) * scale, faceBottom - (co(x, y, z, mid) - mn[mid]) * scale];
+  const depthFace: Depth = (x, y, z) => co(x, y, z, thin);
+  const projEdge: Proj = (x, y, z) => [vx0 + (co(x, y, z, long) - mn[long]) * scale, edgeBottom - (co(x, y, z, thin) - mn[thin]) * scale];
+  const depthEdge: Depth = (x, y, z) => co(x, y, z, mid);
+
+  const span = Math.max(L, Wd, T);
+  const views = renderView(pieces, projFace, depthFace, sw, span) + renderView(pieces, projEdge, depthEdge, sw, span);
+
+  const tick = ds * 0.4;
+  const xR = vx0 + L * scale;
+  const yLen = edgeBottom + ds * 1.2;
+  const dl = (x1: number, y1: number, x2: number, y2: number) =>
+    `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`;
+  const tx = (x: number, y: number, s: string, rot = false) =>
+    `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${(ds * 0.82).toFixed(2)}" fill="#1b1b1b" text-anchor="middle" font-family="sans-serif"${rot ? ` transform="rotate(-90 ${x.toFixed(2)} ${y.toFixed(2)})"` : ''}>${esc(s)}</text>`;
+  const dims = [
+    dl(vx0, yLen, xR, yLen),
+    dl(vx0, yLen - tick, vx0, yLen + tick),
+    dl(xR, yLen - tick, xR, yLen + tick),
+    tx((vx0 + xR) / 2, yLen + ds * 0.9, formatLength(cut.length, units)),
+    tx(x0 + ds * 0.7, (faceTop + faceBottom) / 2, formatLength(cut.width, units), true),
+    tx(x0 + ds * 0.7, (edgeTop + edgeBottom) / 2, formatLength(cut.thickness, units), true),
+  ];
+  const label = `<text x="${x0.toFixed(2)}" y="${labelY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${esc(qty > 1 ? `${name} ×${qty}` : name)}</text>`;
+  return { svg: [label, views, ...dims].join('\n'), height: yLen + ds * 1.4 - yTop };
 }
 
 interface Drawing {
@@ -273,10 +353,52 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
   const tableBottom = tableTop + rowH * (rows.length + 1);
   table.push(rule(tableBottom, sw * 1.5));
 
+  // Part drawings: a dimensioned face + edge view of every unique part, in a
+  // grid below the cut list. One representative part per cut-list row.
+  const partDefs: { row: (typeof rows)[number]; part: (typeof model.parts)[number] }[] = [];
+  for (const r of rows) {
+    const part = model.parts.find((p) => p.id === r.partIds[0]);
+    if (part) partDefs.push({ row: r, part });
+  }
+  const parts: string[] = [];
+  let partsBottom = tableBottom;
+  if (partDefs.length > 0) {
+    const headerY = tableBottom + ds * 2.2;
+    parts.push(
+      `<text x="${margin.toFixed(2)}" y="${headerY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">PART DRAWINGS</text>`,
+    );
+    const gridW = contentRight - margin;
+    const cols = Math.max(1, Math.min(4, Math.floor(gridW / (span * 0.55))));
+    const cellW = gridW / cols;
+    let gy = headerY + ds * 1.4;
+    let rowMaxH = 0;
+    partDefs.forEach((d, i) => {
+      const col = i % cols;
+      if (col === 0 && i > 0) {
+        gy += rowMaxH + ds * 1.6;
+        rowMaxH = 0;
+      }
+      const c = renderPartCell(
+        collectPartPieces(d.part.primitives),
+        d.part.name,
+        d.row.qty,
+        { length: d.row.length, width: d.row.width, thickness: d.row.thickness },
+        units,
+        margin + col * cellW,
+        gy,
+        cellW - ds,
+        sw,
+      );
+      parts.push(c.svg);
+      rowMaxH = Math.max(rowMaxH, c.height);
+    });
+    partsBottom = gy + rowMaxH;
+  }
+
   return {
-    content: [views, ...dims, ...labels, ...title, ...table].join('\n'),
+    content: [views, ...dims, ...labels, ...title, ...table, ...parts].join('\n'),
     width: contentRight + margin,
-    height: tableBottom + margin,
+    height: partsBottom + margin,
   };
 }
 

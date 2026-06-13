@@ -52,6 +52,20 @@ function primitiveGeometry(prim: Primitive): { geometry: THREE.BufferGeometry; r
   return { geometry, rotation };
 }
 
+/** A single part's primitives as a THREE.Group in model space (Z-up, mm),
+ * positioned where the part sits — used for per-part shop drawings. */
+export function buildPartGroup(primitives: Primitive[]): THREE.Group {
+  const group = new THREE.Group();
+  for (const prim of primitives) {
+    const { geometry, rotation } = primitiveGeometry(prim);
+    const mesh = new THREE.Mesh(geometry);
+    mesh.position.set(...prim.at);
+    mesh.rotation.copy(rotation);
+    group.add(mesh);
+  }
+  return group;
+}
+
 /** The whole document as one THREE.Group, every part a named mesh, in model
  * space (Z-up, mm). Each instance's placement and rotation are baked in. */
 export function buildExportGroup(doc: ProjectDoc): THREE.Group {
