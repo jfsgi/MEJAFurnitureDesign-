@@ -1231,3 +1231,60 @@ button {
   font-size: 14px;
   padding: 24px 0;
 }
+
+/* Joint editor overlay. */
+.joint-hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent, #0f766e);
+  color: #fff;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-pop);
+  z-index: 6;
+}
+.joint-picker {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-ctl);
+  box-shadow: var(--shadow-pop);
+  padding: 12px;
+  z-index: 6;
+}
+.joint-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.joint-picker-x {
+  margin-left: auto;
+  border: none;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--text-2, #777);
+}
+.joint-picker-kind {
+  font-size: 12px;
+  color: var(--text-2, #777);
+  margin-bottom: 8px;
+}
+.joint-picker-styles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.joint-picker-styles .btn {
+  justify-content: flex-start;
+}

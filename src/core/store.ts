@@ -3,9 +3,10 @@
 // (UI standard §1.6). Gestures (scrubs/drags) snapshot once at start, commit once at end.
 
 import { create } from 'zustand';
-import type { ParamValue, ParamValues, ProjectDoc, Units } from './types';
+import type { JointStyle, ParamValue, ParamValues, ProjectDoc, Units } from './types';
 import { REGISTRY } from './components/registry';
 import { instanceBBox } from './evaluate';
+import { jointKey } from './joints';
 import { inch } from './units';
 
 const STORAGE_KEY = 'atelier3d.project.v1';
@@ -69,6 +70,10 @@ interface State {
   /** Exploded-view spread, 0 (assembled) to 1 — parts fan out from each
    *  assembly's center to show the construction. */
   explode: number;
+  /** Joint editor: clicking parts assigns joinery instead of selecting. */
+  jointMode: boolean;
+  /** Parts picked for the joint being edited (same instance, up to two). */
+  jointPick: { instanceId: string; partIds: string[] } | null;
   workshop: WorkshopPreset[];
 
   commitDoc(mutate: (doc: ProjectDoc) => void): void;
@@ -87,6 +92,10 @@ interface State {
   setInspectorOpen(open: boolean): void;
   setZoomWindowArmed(on: boolean): void;
   setExplode(spread: number): void;
+  setJointMode(on: boolean): void;
+  pickJointPart(instanceId: string, partId: string): void;
+  clearJointPick(): void;
+  setJoint(instanceId: string, partA: string, partB: string, style: JointStyle): void;
   showToast(message: string, undoable?: boolean): void;
   dismissToast(): void;
 
@@ -183,6 +192,8 @@ export const useStore = create<State>()((set, get) => {
     toast: null,
     zoomWindowArmed: false,
     explode: 0,
+    jointMode: false,
+    jointPick: null,
     workshop: loadWorkshop(),
 
     commitDoc(mutate) {
@@ -234,6 +245,36 @@ export const useStore = create<State>()((set, get) => {
     setInspectorOpen: (open) => set({ inspectorOpen: open }),
     setZoomWindowArmed: (on) => set({ zoomWindowArmed: on }),
     setExplode: (spread) => set({ explode: spread }),
+    setJointMode: (on) => set({ jointMode: on, jointPick: null }),
+    clearJointPick: () => set({ jointPick: null }),
+    pickJointPart: (instanceId, partId) => {
+      const cur = get().jointPick;
+      // Restart the pick on a different instance.
+      if (!cur || cur.instanceId !== instanceId) {
+        set({ jointPick: { instanceId, partIds: [partId] } });
+        return;
+      }
+      if (cur.partIds.includes(partId)) {
+        set({ jointPick: { instanceId, partIds: cur.partIds.filter((p) => p !== partId) } });
+        return;
+      }
+      // Keep at most two parts (the joint pair).
+      const partIds = [...cur.partIds, partId].slice(-2);
+      set({ jointPick: { instanceId, partIds } });
+    },
+    setJoint: (instanceId, partA, partB, style) => {
+      get().commitDoc((doc) => {
+        const inst = doc.instances.find((i) => i.id === instanceId);
+        if (!inst) return;
+        const joints = { ...(inst.joints ?? {}) };
+        const key = jointKey(partA, partB);
+        if (style === 'butt') delete joints[key];
+        else joints[key] = style;
+        inst.joints = joints;
+      });
+      set({ jointPick: null });
+      get().showToast(style === 'butt' ? 'Joint cleared' : `Joint set: ${style.replace(/-/g, ' ')}`);
+    },
     showToast: (message, undoable = false) => set({ toast: { id: ++toastSeq, message, undoable } }),
     dismissToast: () => set({ toast: null }),
 

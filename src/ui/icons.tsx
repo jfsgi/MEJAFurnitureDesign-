@@ -131,6 +131,12 @@ export const ExplodeIcon = () => (
     <path d="M13.5 13.5 16 16M16.5 13.75v2.75h-2.75" />
   </I>
 );
+export const JointIcon = () => (
+  <I>
+    <path d="M3 7h6v2.2l2 1.3-2 1.3V17H3" />
+    <path d="M17 7h-6v2.2l-2 1.3 2 1.3V17h6" />
+  </I>
+);
 export const RotateIcon = () => (
   <I>
     <path d="M16 10a6 6 0 1 1-2-4.47" />

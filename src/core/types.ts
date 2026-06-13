@@ -181,6 +181,16 @@ export interface ComponentDef {
   generate(params: ParamValues): GeneratedModel;
 }
 
+/** Joinery a user can assign to a joint between two parts. */
+export type JointStyle =
+  | 'butt'
+  | 'mortise-tenon'
+  | 'dowel'
+  | 'through-dovetail'
+  | 'half-blind-dovetail'
+  | 'french-dovetail'
+  | 'box-joint';
+
 export interface Instance {
   id: string;
   componentId: string;
@@ -188,6 +198,8 @@ export interface Instance {
   position: [number, number]; // X, Y on the floor, mm
   rotationZ: number; // radians
   params: ParamValues; // sparse overrides; missing keys use the component defaults
+  /** Per-joint joinery overrides, keyed by the sorted pair of part ids. */
+  joints?: Record<string, JointStyle>;
 }
 
 export interface ProjectDoc {

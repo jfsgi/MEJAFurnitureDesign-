@@ -36,10 +36,13 @@ import {
   ExplodeIcon,
   FrameIcon,
   FrameSelectionIcon,
+  JointIcon,
   MinusIcon,
   PlusIcon,
   ZoomWindowIcon,
 } from '../ui/icons';
+import { detectJoint, jointKey } from '../core/joints';
+import type { JointStyle } from '../core/types';
 
 const FALLBACK_MATERIAL = MATERIALS[0];
 
@@ -229,6 +232,9 @@ function InstanceGroup({ inst }: { inst: Instance }) {
   const hoveredPartIds = useStore((s) =>
     s.hoveredPart?.instanceId === inst.id ? s.hoveredPart.partIds : null,
   );
+  const jointPickIds = useStore((s) =>
+    s.jointPick?.instanceId === inst.id ? s.jointPick.partIds : null,
+  );
   const snap = useStore((s) => s.snap);
   const units = useStore((s) => s.doc.units);
   const { select, hover, setHoveredPart, setPosition, beginGesture, endGesture } =
@@ -254,6 +260,14 @@ function InstanceGroup({ inst }: { inst: Instance }) {
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (e.button !== 0) return;
     e.stopPropagation();
+    // Joint editor: clicking a part picks it for the joint instead of moving.
+    if (useStore.getState().jointMode) {
+      const partId =
+        (e.object.userData?.partId as string | undefined) ??
+        (e.object.parent?.userData?.partId as string | undefined);
+      if (partId) useStore.getState().pickJointPart(inst.id, partId);
+      return;
+    }
     select(inst.id);
     const gp = groundFromRay(e.ray);
     if (!gp) return;
@@ -338,7 +352,10 @@ function InstanceGroup({ inst }: { inst: Instance }) {
                 mat={mat}
                 selected={selected}
                 hovered={hovered}
-                partHovered={hoveredPartIds?.includes(part.id) ?? false}
+                partHovered={
+                  (hoveredPartIds?.includes(part.id) ?? false) ||
+                  (jointPickIds?.includes(part.id) ?? false)
+                }
                 seed={`${inst.id}/${part.id}`}
                 partId={part.id}
               />
@@ -528,9 +545,19 @@ function ZoomWindowOverlay() {
 function ViewportTools() {
   const armed = useStore((s) => s.zoomWindowArmed);
   const explode = useStore((s) => s.explode);
-  const { setZoomWindowArmed, setExplode } = useStore.getState();
+  const jointMode = useStore((s) => s.jointMode);
+  const { setZoomWindowArmed, setExplode, setJointMode } = useStore.getState();
   return (
     <div className="viewport-tools" role="toolbar" aria-label="Zoom tools">
+      <button
+        className={`btn btn--icon${jointMode ? ' btn--toggle-on' : ''}`}
+        onClick={() => setJointMode(!jointMode)}
+        title="Joint editor — click two parts that meet"
+        aria-label="Joint editor"
+        aria-pressed={jointMode}
+      >
+        <JointIcon />
+      </button>
       {explode > 0 && (
         <input
           type="range"
@@ -650,6 +677,78 @@ export function Viewport() {
     </Canvas>
     <ZoomWindowOverlay />
     <ViewportTools />
+    <JointPicker />
     </>
+  );
+}
+
+const JOINT_LABELS: Record<JointStyle, string> = {
+  butt: 'Butt / none',
+  'mortise-tenon': 'Mortise & tenon',
+  dowel: 'Dowel',
+  'through-dovetail': 'Through dovetail',
+  'half-blind-dovetail': 'Half-blind dovetail',
+  'french-dovetail': 'French dovetail',
+  'box-joint': 'Box joint',
+};
+
+/** Joint editor overlay: prompts for two parts, then offers the joinery
+ * styles valid for the joint between them. */
+function JointPicker() {
+  const jointMode = useStore((s) => s.jointMode);
+  const pick = useStore((s) => s.jointPick);
+  const doc = useStore((s) => s.doc);
+  const { setJoint, clearJointPick } = useStore.getState();
+  if (!jointMode) return null;
+
+  if (!pick || pick.partIds.length < 2) {
+    return (
+      <div className="joint-hint">
+        Joint editor — click two parts that meet{pick?.partIds.length ? ' (one more)' : ''}.
+      </div>
+    );
+  }
+
+  const inst = doc.instances.find((i) => i.id === pick.instanceId);
+  const model = inst ? evaluateInstance(inst) : null;
+  const [idA, idB] = pick.partIds;
+  const a = model?.parts.find((p) => p.id === idA);
+  const b = model?.parts.find((p) => p.id === idB);
+  if (!inst || !a || !b) return null;
+  const ba = partBBox(a);
+  const bb = partBBox(b);
+  const joint = ba && bb ? detectJoint(a, b, ba, bb) : null;
+  const styles = joint?.styles ?? (['butt'] as JointStyle[]);
+  const current = inst.joints?.[jointKey(idA, idB)] ?? 'butt';
+
+  return (
+    <div className="joint-picker" role="dialog" aria-label="Choose joinery">
+      <div className="joint-picker-head">
+        <strong>{a.name}</strong> + <strong>{b.name}</strong>
+        <button className="joint-picker-x" onClick={clearJointPick} aria-label="Cancel">
+          ×
+        </button>
+      </div>
+      <div className="joint-picker-kind">
+        {joint
+          ? joint.kind === 'end-face'
+            ? 'End-to-face joint'
+            : 'Corner joint'
+          : "These parts don't meet — pick two that touch."}
+      </div>
+      {joint && (
+        <div className="joint-picker-styles">
+          {styles.map((s) => (
+            <button
+              key={s}
+              className={`btn${s === current ? ' btn--toggle-on' : ''}`}
+              onClick={() => setJoint(inst.id, idA, idB, s)}
+            >
+              {JOINT_LABELS[s]}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

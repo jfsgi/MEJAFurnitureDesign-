@@ -12,6 +12,7 @@ import type {
   ProjectDoc,
 } from './types';
 import { REGISTRY } from './components/registry';
+import { applyJoints } from './joints';
 
 export function defaultParams(def: ComponentDef): ParamValues {
   return Object.fromEntries(def.params.map((p) => [p.key, p.default]));
@@ -29,7 +30,11 @@ export function evaluateInstance(inst: Instance): GeneratedModel {
     return { parts: [], findings: [{ severity: 'warning', message: `Unknown component "${inst.componentId}".` }] };
   }
   try {
-    return def.generate(effectiveParams(inst));
+    const model = def.generate(effectiveParams(inst));
+    if (inst.joints && Object.keys(inst.joints).length > 0) {
+      return { ...model, parts: applyJoints(model.parts, inst.joints, partBBox) };
+    }
+    return model;
   } catch (err) {
     return {
       parts: [],
