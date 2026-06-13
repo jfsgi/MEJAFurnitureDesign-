@@ -107,35 +107,32 @@ export const entryBench: ComponentDef = {
       }
     }
 
-    // Everything between the legs — boot shelf edges, shelf rails, and the
-    // seat aprons — sets back half the leg thickness from the leg faces.
+    // The shelf rails and end rails set back half the leg thickness from the
+    // leg outer faces.
     const SB = legT / 2;
-    const shelfW = envW - 2 * SB;
-    const shelfD = envD - 2 * SB;
+    const endRailT = legT - SB; // end rail thickness (also the shelf tongue band)
 
-    // Boot shelf: one slab notched around the four posts, its edges inset
-    // the half-leg setback. Modeled as the center board plus a corner
-    // tongue beside each leg pair; the tongues keep the slab's grain.
+    // Boot shelf: a slab notched around the four posts, run FLUSH with the
+    // surrounding aprons — the center board reaches the front/back aprons'
+    // outer faces, and the side tongues beside each leg pair reach the end
+    // aprons'. Modeled as the center board plus a tongue per leg pair so the
+    // grain runs continuously along the bench.
+    const shelfHalfD = legY + apronT / 2;   // flush with the front/back aprons
+    const shelfHalfW = legX + endRailT / 2; // flush with the end aprons
+    const centerHalfW = envW / 2 - legT;    // center board half width (between the legs)
+    const tongueW = shelfHalfW - centerHalfW;
+    const tongueCx = (centerHalfW + shelfHalfW) / 2;
+    const tongueD = envD - 2 * legT;        // between the front and back legs
     parts.push({
       id: 'shelf',
       name: 'Boot shelf',
       material: mat,
       primitives: [
-        { shape: 'box', size: [envW - 2 * legT, shelfD, shelfT], at: [0, cy, shelfZ], grain: 'x' },
-        {
-          shape: 'box',
-          size: [legT - SB, envD - 2 * legT, shelfT],
-          at: [-(envW / 2 - (legT + SB) / 2), cy, shelfZ],
-          grain: 'x',
-        },
-        {
-          shape: 'box',
-          size: [legT - SB, envD - 2 * legT, shelfT],
-          at: [envW / 2 - (legT + SB) / 2, cy, shelfZ],
-          grain: 'x',
-        },
+        { shape: 'box', size: [2 * centerHalfW, 2 * shelfHalfD, shelfT], at: [0, cy, shelfZ], grain: 'x' },
+        { shape: 'box', size: [tongueW, tongueD, shelfT], at: [-tongueCx, cy, shelfZ], grain: 'x' },
+        { shape: 'box', size: [tongueW, tongueD, shelfT], at: [tongueCx, cy, shelfZ], grain: 'x' },
       ],
-      cut: { length: shelfW, width: shelfD, thickness: shelfT },
+      cut: { length: 2 * shelfHalfW, width: 2 * shelfHalfD, thickness: shelfT },
     });
 
     // Aprons under the seat and rails under the shelf's front and back

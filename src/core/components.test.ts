@@ -995,24 +995,41 @@ describe('entryway bench', () => {
     }
   });
 
-  it('shelf edges set back half a leg thickness from the leg faces', () => {
+  it('runs the boot shelf flush with the surrounding aprons', () => {
     const base = defaultParams(def);
     const model = def.generate(base);
     const W = base.width as number;
     const ovEnd = base.endOverhang as number;
     const legT = base.legThickness as number;
     const shelf = model.parts.find((p) => p.id === 'shelf')!;
-    const xs = shelf.primitives.map(
-      (pr) => (pr as { at: number[]; size: number[] }).at[0] + (pr as { size: number[] }).size[0] / 2,
-    );
-    expect(Math.max(...xs)).toBeCloseTo(W / 2 - ovEnd - legT / 2, 5);
-    expect(shelf.cut.length).toBeCloseTo(W - 2 * ovEnd - legT, 5);
-    // Aprons are centered on the legs: the apron's midplane lies on the leg
-    // centerline (D/2 − front overhang − half a leg in from the seat edge).
-    const apron = model.parts.find((p) => p.id === 'apron-1')!;
-    const prim = apron.primitives[0] as { at: number[]; size: number[] };
+    const prims = shelf.primitives as { at: number[]; size: number[] }[];
+
+    // End edge reaches the end aprons' outer face (a quarter-leg past the leg
+    // centerline), and the cut length spans that.
+    const xs = prims.map((pr) => pr.at[0] + pr.size[0] / 2);
+    expect(Math.max(...xs)).toBeCloseTo(W / 2 - ovEnd - legT / 4, 5);
+    expect(shelf.cut.length).toBeCloseTo(W - 2 * ovEnd - legT / 2, 5);
+
+    // Front edge of the shelf is flush with the front shelf rail's outer face.
+    const rail = model.parts.find((p) => p.id === 'shelf-rail-1')!.primitives[0] as {
+      at: number[];
+      size: number[];
+    };
+    const railFace = rail.at[1] + rail.size[1] / 2;
+    const ys = prims.map((pr) => pr.at[1] + pr.size[1] / 2);
+    expect(Math.max(...ys)).toBeCloseTo(railFace, 5);
+  });
+
+  it('centers the aprons on the legs', () => {
+    const base = defaultParams(def);
+    const model = def.generate(base);
+    const legT = base.legThickness as number;
     const D = base.depth as number;
     const ovFront = base.frontOverhang as number;
+    // The apron's midplane lies on the leg centerline (D/2 − front overhang −
+    // half a leg in from the seat edge).
+    const apron = model.parts.find((p) => p.id === 'apron-1')!;
+    const prim = apron.primitives[0] as { at: number[]; size: number[] };
     expect(prim.at[1]).toBeCloseTo(D / 2 - ovFront - legT / 2, 5);
   });
 
