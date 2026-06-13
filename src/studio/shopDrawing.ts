@@ -167,9 +167,102 @@ function partCornerRadius(part: { primitives: Primitive[] }): number {
   return 0;
 }
 
-/** Shop notes for a part: joinery (with sizes), corner radii, edge treatments,
- * notches and other machining a maker needs beyond the stock size. Read off the
- * real primitives plus the instance's joint assignments. */
+/** A dimensionable joinery feature read off a part's primitives. */
+type JointFeature =
+  | { kind: 'tenon'; length: number; width: number; thickness: number }
+  | { kind: 'key'; depth: number; runH: number; rootThin: number; tipThin: number };
+
+/** The joinery features on a part worth a dimensioned detail: tenons (boxes
+ * projecting past the body when the part is in a mortise-tenon joint) and
+ * French-dovetail keys. De-duplicated by size. */
+function partJointFeatures(part: { primitives: Primitive[] }, inMT: boolean): JointFeature[] {
+  const out: JointFeature[] = [];
+  const seen = new Set<string>();
+  const boxes = part.primitives.filter((p) => p.shape === 'box') as Extract<Primitive, { shape: 'box' }>[];
+  const vol = (b: Extract<Primitive, { shape: 'box' }>) => b.size[0] * b.size[1] * b.size[2];
+  let body: Extract<Primitive, { shape: 'box' }> | null = null;
+  for (const b of boxes) if (!body || vol(b) > vol(body)) body = b;
+  for (const prim of part.primitives) {
+    if (prim.shape === 'box' && inMT && body && prim !== body) {
+      const off = [0, 1, 2].map((i) => Math.abs(prim.at[i] - body!.at[i]));
+      const ax = off.indexOf(Math.max(off[0], off[1], off[2]));
+      const perp = [0, 1, 2].filter((i) => i !== ax);
+      const a = prim.size[perp[0]];
+      const b = prim.size[perp[1]];
+      const f: JointFeature = { kind: 'tenon', length: prim.size[ax], width: Math.max(a, b), thickness: Math.min(a, b) };
+      const key = `t${f.length.toFixed(1)}|${f.width.toFixed(1)}|${f.thickness.toFixed(1)}`;
+      if (!seen.has(key)) { seen.add(key); out.push(f); }
+    } else if (prim.shape === 'frenchDovetail') {
+      const f: JointFeature = { kind: 'key', depth: prim.depth, runH: prim.runH, rootThin: prim.rootThin, tipThin: prim.tipThin };
+      if (!seen.has('k')) { seen.add('k'); out.push(f); }
+    }
+  }
+  return out;
+}
+
+/** A zoomed, dimensioned detail of one joinery feature, drawn from (dx0, dyTop)
+ * within dw. Returns the SVG and the height it consumed. */
+function renderJointDetail(
+  f: JointFeature,
+  units: Units,
+  dx0: number,
+  dyTop: number,
+  dw: number,
+  sw: number,
+  ds: number,
+): { svg: string; height: number } {
+  const L = (mm: number) => formatLength(mm, units);
+  const line = (x1: number, y1: number, x2: number, y2: number) =>
+    `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`;
+  const txt = (x: number, y: number, s: string, anchor = 'middle', rot = false) =>
+    `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${(ds * 0.78).toFixed(2)}" fill="#1b1b1b" text-anchor="${anchor}" font-family="sans-serif"${rot ? ` transform="rotate(-90 ${x.toFixed(2)} ${y.toFixed(2)})"` : ''}>${esc(s)}</text>`;
+  const tick = ds * 0.32;
+  // horizontal dim line with end ticks + centered label below it
+  const hdim = (x1: number, x2: number, y: number, s: string) =>
+    [line(x1, y, x2, y), line(x1, y - tick, x1, y + tick), line(x2, y - tick, x2, y + tick), txt((x1 + x2) / 2, y + ds * 0.8, s)].join('');
+  // vertical dim line + rotated label to its right
+  const vdim = (y1: number, y2: number, x: number, s: string) =>
+    [line(x, y1, x, y2), line(x - tick, y1, x + tick, y1), line(x - tick, y2, x + tick, y2), txt(x + ds * 0.7, (y1 + y2) / 2, s, 'middle', true)].join('');
+  const title = `<text x="${dx0.toFixed(2)}" y="${dyTop.toFixed(2)}" font-size="${(ds * 0.82).toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${f.kind === 'tenon' ? 'TENON DETAIL' : 'DOVETAIL KEY DETAIL'}</text>`;
+  const parts: string[] = [title];
+  const top = dyTop + ds * 0.8;
+
+  if (f.kind === 'tenon') {
+    const scale = Math.min((dw * 0.42) / Math.max(f.length, 1), (ds * 4.2) / Math.max(f.width, 1));
+    const shX = dx0 + ds * 0.6;
+    const planY = top + ds * 0.4;
+    const tw = f.width * scale;
+    const len = f.length * scale;
+    // board shoulder line, then the tenon block projecting right
+    parts.push(line(shX, planY - ds * 0.5, shX, planY + tw + ds * 0.5));
+    parts.push(`<rect x="${shX.toFixed(2)}" y="${planY.toFixed(2)}" width="${len.toFixed(2)}" height="${tw.toFixed(2)}" fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`);
+    parts.push(hdim(shX, shX + len, planY + tw + ds * 1.0, L(f.length)));
+    parts.push(vdim(planY, planY + tw, shX + len + ds * 0.7, L(f.width)));
+    // end view (width × thickness)
+    const endX = shX + len + ds * 2.6;
+    const th = f.thickness * scale;
+    parts.push(`<rect x="${endX.toFixed(2)}" y="${planY.toFixed(2)}" width="${th.toFixed(2)}" height="${tw.toFixed(2)}" fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`);
+    parts.push(hdim(endX, endX + th, planY + tw + ds * 1.0, L(f.thickness)));
+    return { svg: parts.join(''), height: planY + tw + ds * 2.2 - dyTop };
+  }
+
+  // Dovetail key: a flared block — root thin at the shoulder, tip thick at the
+  // depth — with depth, root/tip thickness, and run dimensioned.
+  const scale = Math.min((dw * 0.5) / Math.max(f.depth, 1), (ds * 4.2) / Math.max(f.tipThin, 1));
+  const x0k = dx0 + ds * 1.4;
+  const midY = top + ds * 2.6;
+  const depthPx = f.depth * scale;
+  const rootPx = f.rootThin * scale;
+  const tipPx = f.tipThin * scale;
+  parts.push(
+    `<polygon points="${x0k.toFixed(2)},${(midY - rootPx / 2).toFixed(2)} ${(x0k + depthPx).toFixed(2)},${(midY - tipPx / 2).toFixed(2)} ${(x0k + depthPx).toFixed(2)},${(midY + tipPx / 2).toFixed(2)} ${x0k.toFixed(2)},${(midY + rootPx / 2).toFixed(2)}" fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
+  );
+  parts.push(hdim(x0k, x0k + depthPx, midY + Math.max(tipPx, rootPx) / 2 + ds * 1.0, `${L(f.depth)} deep`));
+  parts.push(vdim(midY - rootPx / 2, midY + rootPx / 2, x0k - ds * 0.7, L(f.rootThin)));
+  parts.push(vdim(midY - tipPx / 2, midY + tipPx / 2, x0k + depthPx + ds * 0.7, L(f.tipThin)));
+  parts.push(txt(dx0, midY + Math.max(tipPx, rootPx) / 2 + ds * 2.0, `Run ${L(f.runH)} (slides in from the top)`, 'start'));
+  return { svg: parts.join(''), height: midY + Math.max(tipPx, rootPx) / 2 + ds * 2.4 - dyTop };
+}
 function partDetails(
   part: { id: string; primitives: Primitive[]; cut: { note?: string } },
   joints: Record<string, string> | undefined,
@@ -202,12 +295,12 @@ function partDetails(
       add(`Notched ${L(prim.notch[0])} × ${L(prim.notch[1])} at each post`);
     } else if (prim.shape === 'mortisedPost') {
       if (prim.radius > 0.5) add(`${L(prim.radius)} corner radius`);
-      const m = prim.mortises[0];
-      const n = prim.mortises.length;
-      if (m) {
-        const open = prim.mortises.some((x) => x.openTop);
-        add(`${n} ${open ? 'dovetail socket' : 'mortise'}${n > 1 ? 's' : ''}: ${L(m.width)} × ${L(m.height)} × ${L(m.depth)} deep`);
-      }
+      const dimOf = (m: { width: number; height: number; depth: number }) =>
+        `${L(m.width)} × ${L(m.height)} × ${L(m.depth)} deep`;
+      const sockets = prim.mortises.filter((x) => x.openTop);
+      const mortises = prim.mortises.filter((x) => !x.openTop);
+      if (mortises.length) add(`${mortises.length} mortise${mortises.length > 1 ? 's' : ''}: ${dimOf(mortises[0])}`);
+      if (sockets.length) add(`${sockets.length} dovetail socket${sockets.length > 1 ? 's' : ''}: ${dimOf(sockets[0])}`);
     } else if (prim.shape === 'frenchDovetail') {
       add(`Dovetail key: ${L(prim.depth)} deep × ${L(prim.runH)} long, ${L(prim.rootThin)}–${L(prim.tipThin)} thick`);
     } else if (prim.shape === 'jointedBoard') {
@@ -239,6 +332,7 @@ function renderPartCell(
   qty: number,
   cut: { length: number; width: number; thickness: number },
   details: string[],
+  features: JointFeature[],
   cornerRadius: number,
   units: Units,
   x0: number,
@@ -315,8 +409,20 @@ function renderPartCell(
     (d, i) =>
       `<text x="${x0.toFixed(2)}" y="${(noteTop + i * ds * 0.95).toFixed(2)}" font-size="${(ds * 0.78).toFixed(2)}" fill="#555" font-family="sans-serif">• ${esc(d)}</text>`,
   );
-  const bottom = details.length ? noteTop + (details.length - 1) * ds * 0.95 + ds * 0.6 : yLen + ds;
-  return { svg: [label, views, ...dims, ...radius, ...notes].join('\n'), height: bottom - yTop };
+  const notesBottom = details.length ? noteTop + (details.length - 1) * ds * 0.95 + ds * 0.6 : yLen + ds;
+  // Dimensioned joint detail(s) to the right of the notes.
+  const detailX = x0 + cellW * 0.5;
+  const detailW = cellW * 0.5;
+  const detailSvg: string[] = [];
+  let dy = yLen + ds * 1.4;
+  for (const f of features) {
+    const titleY = dy + ds;
+    const d = renderJointDetail(f, units, detailX, titleY, detailW, sw, ds);
+    detailSvg.push(d.svg);
+    dy = titleY + d.height + ds * 0.8;
+  }
+  const bottom = Math.max(notesBottom, features.length ? dy : 0);
+  return { svg: [label, views, ...dims, ...radius, ...notes, ...detailSvg].join('\n'), height: bottom - yTop };
 }
 
 interface Drawing {
@@ -480,12 +586,16 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
         gy += rowMaxH + ds * 2;
         rowMaxH = 0;
       }
+      const inMT = Object.entries(inst.joints ?? {}).some(
+        ([k, s]) => s === 'mortise-tenon' && k.split('|').includes(d.part.id),
+      );
       const c = renderPartCell(
         collectPartPieces(d.part.primitives),
         d.part.name,
         d.row.qty,
         { length: d.row.length, width: d.row.width, thickness: d.row.thickness },
         partDetails(d.part, inst.joints, units),
+        partJointFeatures(d.part, inMT),
         partCornerRadius(d.part),
         units,
         margin + col * cellW,
