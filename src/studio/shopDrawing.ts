@@ -158,9 +158,18 @@ const JOINT_LABEL: Record<string, string> = {
   butt: 'Butt',
 };
 
-/** Shop notes for a part: joinery, corner radii, edge treatments, and other
- * machining a maker needs beyond the stock size. Read off the real primitives
- * plus the instance's joint assignments. */
+/** The part's corner radius (rounded slab / post), 0 if none — for a callout. */
+function partCornerRadius(part: { primitives: Primitive[] }): number {
+  for (const p of part.primitives) {
+    if ((p.shape === 'roundedSlab' || p.shape === 'roundedNotchedSlab' || p.shape === 'mortisedPost') && p.radius > 0.5)
+      return p.radius;
+  }
+  return 0;
+}
+
+/** Shop notes for a part: joinery (with sizes), corner radii, edge treatments,
+ * notches and other machining a maker needs beyond the stock size. Read off the
+ * real primitives plus the instance's joint assignments. */
 function partDetails(
   part: { id: string; primitives: Primitive[]; cut: { note?: string } },
   joints: Record<string, string> | undefined,
@@ -170,28 +179,49 @@ function partDetails(
   const add = (s: string) => {
     if (s && !out.includes(s)) out.push(s);
   };
+  const L = (mm: number) => formatLength(mm, units);
   if (part.cut.note) add(part.cut.note);
+
+  // Tenons show up as boxes appended beyond the part's body; only treat them as
+  // tenons when the part is actually in a mortise-tenon joint.
+  const inMT = Object.entries(joints ?? {}).some(
+    ([k, s]) => s === 'mortise-tenon' && k.split('|').includes(part.id),
+  );
+  const boxes = part.primitives.filter((p) => p.shape === 'box') as Extract<Primitive, { shape: 'box' }>[];
+  let body: Extract<Primitive, { shape: 'box' }> | null = null;
+  const vol = (b: Extract<Primitive, { shape: 'box' }>) => b.size[0] * b.size[1] * b.size[2];
+  for (const b of boxes) if (!body || vol(b) > vol(body)) body = b;
+
   for (const prim of part.primitives) {
     if (prim.shape === 'roundedSlab') {
-      if (prim.radius > 0.5) add(`${formatLength(prim.radius, units)} corner radius`);
+      if (prim.radius > 0.5) add(`${L(prim.radius)} corner radius`);
       if (prim.edge && prim.edge > 0.5)
-        add(`${formatLength(prim.edge, units)} ${prim.edgeMode === 'top' ? 'half-bullnose' : 'bullnose'} edge${prim.squareBack ? ' (square back)' : ''}`);
+        add(`${L(prim.edge)} ${prim.edgeMode === 'top' ? 'half-bullnose' : 'bullnose'} edge${prim.squareBack ? ' (square back)' : ''}`);
     } else if (prim.shape === 'roundedNotchedSlab') {
-      if (prim.radius > 0.5) add(`${formatLength(prim.radius, units)} corner radius`);
-      add('Notched at the posts');
+      if (prim.radius > 0.5) add(`${L(prim.radius)} corner radius`);
+      add(`Notched ${L(prim.notch[0])} × ${L(prim.notch[1])} at each post`);
     } else if (prim.shape === 'mortisedPost') {
-      if (prim.radius > 0.5) add(`${formatLength(prim.radius, units)} corner radius`);
-      const open = prim.mortises.some((m) => m.openTop);
+      if (prim.radius > 0.5) add(`${L(prim.radius)} corner radius`);
+      const m = prim.mortises[0];
       const n = prim.mortises.length;
-      if (n) add(`${n} ${open ? 'sliding-dovetail socket' : 'mortise'}${n > 1 ? 's' : ''}`);
+      if (m) {
+        const open = prim.mortises.some((x) => x.openTop);
+        add(`${n} ${open ? 'dovetail socket' : 'mortise'}${n > 1 ? 's' : ''}: ${L(m.width)} × ${L(m.height)} × ${L(m.depth)} deep`);
+      }
     } else if (prim.shape === 'frenchDovetail') {
-      add('French dovetail key (slides in from the top)');
+      add(`Dovetail key: ${L(prim.depth)} deep × ${L(prim.runH)} long, ${L(prim.rootThin)}–${L(prim.tipThin)} thick`);
     } else if (prim.shape === 'jointedBoard') {
       add(prim.joint === 'box-joint' ? 'Box joint' : prim.lip ? 'Half-blind dovetail' : 'Through dovetail');
     } else if (prim.shape === 'taperedBox') {
       add('Tapered');
     } else if (prim.shape === 'archedBoard') {
       add(prim.arch === 'scoop' ? 'Finger-pull scoop' : 'Relief arch');
+    } else if (prim.shape === 'box' && inMT && body && prim !== body) {
+      // Tenon: length is along the axis it projects from the body.
+      const off = [0, 1, 2].map((i) => Math.abs(prim.at[i] - body!.at[i]));
+      const ax = off.indexOf(Math.max(off[0], off[1], off[2]));
+      const perp = [0, 1, 2].filter((i) => i !== ax);
+      add(`Tenon: ${L(prim.size[ax])} long × ${L(prim.size[perp[0]])} × ${L(prim.size[perp[1]])}`);
     }
   }
   for (const [key, style] of Object.entries(joints ?? {})) {
@@ -209,6 +239,7 @@ function renderPartCell(
   qty: number,
   cut: { length: number; width: number; thickness: number },
   details: string[],
+  cornerRadius: number,
   units: Units,
   x0: number,
   yTop: number,
@@ -267,6 +298,17 @@ function renderPartCell(
     tx(x0 + ds * 0.7, (faceTop + faceBottom) / 2, formatLength(cut.width, units), true),
     tx(x0 + ds * 0.7, (edgeTop + edgeBottom) / 2, formatLength(cut.thickness, units), true),
   ];
+  // Radius callout: a leader to the top-right corner (the radius is too small to
+  // read at part scale, so it's labelled).
+  const radius: string[] = [];
+  if (cornerRadius > 0.5) {
+    const lx = xR - ds * 0.9;
+    const ly = faceTop + ds * 0.9;
+    radius.push(
+      dl(xR, faceTop, lx, ly),
+      `<text x="${(lx - ds * 0.3).toFixed(2)}" y="${(ly + ds * 0.6).toFixed(2)}" font-size="${(ds * 0.82).toFixed(2)}" fill="#1b1b1b" text-anchor="end" font-family="sans-serif">R ${esc(formatLength(cornerRadius, units))}</text>`,
+    );
+  }
   const label = `<text x="${x0.toFixed(2)}" y="${labelY.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${esc(qty > 1 ? `${name} ×${qty}` : name)}</text>`;
   const noteTop = yLen + ds * 1.9;
   const notes = details.map(
@@ -274,7 +316,7 @@ function renderPartCell(
       `<text x="${x0.toFixed(2)}" y="${(noteTop + i * ds * 0.95).toFixed(2)}" font-size="${(ds * 0.78).toFixed(2)}" fill="#555" font-family="sans-serif">• ${esc(d)}</text>`,
   );
   const bottom = details.length ? noteTop + (details.length - 1) * ds * 0.95 + ds * 0.6 : yLen + ds;
-  return { svg: [label, views, ...dims, ...notes].join('\n'), height: bottom - yTop };
+  return { svg: [label, views, ...dims, ...radius, ...notes].join('\n'), height: bottom - yTop };
 }
 
 interface Drawing {
@@ -444,6 +486,7 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
         d.row.qty,
         { length: d.row.length, width: d.row.width, thickness: d.row.thickness },
         partDetails(d.part, inst.joints, units),
+        partCornerRadius(d.part),
         units,
         margin + col * cellW,
         gy,
