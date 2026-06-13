@@ -33,6 +33,7 @@ export const entryBench: ComponentDef = {
     { kind: 'length', key: 'shelfThickness', label: 'Shelf thickness', default: inch(0.8125), min: inch(0.625), max: inch(1.5), tier: 'advanced' },
     { kind: 'length', key: 'endOverhang', label: 'Seat end overhang', default: inch(1), min: 0, max: inch(3), tier: 'advanced' },
     { kind: 'length', key: 'frontOverhang', label: 'Seat front overhang', default: inch(0.75), min: 0, max: inch(2), tier: 'advanced' },
+    { kind: 'length', key: 'backOverhang', label: 'Seat back overhang', default: inch(0.5), min: 0, max: inch(2), tier: 'advanced' },
   ],
   generate(p): GeneratedModel {
     const W = num(p, 'width');
@@ -45,11 +46,15 @@ export const entryBench: ComponentDef = {
     const shelfH = num(p, 'shelfHeight');
     const ovEnd = num(p, 'endOverhang');
     const ovFront = num(p, 'frontOverhang');
+    const ovBack = num(p, 'backOverhang');
     const mat = str(p, 'material');
 
-    // The leg envelope: outer faces of the post frame, under the seat overhang.
+    // The leg envelope: outer faces of the post frame, under the seat
+    // overhang. The back overhang differs from the front (the bench sets
+    // against a wall), so the leg frame shifts back by half the difference.
     const envW = W - 2 * ovEnd;
-    const envD = D - 2 * ovFront;
+    const envD = D - ovFront - ovBack;
+    const cy = (ovBack - ovFront) / 2; // leg-frame center, relative to the seat center
     const legX = envW / 2 - legT / 2;
     const legY = envD / 2 - legT / 2;
     const legH = H - seatT;
@@ -59,8 +64,9 @@ export const entryBench: ComponentDef = {
     const findings: Finding[] = [];
 
     // Seat edge to the scale drawing (shelftop.dwg): a quarter-round of
-    // radius = the full stock thickness springs from the square bottom
-    // arris and sweeps flush into the top face, all around the seat.
+    // radius = the full stock thickness springs from the square bottom arris
+    // and sweeps flush into the top face — on the front and both ends. The
+    // back edge (against the wall) stays square.
     parts.push({
       id: 'seat',
       name: 'Seat',
@@ -73,7 +79,7 @@ export const entryBench: ComponentDef = {
           radius: inch(0.75),
           edge: seatT,
           edgeMode: 'top',
-          corners: 'all',
+          squareBack: true,
         },
       ],
       cut: { length: W, width: D, thickness: seatT },
@@ -90,7 +96,7 @@ export const entryBench: ComponentDef = {
             {
               shape: 'roundedSlab',
               size: [legT, legT, legH],
-              at: [sx * legX, sy * legY, legH / 2],
+              at: [sx * legX, cy + sy * legY, legH / 2],
               radius: inch(0.375),
               corners: 'all',
               grain: 'z',
@@ -115,17 +121,17 @@ export const entryBench: ComponentDef = {
       name: 'Boot shelf',
       material: mat,
       primitives: [
-        { shape: 'box', size: [envW - 2 * legT, shelfD, shelfT], at: [0, 0, shelfZ], grain: 'x' },
+        { shape: 'box', size: [envW - 2 * legT, shelfD, shelfT], at: [0, cy, shelfZ], grain: 'x' },
         {
           shape: 'box',
           size: [legT - SB, envD - 2 * legT, shelfT],
-          at: [-(envW / 2 - (legT + SB) / 2), 0, shelfZ],
+          at: [-(envW / 2 - (legT + SB) / 2), cy, shelfZ],
           grain: 'x',
         },
         {
           shape: 'box',
           size: [legT - SB, envD - 2 * legT, shelfT],
-          at: [envW / 2 - (legT + SB) / 2, 0, shelfZ],
+          at: [envW / 2 - (legT + SB) / 2, cy, shelfZ],
           grain: 'x',
         },
       ],
@@ -141,7 +147,7 @@ export const entryBench: ComponentDef = {
     const apronH = Math.min(RAIL_HEIGHT, legH - seatT);
 
     for (const sy of [-1, 1]) {
-      const apronY = sy * (envD / 2 - SB - apronT / 2);
+      const apronY = cy + sy * (envD / 2 - SB - apronT / 2);
       const apronZ = H - seatT - apronH / 2;
       parts.push({
         id: `apron-${sy}`,
@@ -158,7 +164,7 @@ export const entryBench: ComponentDef = {
         id: `apron-end-${sx}`,
         name: 'End apron',
         material: mat,
-        primitives: [{ shape: 'box', size: [apronT, endSpan, apronH], at: [apronX, 0, apronZ] }],
+        primitives: [{ shape: 'box', size: [apronT, endSpan, apronH], at: [apronX, cy, apronZ] }],
         cut: { length: endSpan, width: apronH, thickness: apronT },
       });
     }
@@ -172,7 +178,7 @@ export const entryBench: ComponentDef = {
           {
             shape: 'box',
             size: [span, apronT, railH],
-            at: [0, sy * (envD / 2 - SB - apronT / 2), shelfH - shelfT - railH / 2],
+            at: [0, cy + sy * (envD / 2 - SB - apronT / 2), shelfH - shelfT - railH / 2],
           },
         ],
         cut: { length: span, width: railH, thickness: apronT },
@@ -189,7 +195,7 @@ export const entryBench: ComponentDef = {
             {
               shape: 'box',
               size: [legT - SB, envD - 2 * legT, railH],
-              at: [sx * (envW / 2 - (legT + SB) / 2), 0, shelfH - shelfT - railH / 2],
+              at: [sx * (envW / 2 - (legT + SB) / 2), cy, shelfH - shelfT - railH / 2],
             },
           ],
           cut: { length: envD - 2 * legT, width: railH, thickness: legT - SB },

@@ -35,6 +35,7 @@ function primitiveGeometry(prim: Primitive): { geometry: THREE.BufferGeometry; r
       prim.edge ?? 0,
       prim.corners ?? 'front',
       prim.edgeMode ?? 'both',
+      prim.squareBack ?? false,
     );
     if (vertical) geometry.rotateX(-Math.PI / 2);
   } else if (prim.shape === 'mortisedPost') {

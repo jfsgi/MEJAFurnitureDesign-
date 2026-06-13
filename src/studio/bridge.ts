@@ -146,6 +146,7 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.edge ?? 0,
             prim.corners ?? 'front',
             prim.edgeMode ?? 'both',
+            prim.squareBack ?? false,
           );
           if (vertical) geometry.rotateX(-Math.PI / 2);
           grain = prim.grain ?? (vertical ? 'z' : 'x');

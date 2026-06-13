@@ -354,11 +354,32 @@ export function roundedSlabGeometry(
   corners: 'front' | 'all' = 'front',
   /** 'both' rounds top and bottom arrises; 'top' leaves the bottom square. */
   edgeMode: 'both' | 'top' = 'both',
+  /** Keep the back (−Y) edge square (no roundover, square corners) — for a
+   *  piece that sets against a wall. The front and ends still get the edge. */
+  squareBack = false,
 ): THREE.BufferGeometry {
   const [w, d, t] = size;
   const reMax = edgeMode === 'top' ? t - 0.2 : t / 2 - 0.1;
   const re = Math.max(0, Math.min(edge, reMax, w / 4, d / 4));
-  const outline = (ww: number, dd: number, r: number) => {
+  // Square-back outline: front + ends inset by `ins` and round at the front
+  // corners; the back edge stays fixed at −d/2 with square corners.
+  const sbOutline = (ins: number, r: number) => {
+    const xl = -w / 2 + ins;
+    const xr = w / 2 - ins;
+    const yf = d / 2 - ins;
+    const yb = -d / 2;
+    const rr = Math.max(Math.min(r, (xr - xl) / 2 - 0.1, yf - yb - 0.1), 0.1);
+    const shape = new THREE.Shape();
+    shape.moveTo(xl, yb);
+    shape.lineTo(xr, yb);
+    shape.lineTo(xr, yf - rr);
+    shape.absarc(xr - rr, yf - rr, rr, 0, Math.PI / 2, false);
+    shape.lineTo(xl + rr, yf);
+    shape.absarc(xl + rr, yf - rr, rr, Math.PI / 2, Math.PI, false);
+    shape.lineTo(xl, yb);
+    return shape;
+  };
+  const baseOutline = (ww: number, dd: number, r: number) => {
     const shape = new THREE.Shape();
     if (corners === 'all') {
       shape.moveTo(-ww / 2 + r, -dd / 2);
@@ -381,9 +402,12 @@ export function roundedSlabGeometry(
     shape.lineTo(-ww / 2, -dd / 2);
     return shape;
   };
+  // `ins` insets front + ends (and, for the symmetric outline, the back too).
+  const mainOutline = (ins: number, r: number) =>
+    squareBack ? sbOutline(ins, r) : baseOutline(w - 2 * ins, d - 2 * ins, r);
   if (re < 0.5) {
     const r = Math.min(radius, w / 2 - 0.1, d - 0.1);
-    const geometry = new THREE.ExtrudeGeometry(outline(w, d, r), {
+    const geometry = new THREE.ExtrudeGeometry(mainOutline(0, r), {
       depth: t,
       bevelEnabled: false,
       curveSegments: ARC_SEGMENTS,
@@ -402,7 +426,7 @@ export function roundedSlabGeometry(
     const reT = Math.min(re, t - 0.6); // keep a hair of square wall below
     const rcFull = Math.min(radius, w / 2 - 0.1, d - 0.1);
     const rIns = Math.max(rcFull - reT, 0.5);
-    const body = new THREE.ExtrudeGeometry(outline(w, d, rcFull), {
+    const body = new THREE.ExtrudeGeometry(mainOutline(0, rcFull), {
       depth: t - reT,
       bevelEnabled: false,
       curveSegments: ARC_SEGMENTS,
@@ -417,7 +441,7 @@ export function roundedSlabGeometry(
     for (let k = 0; k <= STEPS; k++) {
       const th = (k / STEPS) * (Math.PI / 2);
       const s = reT * Math.sin(th);
-      rings.push(outline(w - 2 * reT + 2 * s, d - 2 * reT + 2 * s, rIns + s).getPoints(RING_DIVS));
+      rings.push(mainOutline(reT - s, rIns + s).getPoints(RING_DIVS));
       zs.push(t / 2 - reT * (1 - Math.cos(th)));
     }
     const pos: number[] = [];
@@ -436,8 +460,7 @@ export function roundedSlabGeometry(
     bandGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
     bandGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
     bandGeo.computeVertexNormals();
-    const cap = new THREE.ShapeGeometry(outline(w - 2 * reT, d - 2 * reT, rIns), RING_DIVS)
-      .toNonIndexed();
+    const cap = new THREE.ShapeGeometry(mainOutline(reT, rIns), RING_DIVS).toNonIndexed();
     cap.translate(0, 0, t / 2);
     const merged = mergeGeometries([body, bandGeo, cap], false)!;
     body.dispose();
@@ -446,7 +469,7 @@ export function roundedSlabGeometry(
     return merged;
   }
   const band = t - 2 * re;
-  const geometry = new THREE.ExtrudeGeometry(outline(w - 2 * re, d - 2 * re, r), {
+  const geometry = new THREE.ExtrudeGeometry(mainOutline(re, r), {
     depth: band,
     bevelEnabled: true,
     bevelThickness: re,

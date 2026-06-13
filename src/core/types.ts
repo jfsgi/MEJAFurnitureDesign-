@@ -103,6 +103,8 @@ export type Primitive =
       axis?: 'z' | 'y';
       /** Which outline corners round (default 'front'). */
       corners?: 'front' | 'all';
+      /** Keep the back (−Y) edge square — a piece set against a wall. */
+      squareBack?: boolean;
       /** Grain override — vertical for posts with radiused corners. */
       grain?: 'x' | 'y' | 'z';
     }
