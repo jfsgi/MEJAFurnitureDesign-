@@ -112,6 +112,17 @@ export type Primitive =
       grain?: 'x' | 'y' | 'z';
     }
   | {
+      shape: 'roundedNotchedSlab';
+      /** Outer w, d, t — a flat slab through Z. */
+      size: [number, number, number];
+      at: [number, number, number];
+      /** Corner notch [nw, nd] removed at all four corners (for legs). */
+      notch: [number, number];
+      /** Round on the slab's exposed (convex) corners. */
+      radius: number;
+      grain?: 'x' | 'y' | 'z';
+    }
+  | {
       shape: 'mortisedPost';
       /** w, d, h — the post stands along Z (h is its length). */
       size: [number, number, number];

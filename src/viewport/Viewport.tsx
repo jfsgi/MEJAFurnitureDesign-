@@ -27,6 +27,7 @@ import {
   grainBoxGeometry,
   longestAxis,
   mortisedPostGeometry,
+  roundedNotchedSlabGeometry,
   roundedSlabGeometry,
   taperedBoxGeometry,
 } from './geometry';
@@ -82,6 +83,7 @@ function PrimitiveMesh({
     prim.shape === 'cylinder' ||
     prim.shape === 'jointedBoard' ||
     prim.shape === 'roundedSlab' ||
+    prim.shape === 'roundedNotchedSlab' ||
     prim.shape === 'mortisedPost' ||
     prim.shape === 'frenchDovetail';
   const grainTex = mat.grain ? getWoodTexture(mat.id, rotatedGrain) : null;
@@ -112,6 +114,11 @@ function PrimitiveMesh({
     if (prim.shape === 'mortisedPost') {
       const geo = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
       applyBoxUVs(geo, GRAIN_MM_U, prim.grain ?? 'z', offset[0], offset[1]);
+      return geo;
+    }
+    if (prim.shape === 'roundedNotchedSlab') {
+      const geo = roundedNotchedSlabGeometry(prim.size, prim.notch, prim.radius);
+      applyBoxUVs(geo, GRAIN_MM_U, prim.grain ?? 'x', offset[0], offset[1]);
       return geo;
     }
     if (prim.shape === 'frenchDovetail') {

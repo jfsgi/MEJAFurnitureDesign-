@@ -523,6 +523,82 @@ export function roundedSlabGeometry(
   return geometry;
 }
 
+/** Closed Shape from an axis-aligned polygon, rounding the corners flagged in
+ * `round` with radius r (true quarter-arcs); the rest stay sharp. */
+function roundedAxisShape(pts: Array<[number, number]>, round: boolean[], r: number): THREE.Shape {
+  const n = pts.length;
+  const s = new THREE.Shape();
+  let started = false;
+  const moveOrLine = (x: number, y: number) => {
+    if (!started) {
+      s.moveTo(x, y);
+      started = true;
+    } else s.lineTo(x, y);
+  };
+  for (let i = 0; i < n; i++) {
+    const V = pts[i];
+    if (!round[i] || r <= 0) {
+      moveOrLine(V[0], V[1]);
+      continue;
+    }
+    const P = pts[(i - 1 + n) % n];
+    const N = pts[(i + 1) % n];
+    const din = [V[0] - P[0], V[1] - P[1]];
+    const dout = [N[0] - V[0], N[1] - V[1]];
+    const lin = Math.hypot(din[0], din[1]) || 1;
+    const lout = Math.hypot(dout[0], dout[1]) || 1;
+    const rr = Math.min(r, lin / 2, lout / 2);
+    const t1: [number, number] = [V[0] - (rr * din[0]) / lin, V[1] - (rr * din[1]) / lin];
+    const t2: [number, number] = [V[0] + (rr * dout[0]) / lout, V[1] + (rr * dout[1]) / lout];
+    moveOrLine(t1[0], t1[1]);
+    const cx = t1[0] + t2[0] - V[0]; // arc center (exact for right-angle corners)
+    const cy = t1[1] + t2[1] - V[1];
+    const a1 = Math.atan2(t1[1] - cy, t1[0] - cx);
+    const a2 = Math.atan2(t2[1] - cy, t2[0] - cx);
+    let delta = a2 - a1;
+    while (delta <= -Math.PI) delta += 2 * Math.PI;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    s.absarc(cx, cy, rr, a1, a2, delta < 0);
+  }
+  s.closePath();
+  return s;
+}
+
+/**
+ * Flat slab (extruded through Z) shaped like a rectangle with a notch cut from
+ * each of the four corners — a boot shelf that wraps four legs — and its
+ * exposed (convex) corners rounded so they read like the rounded posts. The
+ * concave notch corners stay square. Model space, Z-up; the caller applies
+ * engine box UVs.
+ */
+export function roundedNotchedSlabGeometry(
+  size: V3,
+  notch: [number, number],
+  radius: number,
+): THREE.BufferGeometry {
+  const [w, d, t] = size;
+  const [nw, nd] = notch;
+  const aX = w / 2 - nw;
+  const bX = w / 2;
+  const cY = d / 2;
+  const dY = d / 2 - nd;
+  const r = Math.max(0, Math.min(radius, nw * 0.9, nd * 0.9));
+  // CCW outline: back edge, up the right (out and back for the tongue), front
+  // edge, down the left. Convex corners round; notch (concave) corners stay sharp.
+  const pts: Array<[number, number]> = [
+    [-aX, -cY], [aX, -cY], [aX, -dY], [bX, -dY], [bX, dY], [aX, dY],
+    [aX, cY], [-aX, cY], [-aX, dY], [-bX, dY], [-bX, -dY], [-aX, -dY],
+  ];
+  const round = [true, true, false, true, true, false, true, true, false, true, true, false];
+  const geo = new THREE.ExtrudeGeometry(roundedAxisShape(pts, round, r), {
+    depth: t,
+    bevelEnabled: false,
+    curveSegments: ARC_SEGMENTS,
+  });
+  geo.translate(0, 0, -t / 2);
+  return geo;
+}
+
 /**
  * French (sliding) dovetail key: a stopped tongue that projects along X,
  * flares across its thickness (Y) from root to tip — the dovetail — and runs

@@ -988,11 +988,10 @@ describe('entryway bench', () => {
     expect(names.filter((n) => n === 'Shelf rail')).toHaveLength(2); // under the shelf's front and back edges
     expect(names.filter((n) => n === 'Shelf end rail')).toHaveLength(2);
     const shelf = model.parts.find((p) => p.id === 'shelf')!;
-    expect(shelf.primitives).toHaveLength(3); // center board + a tongue between each leg pair
-    // The tongues keep the slab's grain running along the bench.
-    for (const prim of shelf.primitives) {
-      expect((prim as { grain?: string }).grain).toBe('x');
-    }
+    // One notched slab with the grain running along the bench.
+    expect(shelf.primitives).toHaveLength(1);
+    expect(shelf.primitives[0].shape).toBe('roundedNotchedSlab');
+    expect((shelf.primitives[0] as { grain?: string }).grain).toBe('x');
   });
 
   it('runs the boot shelf flush with the surrounding aprons', () => {

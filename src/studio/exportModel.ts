@@ -9,7 +9,7 @@ import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js';
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js';
 import type { Primitive, ProjectDoc } from '../core/types';
 import { evaluateInstance } from '../core/evaluate';
-import { archedBoardGeometry, frenchDovetailGeometry, mortisedPostGeometry, roundedSlabGeometry, taperedBoxGeometry } from '../viewport/geometry';
+import { archedBoardGeometry, frenchDovetailGeometry, mortisedPostGeometry, roundedNotchedSlabGeometry, roundedSlabGeometry, taperedBoxGeometry } from '../viewport/geometry';
 import { jointedBoardGeometry } from '../viewport/jointBoards';
 
 /** Geometry for one primitive, centered at the origin, with the local
@@ -40,6 +40,8 @@ function primitiveGeometry(prim: Primitive): { geometry: THREE.BufferGeometry; r
     if (vertical) geometry.rotateX(-Math.PI / 2);
   } else if (prim.shape === 'mortisedPost') {
     geometry = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
+  } else if (prim.shape === 'roundedNotchedSlab') {
+    geometry = roundedNotchedSlabGeometry(prim.size, prim.notch, prim.radius);
   } else if (prim.shape === 'frenchDovetail') {
     geometry = frenchDovetailGeometry(prim.depth, prim.rootThin, prim.tipThin, prim.runH, prim.dir);
     if (prim.interfaceAxis === 'y') geometry.rotateZ(Math.PI / 2);

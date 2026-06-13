@@ -12,6 +12,7 @@ import {
   frenchDovetailGeometry,
   longestAxis,
   mortisedPostGeometry,
+  roundedNotchedSlabGeometry,
   roundedSlabGeometry,
   taperedBoxGeometry,
 } from '../viewport/geometry';
@@ -66,6 +67,8 @@ function modelGrainAxis(prim: Primitive): 'x' | 'y' | 'z' {
       return prim.arch === 'bottom-y' ? 'y' : 'x';
     case 'roundedSlab':
       return prim.axis === 'y' ? 'z' : 'x';
+    case 'roundedNotchedSlab':
+      return prim.grain ?? 'x';
     case 'mortisedPost':
       return prim.grain ?? 'z';
     default:
@@ -154,6 +157,9 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
         } else if (prim.shape === 'mortisedPost') {
           geometry = mortisedPostGeometry(prim.size[0], prim.size[1], prim.size[2], prim.radius, prim.mortises);
           grain = prim.grain ?? 'z';
+        } else if (prim.shape === 'roundedNotchedSlab') {
+          geometry = roundedNotchedSlabGeometry(prim.size, prim.notch, prim.radius);
+          grain = prim.grain ?? 'x';
         } else if (prim.shape === 'frenchDovetail') {
           geometry = frenchDovetailGeometry(prim.depth, prim.rootThin, prim.tipThin, prim.runH, prim.dir);
           if (prim.interfaceAxis === 'y') geometry.rotateZ(Math.PI / 2);

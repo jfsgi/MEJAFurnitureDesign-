@@ -112,25 +112,27 @@ export const entryBench: ComponentDef = {
     const SB = legT / 2;
     const endRailT = legT - SB; // end rail thickness (also the shelf tongue band)
 
-    // Boot shelf: a slab notched around the four posts, run FLUSH with the
-    // surrounding aprons — the center board reaches the front/back aprons'
-    // outer faces, and the side tongues beside each leg pair reach the end
-    // aprons'. Modeled as the center board plus a tongue per leg pair so the
-    // grain runs continuously along the bench.
+    // Boot shelf: a slab run FLUSH with the surrounding aprons — front/back
+    // edges reach the front/back aprons' outer faces, the ends reach the end
+    // aprons' — with a notch cut at each post and its exposed corners rounded
+    // 3/8" to match the legs.
     const shelfHalfD = legY + apronT / 2;   // flush with the front/back aprons
     const shelfHalfW = legX + endRailT / 2; // flush with the end aprons
-    const centerHalfW = envW / 2 - legT;    // center board half width (between the legs)
-    const tongueW = shelfHalfW - centerHalfW;
-    const tongueCx = (centerHalfW + shelfHalfW) / 2;
-    const tongueD = envD - 2 * legT;        // between the front and back legs
+    const notchW = shelfHalfW - (envW / 2 - legT); // X span of each corner notch
+    const notchD = shelfHalfD - (envD / 2 - legT); // Y span of each corner notch
     parts.push({
       id: 'shelf',
       name: 'Boot shelf',
       material: mat,
       primitives: [
-        { shape: 'box', size: [2 * centerHalfW, 2 * shelfHalfD, shelfT], at: [0, cy, shelfZ], grain: 'x' },
-        { shape: 'box', size: [tongueW, tongueD, shelfT], at: [-tongueCx, cy, shelfZ], grain: 'x' },
-        { shape: 'box', size: [tongueW, tongueD, shelfT], at: [tongueCx, cy, shelfZ], grain: 'x' },
+        {
+          shape: 'roundedNotchedSlab',
+          size: [2 * shelfHalfW, 2 * shelfHalfD, shelfT],
+          at: [0, cy, shelfZ],
+          notch: [notchW, notchD],
+          radius: inch(0.375),
+          grain: 'x',
+        },
       ],
       cut: { length: 2 * shelfHalfW, width: 2 * shelfHalfD, thickness: shelfT },
     });
