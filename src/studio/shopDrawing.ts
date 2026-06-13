@@ -1,14 +1,134 @@
-// Shop drawings: dimensioned third-angle orthographic elevations (Front,
-// Top, Right) of each piece, as print-ready SVG. Built from the evaluated
-// model — every part projects to a bounding rectangle in each view, the
-// classic woodworking elevation. Overall dimensions and a MEJA title block
-// frame the sheet. Model space is Z-up, mm; SVG is y-down (flipped at emit).
+// Shop drawings: dimensioned third-angle elevations (Front, Top, Right) of
+// each piece as print-ready SVG, drawn from the real geometry. Every part's
+// feature edges are extracted (EdgesGeometry), projected to each view, and
+// run through hidden-line removal — edges you can see are solid, edges behind
+// a surface are dashed — the woodworking-drawing convention. Model space is
+// Z-up, mm; the projections emit straight into SVG space (y-down).
 
+import * as THREE from 'three';
 import type { Instance, ProjectDoc, Units } from '../core/types';
-import { evaluateInstance, modelBBox, partBBox } from '../core/evaluate';
+import { evaluateInstance, modelBBox } from '../core/evaluate';
 import { formatLength } from '../core/units';
+import { buildExportGroup } from './exportModel';
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]!));
+
+type V3 = [number, number, number];
+interface Piece {
+  segs: number[][]; // [ax,ay,az,bx,by,bz] in model space (mm)
+  min: V3;
+  max: V3;
+}
+type Proj = (x: number, y: number, z: number) => [number, number];
+type Depth = (x: number, y: number, z: number) => number; // larger = nearer the viewer
+
+/** Real feature edges + bbox for every primitive of one piece, in the piece's
+ * local model space (instance placement/rotation dropped — a shop drawing is
+ * the canonical piece). */
+function collectPieces(inst: Instance): Piece[] {
+  const local: Instance = { ...inst, position: [0, 0], rotationZ: 0 };
+  const doc: ProjectDoc = { schema: 1, name: inst.name, units: 'imperial', instances: [local] };
+  const group = buildExportGroup(doc);
+  group.updateMatrixWorld(true);
+  const pieces: Piece[] = [];
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  group.traverse((o) => {
+    if (!(o instanceof THREE.Mesh)) return;
+    const edges = new THREE.EdgesGeometry(o.geometry, 1);
+    const pos = edges.getAttribute('position');
+    const segs: number[][] = [];
+    for (let i = 0; i < pos.count; i += 2) {
+      a.fromBufferAttribute(pos, i).applyMatrix4(o.matrixWorld);
+      b.fromBufferAttribute(pos, i + 1).applyMatrix4(o.matrixWorld);
+      segs.push([a.x, a.y, a.z, b.x, b.y, b.z]);
+    }
+    const bb = new THREE.Box3().setFromObject(o);
+    pieces.push({ segs, min: [bb.min.x, bb.min.y, bb.min.z], max: [bb.max.x, bb.max.y, bb.max.z] });
+    edges.dispose();
+    o.geometry.dispose();
+  });
+  return pieces;
+}
+
+const lerp = (A: number[], B: number[], t: number): V3 => [
+  A[0] + (B[0] - A[0]) * t,
+  A[1] + (B[1] - A[1]) * t,
+  A[2] + (B[2] - A[2]) * t,
+];
+
+/** Renders one view's pieces with hidden-line removal. */
+function renderView(
+  pieces: Piece[],
+  proj: Proj,
+  depth: Depth,
+  sw: number,
+  span: number,
+): string {
+  const inset = span * 0.004;
+  const eps = span * 0.005;
+  const step = Math.max(span * 0.04, 1);
+  // 2D rectangle + nearest depth of every piece, for occlusion tests.
+  const rects = pieces.map((p) => {
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity, near = -Infinity;
+    for (const x of [p.min[0], p.max[0]])
+      for (const y of [p.min[1], p.max[1]])
+        for (const z of [p.min[2], p.max[2]]) {
+          const [u, v] = proj(x, y, z);
+          u0 = Math.min(u0, u); u1 = Math.max(u1, u);
+          v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+          near = Math.max(near, depth(x, y, z));
+        }
+    return { u0, u1, v0, v1, near };
+  });
+
+  const occluded = (u: number, v: number, d: number, self: number): boolean => {
+    for (let i = 0; i < rects.length; i++) {
+      if (i === self) continue;
+      const r = rects[i];
+      if (r.near > d + eps && u > r.u0 + inset && u < r.u1 - inset && v > r.v0 + inset && v < r.v1 - inset)
+        return true;
+    }
+    return false;
+  };
+
+  const solid: string[] = [];
+  const hidden: string[] = [];
+  pieces.forEach((p, pi) => {
+    for (const s of p.segs) {
+      const A = [s[0], s[1], s[2]];
+      const B = [s[3], s[4], s[5]];
+      const [pax, pay] = proj(A[0], A[1], A[2]);
+      const [pbx, pby] = proj(B[0], B[1], B[2]);
+      const n = Math.min(48, Math.max(1, Math.round(Math.hypot(pbx - pax, pby - pay) / step)));
+      const flag = (i: number) => {
+        const m = lerp(A, B, (i + 0.5) / n);
+        const [u, v] = proj(m[0], m[1], m[2]);
+        return occluded(u, v, depth(m[0], m[1], m[2]), pi);
+      };
+      // Coalesce consecutive intervals that share visibility into one line.
+      let runStart = 0;
+      let runHidden = flag(0);
+      for (let i = 1; i <= n; i++) {
+        const h = i < n ? flag(i) : !runHidden;
+        if (i === n || h !== runHidden) {
+          const p0 = lerp(A, B, runStart / n);
+          const p1 = lerp(A, B, i / n);
+          const [x0, y0] = proj(p0[0], p0[1], p0[2]);
+          const [x1, y1] = proj(p1[0], p1[1], p1[2]);
+          const line = `<line x1="${x0.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y1.toFixed(2)}"`;
+          (runHidden ? hidden : solid).push(line);
+          runStart = i;
+          runHidden = h;
+        }
+      }
+    }
+  });
+  return [
+    `<g fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}" stroke-linecap="round">${solid.map((l) => l + '/>').join('')}</g>`,
+    `<g fill="none" stroke="#8a8a8a" stroke-width="${(sw * 0.8).toFixed(3)}" stroke-dasharray="${(sw * 4).toFixed(2)} ${(sw * 3).toFixed(2)}">${hidden.map((l) => l + '/>').join('')}</g>`,
+  ].join('\n');
+}
 
 interface Drawing {
   content: string;
@@ -16,8 +136,6 @@ interface Drawing {
   height: number;
 }
 
-/** One piece's three-view drawing as SVG content (no <svg> wrapper), in its
- * own mm coordinate space starting at the origin. */
 function instanceDrawing(inst: Instance, units: Units): Drawing {
   const model = evaluateInstance(inst);
   const box = modelBBox(model);
@@ -29,74 +147,66 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
   const H = maxZ - minZ;
 
   const span = Math.max(W, D, H);
-  const gap = span * 0.22; // between views
-  const sw = Math.max(span * 0.0025, 0.5); // stroke width
-  const ts = Math.max(span * 0.03, 4); // title text size
-  const ds = ts * 0.7; // dimension text size
-  const dimOff = span * 0.13; // dimension line standoff
+  const gap = span * 0.22;
+  const sw = Math.max(span * 0.0025, 0.5);
+  const ts = Math.max(span * 0.03, 4);
+  const ds = ts * 0.7;
+  const dimOff = span * 0.13;
   const margin = span * 0.1;
 
-  // View origins in SVG space (y-down).
-  const xFrontLeft = margin + dimOff * 1.4; // room for the H dimension on the left
+  const xFrontLeft = margin + dimOff * 1.4;
   const topTop = margin;
   const frontTop = topTop + D + gap;
   const frontBottom = frontTop + H;
   const rightLeft = xFrontLeft + W + gap;
 
-  // 3D → SVG projections per view.
-  const fX = (x: number) => xFrontLeft + (x - minX);
-  const fY = (z: number) => frontBottom - (z - minZ);
-  const tY = (y: number) => topTop + (y - minY);
-  const rX = (y: number) => rightLeft + (maxY - y);
+  // Per-view projection (model mm → SVG) and depth (larger = nearer viewer).
+  const front: Proj = (x, _y, z) => [xFrontLeft + (x - minX), frontBottom - (z - minZ)];
+  const frontD: Depth = (_x, y) => y;
+  const top: Proj = (x, y) => [xFrontLeft + (x - minX), topTop + (y - minY)];
+  const topD: Depth = (_x, _y, z) => z;
+  const right: Proj = (_x, y, z) => [rightLeft + (maxY - y), frontBottom - (z - minZ)];
+  const rightD: Depth = (x) => x;
 
-  const parts: string[] = [];
-  const rect = (x0: number, y0: number, x1: number, y1: number) =>
-    `<rect x="${Math.min(x0, x1).toFixed(2)}" y="${Math.min(y0, y1).toFixed(2)}" width="${Math.abs(x1 - x0).toFixed(2)}" height="${Math.abs(y1 - y0).toFixed(2)}" fill="none" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`;
+  const pieces = collectPieces(inst);
+  const views = [
+    renderView(pieces, front, frontD, sw, span),
+    renderView(pieces, top, topD, sw, span),
+    renderView(pieces, right, rightD, sw, span),
+  ].join('\n');
 
-  for (const part of model.parts) {
-    const b = partBBox(part);
-    if (!b) continue;
-    parts.push(rect(fX(b.min[0]), fY(b.min[2]), fX(b.max[0]), fY(b.max[2]))); // front
-    parts.push(rect(fX(b.min[0]), tY(b.min[1]), fX(b.max[0]), tY(b.max[1]))); // top
-    parts.push(rect(rX(b.min[1]), fY(b.min[2]), rX(b.max[1]), fY(b.max[2]))); // right
-  }
-
-  // Dimension lines: extension lines, a line with end ticks, and a label.
-  const dims: string[] = [];
+  // Overall dimension lines with end ticks.
   const tick = ds * 0.5;
-  const dimText = (x: number, y: number, label: string, vertical = false) =>
+  const dims: string[] = [];
+  const lab = (x: number, y: number, label: string, vertical = false) =>
     `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" text-anchor="middle" font-family="sans-serif"${vertical ? ` transform="rotate(-90 ${x.toFixed(2)} ${y.toFixed(2)})"` : ''}>${esc(label)}</text>`;
-  const hDim = (x0: number, x1: number, y: number, label: string) => {
-    dims.push(
-      `<line x1="${x0.toFixed(2)}" y1="${y.toFixed(2)}" x2="${x1.toFixed(2)}" y2="${y.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
-      `<line x1="${x0.toFixed(2)}" y1="${(y - tick).toFixed(2)}" x2="${x0.toFixed(2)}" y2="${(y + tick).toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
-      `<line x1="${x1.toFixed(2)}" y1="${(y - tick).toFixed(2)}" x2="${x1.toFixed(2)}" y2="${(y + tick).toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
-      dimText((x0 + x1) / 2, y - tick, label),
-    );
-  };
-  const vDim = (y0: number, y1: number, x: number, label: string) => {
-    dims.push(
-      `<line x1="${x.toFixed(2)}" y1="${y0.toFixed(2)}" x2="${x.toFixed(2)}" y2="${y1.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
-      `<line x1="${(x - tick).toFixed(2)}" y1="${y0.toFixed(2)}" x2="${(x + tick).toFixed(2)}" y2="${y0.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
-      `<line x1="${(x - tick).toFixed(2)}" y1="${y1.toFixed(2)}" x2="${(x + tick).toFixed(2)}" y2="${y1.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`,
-      dimText(x - tick, (y0 + y1) / 2, label, true),
-    );
-  };
-  hDim(fX(minX), fX(maxX), frontBottom + dimOff, formatLength(W, units)); // width under front
-  vDim(fY(minZ), fY(maxZ), xFrontLeft - dimOff, formatLength(H, units)); // height left of front
-  hDim(rightLeft, rightLeft + D, frontBottom + dimOff, formatLength(D, units)); // depth under right
+  const dl = (x1: number, y1: number, x2: number, y2: number) =>
+    `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}" stroke="#1b1b1b" stroke-width="${sw.toFixed(3)}"/>`;
+  const yW = frontBottom + dimOff;
+  dims.push(dl(front(minX, 0, minZ)[0], yW, front(maxX, 0, minZ)[0], yW));
+  dims.push(dl(front(minX, 0, minZ)[0], yW - tick, front(minX, 0, minZ)[0], yW + tick));
+  dims.push(dl(front(maxX, 0, minZ)[0], yW - tick, front(maxX, 0, minZ)[0], yW + tick));
+  dims.push(lab((xFrontLeft + xFrontLeft + W) / 2, yW - tick, formatLength(W, units)));
+  const xH = xFrontLeft - dimOff;
+  dims.push(dl(xH, frontBottom, xH, frontTop));
+  dims.push(dl(xH - tick, frontBottom, xH + tick, frontBottom));
+  dims.push(dl(xH - tick, frontTop, xH + tick, frontTop));
+  dims.push(lab(xH - tick, (frontTop + frontBottom) / 2, formatLength(H, units), true));
+  dims.push(dl(rightLeft, yW, rightLeft + D, yW));
+  dims.push(dl(rightLeft, yW - tick, rightLeft, yW + tick));
+  dims.push(dl(rightLeft + D, yW - tick, rightLeft + D, yW + tick));
+  dims.push(lab(rightLeft + D / 2, yW - tick, formatLength(D, units)));
 
-  // View labels.
+  const viewLabel = (x: number, y: number, t: string) =>
+    `<text x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#888" text-anchor="middle" font-family="sans-serif">${t}</text>`;
   const labels = [
-    `<text x="${(xFrontLeft + W / 2).toFixed(2)}" y="${(frontBottom + dimOff + ds * 1.6).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#666" text-anchor="middle" font-family="sans-serif">FRONT</text>`,
-    `<text x="${(xFrontLeft + W / 2).toFixed(2)}" y="${(topTop - ds * 0.6).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#666" text-anchor="middle" font-family="sans-serif">TOP</text>`,
-    `<text x="${(rightLeft + D / 2).toFixed(2)}" y="${(frontBottom + dimOff + ds * 1.6).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#666" text-anchor="middle" font-family="sans-serif">RIGHT</text>`,
+    viewLabel(xFrontLeft + W / 2, yW + ds * 1.6, 'FRONT'),
+    viewLabel(xFrontLeft + W / 2, topTop - ds * 0.6, 'TOP'),
+    viewLabel(rightLeft + D / 2, yW + ds * 1.6, 'RIGHT'),
   ];
 
-  // Title block across the bottom.
   const contentRight = rightLeft + D;
   const titleY = frontBottom + dimOff + ds * 3;
-  const blockW = contentRight - margin;
   const title = [
     `<line x1="${margin.toFixed(2)}" y1="${titleY.toFixed(2)}" x2="${contentRight.toFixed(2)}" y2="${titleY.toFixed(2)}" stroke="#1b1b1b" stroke-width="${(sw * 1.5).toFixed(3)}"/>`,
     `<text x="${margin.toFixed(2)}" y="${(titleY + ts * 1.3).toFixed(2)}" font-size="${ts.toFixed(2)}" fill="#1b1b1b" font-family="sans-serif" font-weight="600">${esc(inst.name)}</text>`,
@@ -104,24 +214,23 @@ function instanceDrawing(inst: Instance, units: Units): Drawing {
     `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 1.3).toFixed(2)}" font-size="${ds.toFixed(2)}" fill="#1b1b1b" text-anchor="end" font-family="sans-serif">MEJA Designs · mejadesigns.com</text>`,
     `<text x="${contentRight.toFixed(2)}" y="${(titleY + ts * 2.6).toFixed(2)}" font-size="${(ds * 0.85).toFixed(2)}" fill="#999" text-anchor="end" font-family="sans-serif">Proprietary drawing — not for distribution</text>`,
   ];
-  void blockW;
 
-  const width = contentRight + margin;
-  const height = titleY + ts * 3.4;
-  return { content: [...parts, ...dims, ...labels, ...title].join('\n'), width, height };
+  return {
+    content: [views, ...dims, ...labels, ...title].join('\n'),
+    width: contentRight + margin,
+    height: titleY + ts * 3.4,
+  };
 }
 
 function wrap(content: string, width: number, height: number): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width.toFixed(2)} ${height.toFixed(2)}" width="${width.toFixed(2)}" height="${height.toFixed(2)}"><rect width="100%" height="100%" fill="#ffffff"/>${content}</svg>`;
 }
 
-/** A standalone SVG sheet for one piece (for inline display). */
 export function instanceShopDrawingSVG(inst: Instance, units: Units): string {
   const d = instanceDrawing(inst, units);
   return wrap(d.content, d.width, d.height);
 }
 
-/** One SVG file with every piece's sheet stacked vertically (for export). */
 export function shopDrawingsSVG(doc: ProjectDoc, units: Units): string {
   let y = 0;
   let maxW = 0;
@@ -130,7 +239,7 @@ export function shopDrawingsSVG(doc: ProjectDoc, units: Units): string {
     const d = instanceDrawing(inst, units);
     if (d.width === 0) continue;
     blocks.push(`<g transform="translate(0 ${y.toFixed(2)})">${d.content}</g>`);
-    y += d.height + d.height * 0.08;
+    y += d.height * 1.08;
     maxW = Math.max(maxW, d.width);
   }
   return wrap(blocks.join('\n'), maxW, Math.max(y, 1));
