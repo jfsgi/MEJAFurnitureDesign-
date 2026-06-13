@@ -169,7 +169,10 @@ function primCorners(prim: Primitive): [number, number, number][] {
     return corners;
   } else {
     const r = Math.max(prim.radiusTop, prim.radiusBottom);
-    [hx, hy, hz] = [r, r, prim.height / 2];
+    const half = prim.height / 2;
+    const ax = prim.axis ?? 'z';
+    // The cylinder's length lies along its axis; the radius spans the other two.
+    [hx, hy, hz] = ax === 'x' ? [half, r, r] : ax === 'y' ? [r, half, r] : [r, r, half];
   }
   const corners: [number, number, number][] = [];
   for (const sx of [-1, 1])

@@ -85,7 +85,10 @@ export type Primitive =
       radiusTop: number;
       radiusBottom: number;
       height: number;
-      at: [number, number, number]; // center; axis along Z
+      at: [number, number, number]; // center
+      /** Axis the cylinder runs along (default 'z', a standing post). Use 'x'
+       *  or 'y' for horizontal rods — dowel galley rails. */
+      axis?: 'x' | 'y' | 'z';
     }
   | {
       shape: 'roundedSlab';

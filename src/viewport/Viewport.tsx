@@ -187,8 +187,11 @@ function PrimitiveMesh({
   const userData = { partId };
 
   if (prim.shape === 'cylinder') {
+    const ax = prim.axis ?? 'z';
+    const rot: [number, number, number] =
+      ax === 'z' ? [Math.PI / 2, 0, 0] : ax === 'x' ? [0, 0, Math.PI / 2] : [0, 0, 0];
     return (
-      <mesh position={prim.at} rotation={[Math.PI / 2, 0, 0]} userData={userData}>
+      <mesh position={prim.at} rotation={rot} userData={userData}>
         <cylinderGeometry args={[prim.radiusTop, prim.radiusBottom, prim.height, 32]} />
         {material}
         {edges}

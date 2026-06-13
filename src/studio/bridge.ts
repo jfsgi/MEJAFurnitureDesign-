@@ -165,7 +165,10 @@ export function buildStudioGroup(doc: ProjectDoc, materials: MaterialLibrary): T
             prim.height,
             48,
           );
-          rotation.x = Math.PI / 2;
+          // CylinderGeometry runs along local Y; rotate to the model axis.
+          const ax = prim.axis ?? 'z';
+          if (ax === 'z') rotation.x = Math.PI / 2;
+          else if (ax === 'x') rotation.z = Math.PI / 2;
           grain = 'y'; // along the cylinder axis pre-rotation
         }
         applyBoxUVs(geometry, ENGINE_TILE_MM, grain, offsetU, offset[1]);

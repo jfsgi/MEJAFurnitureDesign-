@@ -643,6 +643,43 @@ describe('spice rack', () => {
   });
 });
 
+describe('spice rack pull-out', () => {
+  const def = REGISTRY['spice-pullout'];
+
+  it('builds four posts, a shelf per tier, and dowel galley rails', () => {
+    const model = def.generate(defaultParams(def));
+    const names = model.parts.map((p) => p.name);
+    expect(names.filter((n) => n === 'Corner post')).toHaveLength(4);
+    expect(names.filter((n) => n === 'Bottom shelf')).toHaveLength(1);
+    expect(names.filter((n) => n === 'Shelf')).toHaveLength(2); // tiers − 1 at default tiers = 3
+    // tiers × 2 sides × railRows + 2 top tie rails = 3·2·2 + 2
+    expect(names.filter((n) => n === 'Galley rail')).toHaveLength(14);
+  });
+
+  it('runs the rails as horizontal dowels along the depth', () => {
+    const model = def.generate(defaultParams(def));
+    const rail = model.parts.find((p) => p.name === 'Galley rail')!;
+    const prim = rail.primitives[0] as { shape: string; axis?: string };
+    expect(prim.shape).toBe('cylinder');
+    expect(prim.axis).toBe('y');
+  });
+
+  it('stands on the floor and fills its width, depth, and height', () => {
+    const base = defaultParams(def);
+    const box = modelBBox(def.generate(base))!;
+    expect(box.min[2]).toBeCloseTo(0, 0);
+    expect(box.max[0] - box.min[0]).toBeCloseTo(base.width as number, 5);
+    expect(box.max[1] - box.min[1]).toBeCloseTo(base.depth as number, 5);
+    expect(box.max[2] - box.min[2]).toBeCloseTo(base.height as number, 5);
+  });
+
+  it('adds rails as the shelf count and rows grow', () => {
+    const base = defaultParams(def);
+    const more = def.generate({ ...base, tiers: 4, railRows: 3 });
+    expect(more.parts.filter((p) => p.name === 'Galley rail')).toHaveLength(4 * 2 * 3 + 2);
+  });
+});
+
 describe('parameter → part mapping (adjustment highlighting)', () => {
   const inst = (componentId: string): Instance => ({
     id: 'i',

@@ -45,7 +45,9 @@ function primitiveGeometry(prim: Primitive): { geometry: THREE.BufferGeometry; r
     if (prim.interfaceAxis === 'y') geometry.rotateZ(Math.PI / 2);
   } else {
     geometry = new THREE.CylinderGeometry(prim.radiusTop, prim.radiusBottom, prim.height, 48);
-    rotation.x = Math.PI / 2;
+    const ax = prim.axis ?? 'z';
+    if (ax === 'z') rotation.x = Math.PI / 2;
+    else if (ax === 'x') rotation.z = Math.PI / 2;
   }
   return { geometry, rotation };
 }
