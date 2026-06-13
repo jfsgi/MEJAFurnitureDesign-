@@ -164,8 +164,10 @@ function PrimitiveMesh({
   // brightens neutrally (a color tint would distort wood tones). The exact part under
   // the cursor brightens a step further than the rest of its assembly.
   const highlight = hovered && !selected;
-  // A completed joint tints its parts green (unless the part is also under
-  // the cursor / picked, where the white highlight wins for clarity).
+  // A part in a completed joint gets a light green wash so it reads as
+  // "jointed", but the actual joints are pinpointed by the green markers at
+  // each meeting point (see JointMarkers) — the wash alone can't show which
+  // end carries a joint.
   const showJointed = jointed && !partHovered;
   const material = (
     <meshStandardMaterial
@@ -174,7 +176,7 @@ function PrimitiveMesh({
       roughness={mat.roughness}
       metalness={mat.metalness}
       emissive={showJointed ? '#2bd47a' : highlight || selected || partHovered ? '#ffffff' : '#000000'}
-      emissiveIntensity={showJointed ? 0.22 : partHovered ? 0.15 : highlight ? 0.08 : selected ? 0.04 : 0}
+      emissiveIntensity={showJointed ? 0.1 : partHovered ? 0.15 : highlight ? 0.08 : selected ? 0.04 : 0}
       side={prim.shape === 'frenchDovetail' ? THREE.DoubleSide : THREE.FrontSide}
     />
   );
@@ -271,6 +273,30 @@ function InstanceGroup({ inst }: { inst: Instance }) {
     }
     return set;
   }, [jointMode, inst.joints]);
+  // A marker at every completed joint's meeting point — so a rail jointed at
+  // both ends shows two markers, and an un-jointed part shows none.
+  const jointMarkers = useMemo(() => {
+    if (!jointMode || !inst.joints || Object.keys(inst.joints).length === 0) return [];
+    const boxes = new Map(model.parts.map((p) => [p.id, partBBox(p)] as const));
+    let span = 0;
+    for (const b of boxes.values())
+      if (b) span = Math.max(span, b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+    const r = Math.min(Math.max(span * 0.014, inch(0.3)), inch(0.7));
+    const out: { key: string; at: [number, number, number]; r: number }[] = [];
+    for (const key of Object.keys(inst.joints)) {
+      const [idA, idB] = key.split('|');
+      const ba = boxes.get(idA);
+      const bb = boxes.get(idB);
+      if (!ba || !bb) continue;
+      const at = [0, 1, 2].map((i) => {
+        const lo = Math.max(ba.min[i], bb.min[i]);
+        const hi = Math.min(ba.max[i], bb.max[i]);
+        return (lo + hi) / 2;
+      }) as [number, number, number];
+      out.push({ key, at, r });
+    }
+    return out;
+  }, [jointMode, inst.joints, model]);
   const snap = useStore((s) => s.snap);
   const units = useStore((s) => s.doc.units);
   const { select, hover, setHoveredPart, setPosition, beginGesture, endGesture } =
@@ -400,6 +426,21 @@ function InstanceGroup({ inst }: { inst: Instance }) {
           </group>
         );
       })}
+      {jointMarkers.map((m) => (
+        <mesh key={m.key} position={m.at} renderOrder={999} raycast={() => null}>
+          <sphereGeometry args={[m.r, 20, 20]} />
+          <meshStandardMaterial
+            color="#15803d"
+            emissive="#22c55e"
+            emissiveIntensity={0.6}
+            roughness={0.4}
+            metalness={0}
+            transparent
+            opacity={0.95}
+            depthTest={false}
+          />
+        </mesh>
+      ))}
     </group>
   );
 }
